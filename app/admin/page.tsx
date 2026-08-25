@@ -301,28 +301,41 @@ export default function AdminDashboardPage() {
   const handleOpenDeleteModal = (item: PriceMatrixItem) => {
     setDeletingItem(item);
     setIsDeleteModalOpen(true);
+    setDeleteLoading(false);
   };
 
-  // Confirm Delete Action
+  // Close Delete Modal
+  const handleCloseDeleteModal = () => {
+    if (deleteLoading) return;
+    setIsDeleteModalOpen(false);
+    setDeletingItem(null);
+    setDeleteLoading(false);
+  };
+
+  // Confirm Delete Action with guaranteed finally UI cleanup
   const handleConfirmDelete = async () => {
     if (!deletingItem) return;
+    const targetId = deletingItem.id;
     setDeleteLoading(true);
 
     try {
       if (isFirebaseConfigured && db) {
-        const docRef = doc(db, "price_matrix", deletingItem.id);
+        const docRef = doc(db, "price_matrix", targetId);
         await deleteDoc(docRef);
       } else {
-        const updated = items.filter((i) => i.id !== deletingItem.id);
+        const updated = items.filter((i) => i.id !== targetId);
         saveDemoData(updated);
       }
 
-      setIsDeleteModalOpen(false);
-      setDeletingItem(null);
+      // Immediately filter out deleted item from state for instant UI table update
+      setItems((prevItems) => prevItems.filter((i) => i.id !== targetId));
     } catch (err) {
       console.error("Delete document error:", err);
     } finally {
+      // Always close modal and reset loading state in finally block to prevent UI freeze
       setDeleteLoading(false);
+      setIsDeleteModalOpen(false);
+      setDeletingItem(null);
     }
   };
 
@@ -801,7 +814,7 @@ export default function AdminDashboardPage() {
             <div className="pt-3 border-t border-neutral-800 flex items-center justify-end space-x-3">
               <button
                 type="button"
-                onClick={() => setIsDeleteModalOpen(false)}
+                onClick={handleCloseDeleteModal}
                 disabled={deleteLoading}
                 className="bg-neutral-950 hover:bg-neutral-800 text-neutral-400 hover:text-white border border-neutral-800 px-4 py-2 text-xs font-mono transition rounded-none"
               >
