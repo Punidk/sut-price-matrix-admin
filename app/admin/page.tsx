@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { db, isFirebaseConfigured } from "@/lib/firebase";
@@ -12,6 +12,7 @@ import {
   deleteDoc,
   doc,
   serverTimestamp,
+  getDocs,
 } from "firebase/firestore";
 import {
   ShieldCheck,
@@ -117,7 +118,7 @@ export default function AdminDashboardPage() {
   const [sortField, setSortField] = useState<"itemName" | "maxPrice" | "category">("itemName");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
-  // Modal Control States
+  // Modal Control States (Add / Edit)
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<PriceMatrixItem | null>(null);
 
@@ -129,9 +130,11 @@ export default function AdminDashboardPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [formSubmitting, setFormSubmitting] = useState(false);
 
-  // Confirm Delete Modal State
+  // Confirm Delete Modal State & Compatibility Aliases
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletingItem, setDeletingItem] = useState<PriceMatrixItem | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<PriceMatrixItem | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
   // 1. Auth Guard Protection
@@ -141,20 +144,43 @@ export default function AdminDashboardPage() {
     }
   }, [user, authLoading, router]);
 
+  // Fetch / Reload Items from Firestore
+  const fetchItems = useCallback(async () => {
+    if (isFirebaseConfigured && db) {
+      try {
+        const matrixCollectionRef = collection(db, "price_matrix");
+        const snapshot = await getDocs(matrixCollectionRef);
+        const list: PriceMatrixItem[] = snapshot.docs.map((docSnap) => {
+          const data = docSnap.data();
+          return {
+            id: docSnap.id,
+            itemName: data.itemName || "",
+            category: data.category || "อื่นๆ",
+            maxPrice: Number(data.maxPrice) || 0,
+            unit: data.unit || "",
+            updatedAt: data.updatedAt?.toMillis ? data.updatedAt.toMillis() : Date.now(),
+          };
+        });
+        setItems(list);
+      } catch (err) {
+        console.error("Fetch items error:", err);
+      }
+    }
+  }, []);
+
   // 2. Real-time Firestore Subscription (Collection: `price_matrix`)
   useEffect(() => {
     if (!user) return;
 
     if (isFirebaseConfigured && db) {
-      // Connect to Firestore collection: price_matrix
       const matrixCollectionRef = collection(db, "price_matrix");
       const unsubscribe = onSnapshot(
         matrixCollectionRef,
         (snapshot) => {
-          const list: PriceMatrixItem[] = snapshot.docs.map((doc) => {
-            const data = doc.data();
+          const list: PriceMatrixItem[] = snapshot.docs.map((docSnap) => {
+            const data = docSnap.data();
             return {
-              id: doc.id,
+              id: docSnap.id,
               itemName: data.itemName || "",
               category: data.category || "อื่นๆ",
               maxPrice: Number(data.maxPrice) || 0,
@@ -246,7 +272,6 @@ export default function AdminDashboardPage() {
     try {
       if (isFirebaseConfigured && db) {
         if (editingItem) {
-          // Update existing doc in Firestore price_matrix
           const docRef = doc(db, "price_matrix", editingItem.id);
           await updateDoc(docRef, {
             itemName: itemName.trim(),
@@ -256,7 +281,6 @@ export default function AdminDashboardPage() {
             updatedAt: serverTimestamp(),
           });
         } else {
-          // Add new doc to Firestore price_matrix
           const collectionRef = collection(db, "price_matrix");
           await addDoc(collectionRef, {
             itemName: itemName.trim(),
@@ -267,7 +291,6 @@ export default function AdminDashboardPage() {
           });
         }
       } else {
-        // Local Demo Mode
         if (editingItem) {
           const updated = items.map((i) =>
             i.id === editingItem.id
@@ -300,7 +323,9 @@ export default function AdminDashboardPage() {
   // Open Confirm Delete Modal
   const handleOpenDeleteModal = (item: PriceMatrixItem) => {
     setDeletingItem(item);
+    setItemToDelete(item);
     setIsDeleteModalOpen(true);
+    setShowDeleteModal(true);
     setDeleteLoading(false);
   };
 
@@ -308,41 +333,50 @@ export default function AdminDashboardPage() {
   const handleCloseDeleteModal = () => {
     if (deleteLoading) return;
     setIsDeleteModalOpen(false);
+    setShowDeleteModal(false);
     setDeletingItem(null);
+    setItemToDelete(null);
     setDeleteLoading(false);
   };
 
-  // Confirm Delete Action with explicit immediate modal close
-  const handleConfirmDelete = async () => {
-    if (!deletingItem) return;
-    const targetId = deletingItem.id;
+  // Strict Delete Action Function (handleDelete / handleConfirmDelete)
+  const handleDelete = async () => {
+    const targetItem = deletingItem || itemToDelete;
+    if (!targetItem) return;
+    const targetId = targetItem.id;
+
+    // 1. ก่อนเริ่มลบ: เซ็ต Loading เป็น true
     setDeleteLoading(true);
 
     try {
+      // 2. ใน try: รันคำสั่ง deleteDoc จาก Firestore และเรียกฟังก์ชันดึงข้อมูลใหม่มาแสดง
       if (isFirebaseConfigured && db) {
         const docRef = doc(db, "price_matrix", targetId);
         await deleteDoc(docRef);
+        await fetchItems();
       } else {
         const updated = items.filter((i) => i.id !== targetId);
         saveDemoData(updated);
       }
-
-      // บังคับสั่งปิด Modal และรีเซ็ต Item ที่เลือกลบให้เป็น null ทันทีหลังลบสำเร็จ
-      setIsDeleteModalOpen(false);
-      setDeletingItem(null);
-      setDeleteLoading(false);
 
       // อัปเดตข้อมูลตารางแบบ Real-time ทันที
       setItems((prevItems) => prevItems.filter((i) => i.id !== targetId));
     } catch (err) {
       console.error("Delete document error:", err);
     } finally {
-      // บังคับปิด Modal และล้างสถานะใน finally block อีกครั้งเพื่อความชัวร์ 100%
-      setIsDeleteModalOpen(false);
-      setDeletingItem(null);
+      // 3. ใน finally (สำคัญมาก):
+      // - เซ็ตสถานะ Loading กลับเป็น false
+      // - เซ็ต State เพื่อปิด Modal ทันที (setIsDeleteModalOpen / setShowDeleteModal)
+      // - เคลียร์ค่า Item ที่เลือกลบให้เป็น null (setDeletingItem / setItemToDelete)
       setDeleteLoading(false);
+      setIsDeleteModalOpen(false);
+      setShowDeleteModal(false);
+      setDeletingItem(null);
+      setItemToDelete(null);
     }
   };
+
+  const handleConfirmDelete = handleDelete;
 
   // Filtered & Sorted items calculation
   const filteredItems = useMemo(() => {
@@ -389,6 +423,9 @@ export default function AdminDashboardPage() {
       </div>
     );
   }
+
+  const activeDeleteTarget = deletingItem || itemToDelete;
+  const isDeleteActive = (isDeleteModalOpen || showDeleteModal) && Boolean(activeDeleteTarget);
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col font-sans selection:bg-white selection:text-black">
@@ -792,8 +829,8 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* 5. Delete Confirm Modal */}
-      {isDeleteModalOpen && deletingItem && (
+      {/* 5. Strict Delete Confirm Modal */}
+      {isDeleteActive && activeDeleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs font-sans">
           <div className="bg-neutral-900 border border-neutral-700 w-full max-w-md shadow-2xl rounded-none p-6 space-y-5">
             <div className="flex items-start space-x-3.5">
@@ -812,8 +849,8 @@ export default function AdminDashboardPage() {
 
             <div className="bg-neutral-950 border border-neutral-800 p-3 text-xs font-mono text-white space-y-1">
               <span className="text-neutral-500 uppercase text-[10px] block">รายการที่จะลบ:</span>
-              <div className="font-semibold text-sm">{deletingItem.itemName}</div>
-              <div className="text-neutral-400">ราคากลาง: ฿{deletingItem.maxPrice} / {deletingItem.unit}</div>
+              <div className="font-semibold text-sm">{activeDeleteTarget.itemName}</div>
+              <div className="text-neutral-400">ราคากลาง: ฿{activeDeleteTarget.maxPrice} / {activeDeleteTarget.unit}</div>
             </div>
 
             <div className="pt-3 border-t border-neutral-800 flex items-center justify-end space-x-3">
@@ -821,15 +858,15 @@ export default function AdminDashboardPage() {
                 type="button"
                 onClick={handleCloseDeleteModal}
                 disabled={deleteLoading}
-                className="bg-neutral-950 hover:bg-neutral-800 text-neutral-400 hover:text-white border border-neutral-800 px-4 py-2 text-xs font-mono transition rounded-none"
+                className="bg-neutral-950 hover:bg-neutral-800 text-neutral-400 hover:text-white border border-neutral-800 px-4 py-2 text-xs font-mono transition rounded-none disabled:opacity-50"
               >
                 ยกเลิก
               </button>
               <button
                 type="button"
-                onClick={handleConfirmDelete}
+                onClick={handleDelete}
                 disabled={deleteLoading}
-                className="bg-white hover:bg-neutral-200 text-black font-semibold border border-white px-5 py-2 text-xs font-mono transition rounded-none flex items-center space-x-1.5"
+                className="bg-white hover:bg-neutral-200 text-black font-semibold border border-white px-5 py-2 text-xs font-mono transition rounded-none flex items-center space-x-1.5 disabled:opacity-50"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>{deleteLoading ? "กำลังลบ..." : "ยืนยันการลบ"}</span>
