@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { db, isFirebaseConfigured } from "@/lib/firebase";
@@ -27,9 +27,11 @@ import {
   Filter,
   ArrowUpDown,
   Info,
-  Utensils,
-  Briefcase,
-  Wrench,
+  Sparkles,
+  UploadCloud,
+  RefreshCw,
+  FileText,
+  CheckCircle2,
 } from "lucide-react";
 
 export interface PriceMatrixItem {
@@ -42,7 +44,7 @@ export interface PriceMatrixItem {
 }
 
 const CATEGORIES = ["อาหาร", "อุปกรณ์สำนักงาน", "บริการ", "อื่นๆ"];
-const LOCAL_STORAGE_KEY = "sut_price_matrix_collection_demo";
+const IMGBB_API_KEY = "5f6ccb81e79ea0735182d9a7870bff69";
 
 export default function AdminDashboardPage() {
   const { user, loading: authLoading, logout, isDemoMode } = useAuth();
@@ -56,13 +58,23 @@ export default function AdminDashboardPage() {
   const [sortField, setSortField] = useState<"itemName" | "maxPrice" | "category">("itemName");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
-  // ล้าง State ขยะทิ้งหมด เหลือแค่ตัวเดียวที่คุมหน้าต่าง Add/Edit
+  // ควบคุมหน้าต่าง Add / Edit
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<PriceMatrixItem | null>(null);
 
   // ควบคุมหน้าต่าง Delete
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deletingItem, setDeletingItem] = useState<PriceMatrixItem | null>(null);
+
+  // ควบคุมหน้าต่าง AI Scan Matrix Modal
+  const [isAIScanModalOpen, setIsAIScanModalOpen] = useState(false);
+  const [aiScanFile, setAiScanFile] = useState<File | null>(null);
+  const [aiScanPreview, setAiScanPreview] = useState<string | null>(null);
+  const [aiScanStep, setAiScanStep] = useState(0); // 0: idle, 1: upload ImgBB, 2: extract Gemini, 3: saving Firestore
+  const [aiScanStatusText, setAiScanStatusText] = useState("");
+  const [aiScanError, setAiScanError] = useState<string | null>(null);
+
+  const aiFileInputRef = useRef<HTMLInputElement>(null);
 
   const [itemName, setItemName] = useState("");
   const [category, setCategory] = useState("อาหาร");
@@ -225,6 +237,145 @@ export default function AdminDashboardPage() {
     }
   };
 
+  // --- AI Scan Matrix Modal Handlers ---
+  const handleOpenAIScanModal = () => {
+    setAiScanFile(null);
+    setAiScanPreview(null);
+    setAiScanStep(0);
+    setAiScanStatusText("");
+    setAiScanError(null);
+    setIsAIScanModalOpen(true);
+  };
+
+  const handleCloseAIScanModal = () => {
+    if (aiScanStep > 0) return; // Prevent closing while processing
+    setIsAIScanModalOpen(false);
+    setAiScanFile(null);
+    setAiScanPreview(null);
+    setAiScanStep(0);
+    setAiScanStatusText("");
+    setAiScanError(null);
+  };
+
+  const handleAIScanFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setAiScanFile(file);
+      setAiScanError(null);
+      if (file.type.startsWith("image/")) {
+        setAiScanPreview(URL.createObjectURL(file));
+      } else {
+        setAiScanPreview(null);
+      }
+    }
+  };
+
+  // Automated AI Extraction & Firestore Batch Upload
+  const handleAIScanSubmit = async () => {
+    if (!aiScanFile) return;
+
+    setAiScanError(null);
+
+    try {
+      // 1. Uploading image to ImgBB
+      setAiScanStep(1);
+      setAiScanStatusText("กำลังอัปโหลดรูปเอกสารไปยัง ImgBB...");
+
+      const formData = new FormData();
+      formData.append("key", IMGBB_API_KEY);
+      formData.append("image", aiScanFile);
+
+      const resImgBB = await fetch("https://api.imgbb.com/1/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!resImgBB.ok) {
+        throw new Error(`อัปโหลดรูปภาพไปที่ ImgBB ไม่สำเร็จ (HTTP Status ${resImgBB.status})`);
+      }
+
+      const imgBBData = await resImgBB.json();
+      if (!imgBBData.success || !imgBBData.data?.url) {
+        throw new Error(imgBBData.error?.message || "ไม่สามารถรับ URL รูปภาพจาก ImgBB ได้");
+      }
+
+      const directUrl = imgBBData.data.url;
+
+      // 2. Extract Matrix Table via Gemini AI API
+      setAiScanStep(2);
+      setAiScanStatusText("กำลังให้ Gemini AI อ่านและสกัดตารางราคากลาง...");
+
+      const resExtract = await fetch("/api/extract-matrix", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageUrl: directUrl }),
+      });
+
+      if (!resExtract.ok) {
+        const errJson = await resExtract.json().catch(() => ({}));
+        throw new Error(errJson.details || errJson.error || "ไม่สามารถสกัดข้อมูลจากรูปภาพด้วย Gemini AI ได้");
+      }
+
+      const extractedItems: Array<{
+        itemName: string;
+        category: string;
+        maxPrice: number;
+        unit: string;
+      }> = await resExtract.json();
+
+      if (!Array.isArray(extractedItems) || extractedItems.length === 0) {
+        throw new Error("Gemini AI ไม่พบข้อมูลรายการราคากลางในรูปภาพนี้");
+      }
+
+      // 3. Saving Extracted Items to Firestore collection `price_matrix`
+      setAiScanStep(3);
+      setAiScanStatusText(`กำลังบันทึกรายการราคากลางใหม่ ${extractedItems.length} รายการ ลงฐานข้อมูล Firestore (price_matrix)...`);
+
+      const newLocalItems: PriceMatrixItem[] = [];
+
+      for (const itemData of extractedItems) {
+        const formattedItem = {
+          itemName: itemData.itemName || "รายการไม่มีชื่อ",
+          category: CATEGORIES.includes(itemData.category) ? itemData.category : "อื่นๆ",
+          maxPrice: Number(itemData.maxPrice) || 0,
+          unit: itemData.unit || "รายการ",
+        };
+
+        if (isFirebaseConfigured && db) {
+          const docRef = await addDoc(collection(db, "price_matrix"), {
+            ...formattedItem,
+            updatedAt: serverTimestamp(),
+          });
+          newLocalItems.push({
+            id: docRef.id,
+            ...formattedItem,
+            updatedAt: Date.now(),
+          });
+        } else {
+          newLocalItems.push({
+            id: `pm-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+            ...formattedItem,
+            updatedAt: Date.now(),
+          });
+        }
+      }
+
+      // Update table local state immediately
+      setItems((prev) => [...newLocalItems, ...prev]);
+
+      // Complete & Close Modal
+      setIsAIScanModalOpen(false);
+      setAiScanFile(null);
+      setAiScanPreview(null);
+      setAiScanStep(0);
+      setAiScanStatusText("");
+    } catch (err: any) {
+      console.error("AI Scan submit error:", err);
+      setAiScanError(err.message || "เกิดข้อผิดพลาดในการสกัดราคากลางด้วย AI");
+      setAiScanStep(0);
+    }
+  };
+
   const filteredItems = useMemo(() => {
     return items
       .filter((item) => {
@@ -320,7 +471,7 @@ export default function AdminDashboardPage() {
           </div>
         )}
 
-        {/* Header & Stats Overview */}
+        {/* Header & Stats Overview with AI Button */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
             <div className="text-xs font-mono text-neutral-500 uppercase tracking-wider">
@@ -330,13 +481,26 @@ export default function AdminDashboardPage() {
               จัดการฐานข้อมูลราคากลาง
             </h2>
           </div>
-          <button
-            onClick={handleOpenCreateModal}
-            className="bg-white hover:bg-neutral-200 text-black font-semibold font-mono text-xs py-2.5 px-4 transition border border-white flex items-center justify-center space-x-2 rounded-none shadow-sm"
-          >
-            <Plus className="w-4 h-4 stroke-[2.5]" />
-            <span>เพิ่มรายการราคากลางใหม่</span>
-          </button>
+
+          <div className="flex items-center space-x-3">
+            {/* AI Matrix Scan Button */}
+            <button
+              onClick={handleOpenAIScanModal}
+              className="bg-amber-400 hover:bg-amber-300 text-black font-bold font-mono text-xs py-2.5 px-4 transition border border-amber-400 flex items-center justify-center space-x-2 rounded-none shadow-sm"
+            >
+              <Sparkles className="w-4 h-4 stroke-[2.5]" />
+              <span>สแกนจากรูปภาพ (AI)</span>
+            </button>
+
+            {/* Create Item Button */}
+            <button
+              onClick={handleOpenCreateModal}
+              className="bg-white hover:bg-neutral-200 text-black font-semibold font-mono text-xs py-2.5 px-4 transition border border-white flex items-center justify-center space-x-2 rounded-none shadow-sm"
+            >
+              <Plus className="w-4 h-4 stroke-[2.5]" />
+              <span>เพิ่มรายการราคากลางใหม่</span>
+            </button>
+          </div>
         </div>
 
         {/* Data Table Section */}
@@ -431,7 +595,7 @@ export default function AdminDashboardPage() {
         </div>
       </main>
 
-      {/* Add / Edit Modal */}
+      {/* 1. Add / Edit Modal */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs font-sans">
           <div className="bg-neutral-900 border border-neutral-700 w-full max-w-lg shadow-2xl rounded-none overflow-hidden space-y-0">
@@ -483,7 +647,7 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* Delete Modal */}
+      {/* 2. Delete Modal */}
       {isDeleteModalOpen && deletingItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs font-sans">
           <div className="bg-neutral-900 border border-neutral-700 w-full max-w-md shadow-2xl rounded-none p-6 space-y-5">
@@ -502,6 +666,132 @@ export default function AdminDashboardPage() {
             <div className="pt-3 border-t border-neutral-800 flex items-center justify-end space-x-3">
               <button type="button" onClick={handleCloseDeleteModal} className="bg-neutral-950 hover:bg-neutral-800 text-neutral-400 border border-neutral-800 px-4 py-2 text-xs font-mono transition rounded-none">ยกเลิก</button>
               <button type="button" onClick={handleDelete} className="bg-white hover:bg-neutral-200 text-black font-semibold border border-white px-5 py-2 text-xs font-mono transition rounded-none flex items-center space-x-1.5"><Trash2 className="w-3.5 h-3.5" /><span>ยืนยันการลบ</span></button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 3. AI Scan Matrix Modal */}
+      {isAIScanModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs font-sans">
+          <div className="bg-neutral-900 border border-neutral-700 w-full max-w-lg shadow-2xl rounded-none overflow-hidden space-y-0">
+            <div className="bg-neutral-950 px-6 py-4 border-b border-neutral-800 flex items-center justify-between">
+              <div className="flex items-center space-x-2.5">
+                <Sparkles className="w-5 h-5 text-amber-400" />
+                <h3 className="text-base font-bold font-mono uppercase tracking-tight text-white">
+                  สแกนราคากลางจากรูปภาพด้วย Gemini AI
+                </h3>
+              </div>
+              <button
+                onClick={handleCloseAIScanModal}
+                disabled={aiScanStep > 0}
+                className="text-neutral-400 hover:text-white p-1 transition disabled:opacity-30"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5">
+              {aiScanError && (
+                <div className="bg-neutral-950 border border-neutral-700 p-3 text-xs font-mono text-neutral-200 flex items-start space-x-2">
+                  <AlertTriangle className="w-4 h-4 text-white shrink-0 mt-0.5" />
+                  <span>{aiScanError}</span>
+                </div>
+              )}
+
+              {!aiScanFile ? (
+                <div
+                  onClick={() => aiFileInputRef.current?.click()}
+                  className="border-2 border-dashed border-neutral-700 hover:border-amber-400 bg-neutral-950 p-8 text-center cursor-pointer transition space-y-3 group"
+                >
+                  <div className="w-12 h-12 bg-neutral-900 border border-neutral-800 text-amber-400 flex items-center justify-center mx-auto group-hover:scale-105 transition-transform">
+                    <UploadCloud className="w-6 h-6" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-bold text-white">คลิกเพื่ออัปโหลดรูปภาพประกาศราคากลาง</p>
+                    <p className="text-xs text-neutral-500 font-mono">รองรับไฟล์รูปภาพ JPG, PNG (ตารางประกาศราคากลาง)</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between bg-neutral-950 p-3 border border-neutral-800 text-xs font-mono">
+                    <div className="flex items-center space-x-2 truncate">
+                      <FileText className="w-4 h-4 text-amber-400 shrink-0" />
+                      <span className="text-white truncate">{aiScanFile.name}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setAiScanFile(null)}
+                      disabled={aiScanStep > 0}
+                      className="text-neutral-500 hover:text-white ml-2 shrink-0 disabled:opacity-30"
+                    >
+                      เปลี่ยนรูป
+                    </button>
+                  </div>
+
+                  {aiScanPreview && (
+                    <div className="bg-neutral-950 border border-neutral-800 max-h-56 flex items-center justify-center overflow-hidden p-2">
+                      {/* eslint-disable-next-html-element-suppression */}
+                      <img src={aiScanPreview} alt="Matrix Document" className="max-h-52 object-contain" />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <input
+                type="file"
+                ref={aiFileInputRef}
+                accept="image/*"
+                onChange={handleAIScanFileChange}
+                className="hidden"
+              />
+
+              {/* Step Progress Display */}
+              {aiScanStep > 0 && (
+                <div className="bg-neutral-950 border border-neutral-800 p-4 space-y-2 font-mono text-xs">
+                  <div className="flex items-center space-x-2 text-amber-400 font-bold">
+                    <RefreshCw className="w-4 h-4 animate-spin shrink-0" />
+                    <span>{aiScanStatusText}</span>
+                  </div>
+                  <div className="w-full bg-neutral-800 h-1.5 rounded-none overflow-hidden">
+                    <div
+                      className="bg-amber-400 h-full transition-all duration-300"
+                      style={{
+                        width: aiScanStep === 1 ? "35%" : aiScanStep === 2 ? "70%" : "95%",
+                      }}
+                    ></div>
+                  </div>
+                </div>
+              )}
+
+              <div className="pt-4 border-t border-neutral-800 flex items-center justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={handleCloseAIScanModal}
+                  disabled={aiScanStep > 0}
+                  className="bg-neutral-950 hover:bg-neutral-800 text-neutral-400 border border-neutral-800 px-4 py-2 text-xs font-mono transition rounded-none disabled:opacity-30"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAIScanSubmit}
+                  disabled={!aiScanFile || aiScanStep > 0}
+                  className="bg-amber-400 hover:bg-amber-300 text-black font-bold border border-amber-400 px-5 py-2 text-xs font-mono transition disabled:opacity-40 rounded-none flex items-center space-x-2"
+                >
+                  {aiScanStep > 0 ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>กำลังประมวลผล...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>เริ่มสแกนด้วย Gemini AI</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
