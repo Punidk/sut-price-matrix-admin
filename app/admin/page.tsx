@@ -312,7 +312,7 @@ export default function AdminDashboardPage() {
     setDeleteLoading(false);
   };
 
-  // Confirm Delete Action with guaranteed finally UI cleanup
+  // Confirm Delete Action with explicit immediate modal close
   const handleConfirmDelete = async () => {
     if (!deletingItem) return;
     const targetId = deletingItem.id;
@@ -327,15 +327,20 @@ export default function AdminDashboardPage() {
         saveDemoData(updated);
       }
 
-      // Immediately filter out deleted item from state for instant UI table update
+      // บังคับสั่งปิด Modal และรีเซ็ต Item ที่เลือกลบให้เป็น null ทันทีหลังลบสำเร็จ
+      setIsDeleteModalOpen(false);
+      setDeletingItem(null);
+      setDeleteLoading(false);
+
+      // อัปเดตข้อมูลตารางแบบ Real-time ทันที
       setItems((prevItems) => prevItems.filter((i) => i.id !== targetId));
     } catch (err) {
       console.error("Delete document error:", err);
     } finally {
-      // Always close modal and reset loading state in finally block to prevent UI freeze
-      setDeleteLoading(false);
+      // บังคับปิด Modal และล้างสถานะใน finally block อีกครั้งเพื่อความชัวร์ 100%
       setIsDeleteModalOpen(false);
       setDeletingItem(null);
+      setDeleteLoading(false);
     }
   };
 
