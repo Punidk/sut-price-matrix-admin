@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { db, isFirebaseConfigured } from "@/lib/firebase";
@@ -27,11 +27,9 @@ import {
   Filter,
   ArrowUpDown,
   Info,
-  CheckCircle2,
   Utensils,
   Briefcase,
   Wrench,
-  Grid,
 } from "lucide-react";
 
 // Data Model Interface
@@ -117,8 +115,10 @@ export default function AdminDashboardPage() {
   const [sortField, setSortField] = useState<"itemName" | "maxPrice" | "category">("itemName");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
-  // Modal Control States (Add / Edit)
+  // Modal Control States (Add / Edit) with Aliases
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState<PriceMatrixItem | null>(null);
 
   // Form Field States
@@ -128,6 +128,7 @@ export default function AdminDashboardPage() {
   const [unit, setUnit] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [formSubmitting, setFormSubmitting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Confirm Delete Modal State
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -201,7 +202,7 @@ export default function AdminDashboardPage() {
     }
   };
 
-  // Reset Form Inputs
+  // Reset Form Inputs completely
   const resetFormFields = () => {
     setItemName("");
     setCategory("อาหาร");
@@ -210,11 +211,14 @@ export default function AdminDashboardPage() {
     setEditingItem(null);
     setFormError(null);
     setFormSubmitting(false);
+    setIsSaving(false);
   };
 
   // Close Add/Edit Modal
   const handleCloseModal = () => {
     setIsModalOpen(false);
+    setShowAddModal(false);
+    setShowModal(false);
     resetFormFields();
   };
 
@@ -222,6 +226,8 @@ export default function AdminDashboardPage() {
   const handleOpenCreateModal = () => {
     resetFormFields();
     setIsModalOpen(true);
+    setShowAddModal(true);
+    setShowModal(true);
   };
 
   // Open Edit Modal
@@ -233,11 +239,13 @@ export default function AdminDashboardPage() {
     setUnit(item.unit);
     setFormError(null);
     setIsModalOpen(true);
+    setShowAddModal(true);
+    setShowModal(true);
   };
 
-  // Handle Form Submit (Create / Update in `price_matrix`)
-  const handleFormSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Form Submit Handler (handleFormSubmit / handleSave / handleAdd / handleUpdate / onSubmit)
+  const handleFormSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     setFormError(null);
 
     const priceNum = parseFloat(maxPrice);
@@ -256,12 +264,13 @@ export default function AdminDashboardPage() {
 
     // 1. เมื่อเริ่มบันทึก: เซ็ต Loading เป็น true
     setFormSubmitting(true);
+    setIsSaving(true);
 
     try {
       const formattedName = itemName.trim();
       const formattedUnit = unit.trim();
 
-      // 2. ใน try: รันคำสั่ง addDoc / updateDoc จาก Firestore
+      // 2. ใช้ try-catch-finally สำหรับการเรียก Firebase (addDoc / updateDoc)
       if (isFirebaseConfigured && db) {
         if (editingItem) {
           const docRef = doc(db, "price_matrix", editingItem.id);
@@ -284,7 +293,7 @@ export default function AdminDashboardPage() {
         }
       }
 
-      // 4. เมื่อเซฟสำเร็จ อัปเดตข้อมูลในตารางหน้าเว็บทันที
+      // 5. เมื่อเซฟสำเร็จ อัปเดตข้อมูลในตารางหน้าเว็บทันที
       if (editingItem) {
         setItems((prevItems) =>
           prevItems.map((i) =>
@@ -308,12 +317,15 @@ export default function AdminDashboardPage() {
       console.error("Save price matrix error:", err);
       setFormError(err.message || "เกิดข้อผิดพลาดในการบันทึกข้อมูล");
     } finally {
-      // 3. ใน block finally {}:
+      // 3. ใน block finally {} เด็ดขาด:
       // - เซ็ต Loading สถานะปุ่มกลับเป็น false
-      // - สั่งปิดหน้าต่าง Modal ทันที (setIsModalOpen(false))
-      // - เคลียร์ค่าในฟอร์มให้กลับมาเป็นค่าว่าง (Reset form states)
+      // - สั่งปิดหน้าต่าง Modal ทันที (setIsModalOpen(false) / setShowAddModal(false))
+      // - เคลียร์ค่าในฟอร์มให้กลับมาเป็นค่าว่าง (resetFormFields)
       setFormSubmitting(false);
+      setIsSaving(false);
       setIsModalOpen(false);
+      setShowAddModal(false);
+      setShowModal(false);
       resetFormFields();
     }
   };
@@ -321,6 +333,7 @@ export default function AdminDashboardPage() {
   const handleSave = handleFormSubmit;
   const handleAdd = handleFormSubmit;
   const handleUpdate = handleFormSubmit;
+  const onSubmit = handleFormSubmit;
 
   // Open Confirm Delete Modal
   const handleOpenDeleteModal = (item: PriceMatrixItem) => {
@@ -338,22 +351,19 @@ export default function AdminDashboardPage() {
     setItemToDelete(null);
   };
 
-  // Optimistic UI Delete Function (Instant Modal Close & Table Row Removal)
+  // Optimistic Delete Function
   const handleDelete = () => {
     const targetItem = deletingItem || itemToDelete;
     if (!targetItem) return;
     const targetId = targetItem.id;
 
-    // 1. ทันทีที่กด "ยืนยันการลบ": สั่งปิด Modal และเคลียร์ State ทันที!
     setIsDeleteModalOpen(false);
     setShowDeleteModal(false);
     setDeletingItem(null);
     setItemToDelete(null);
 
-    // 2. อัปเดต State ของตารางข้อมูลทันทีโดยใช้ .filter() เพื่อให้แถวหายไปทันตาเห็น
     setItems((prevItems) => prevItems.filter((i) => i.id !== targetId));
 
-    // 3. รันคำสั่งลบข้อมูล (deleteDoc) จาก Firestore ให้ไปทำงานอยู่เบื้องหลังเงียบๆ
     if (isFirebaseConfigured && db) {
       const docRef = doc(db, "price_matrix", targetId);
       deleteDoc(docRef).catch((err) => {
@@ -423,6 +433,8 @@ export default function AdminDashboardPage() {
 
   const activeDeleteTarget = deletingItem || itemToDelete;
   const isDeleteActive = (isDeleteModalOpen || showDeleteModal) && Boolean(activeDeleteTarget);
+  const isAddModalActive = isModalOpen || showAddModal || showModal;
+  const isSaveLoading = formSubmitting || isSaving;
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col font-sans selection:bg-white selection:text-black">
@@ -707,7 +719,7 @@ export default function AdminDashboardPage() {
       </main>
 
       {/* 4. Modal (Create / Edit Document) */}
-      {isModalOpen && (
+      {isAddModalActive && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs font-sans">
           <div className="bg-neutral-900 border border-neutral-700 w-full max-w-lg shadow-2xl rounded-none overflow-hidden space-y-0">
             
@@ -720,7 +732,7 @@ export default function AdminDashboardPage() {
                 </h3>
               </div>
               <button
-                onClick={() => setIsModalOpen(false)}
+                onClick={handleCloseModal}
                 className="text-neutral-400 hover:text-white p-1 border border-transparent hover:border-neutral-700 transition"
               >
                 <X className="w-5 h-5" />
@@ -806,18 +818,18 @@ export default function AdminDashboardPage() {
               <div className="pt-4 border-t border-neutral-800 flex items-center justify-end space-x-3">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={handleCloseModal}
                   className="bg-neutral-950 hover:bg-neutral-800 text-neutral-400 hover:text-white border border-neutral-800 px-4 py-2 text-xs font-mono transition rounded-none"
                 >
                   ยกเลิก (CANCEL)
                 </button>
                 <button
                   type="submit"
-                  disabled={formSubmitting}
+                  disabled={isSaveLoading}
                   className="bg-white hover:bg-neutral-200 text-black font-semibold border border-white px-5 py-2 text-xs font-mono transition disabled:opacity-50 rounded-none flex items-center space-x-2"
                 >
                   <Save className="w-3.5 h-3.5" />
-                  <span>{formSubmitting ? "กำลังบันทึก..." : editingItem ? "อัปเดตข้อมูล" : "บันทึกข้อมูล"}</span>
+                  <span>{isSaveLoading ? "กำลังบันทึก..." : editingItem ? "อัปเดตข้อมูล" : "บันทึกข้อมูล"}</span>
                 </button>
               </div>
             </form>
