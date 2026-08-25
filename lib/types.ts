@@ -6,6 +6,8 @@ export interface PriceMatrixItem {
   category: string;
   maxPrice: number;
   unit: string;
+  unitPrice?: number;
+  unitType?: string;
   updatedAt?: number;
 }
 

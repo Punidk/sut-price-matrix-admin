@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { PriceMatrixItem, CategoryType } from "@/lib/types";
+import { PriceMatrixItem } from "@/lib/types";
 import {
   Search,
   Edit2,
@@ -32,10 +32,9 @@ export default function PriceMatrixTable({
 }: PriceMatrixTableProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
-  const [sortField, setSortField] = useState<"itemName" | "unitPrice" | "category">("itemName");
+  const [sortField, setSortField] = useState<"itemName" | "maxPrice" | "category">("itemName");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
-  // Filtered & Sorted items calculation
   const filteredItems = useMemo(() => {
     return items
       .filter((item) => {
@@ -43,12 +42,17 @@ export default function PriceMatrixTable({
           .toLowerCase()
           .includes(searchTerm.toLowerCase().trim());
         const matchesCategory =
-          selectedCategory === "ALL" || item.category === selectedCategory;
+          selectedCategory === "ALL" ||
+          item.category === selectedCategory ||
+          (selectedCategory === "Food" && item.category === "อาหาร") ||
+          (selectedCategory === "Material" && item.category === "อุปกรณ์สำนักงาน") ||
+          (selectedCategory === "Service" && item.category === "บริการ") ||
+          (selectedCategory === "Other" && item.category === "อื่นๆ");
         return matchesSearch && matchesCategory;
       })
       .sort((a, b) => {
-        let valA = a[sortField];
-        let valB = b[sortField];
+        let valA: any = sortField === "maxPrice" ? (a.maxPrice ?? a.unitPrice ?? 0) : a[sortField];
+        let valB: any = sortField === "maxPrice" ? (b.maxPrice ?? b.unitPrice ?? 0) : b[sortField];
 
         if (typeof valA === "string") {
           valA = (valA as string).toLowerCase();
@@ -61,7 +65,7 @@ export default function PriceMatrixTable({
       });
   }, [items, searchTerm, selectedCategory, sortField, sortDirection]);
 
-  const toggleSort = (field: "itemName" | "unitPrice" | "category") => {
+  const toggleSort = (field: "itemName" | "maxPrice" | "category") => {
     if (sortField === field) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc");
     } else {
@@ -70,37 +74,37 @@ export default function PriceMatrixTable({
     }
   };
 
-  const getCategoryBadge = (cat: CategoryType) => {
-    switch (cat) {
-      case "Food":
-        return (
-          <span className="inline-flex items-center space-x-1 border border-neutral-700 bg-neutral-900 text-neutral-200 px-2 py-0.5 text-[11px] font-mono">
-            <UtensilsCrossed className="w-3 h-3 text-neutral-400" />
-            <span>Food</span>
-          </span>
-        );
-      case "Material":
-        return (
-          <span className="inline-flex items-center space-x-1 border border-neutral-700 bg-neutral-900 text-neutral-200 px-2 py-0.5 text-[11px] font-mono">
-            <Package className="w-3 h-3 text-neutral-400" />
-            <span>Material</span>
-          </span>
-        );
-      case "Service":
-        return (
-          <span className="inline-flex items-center space-x-1 border border-neutral-700 bg-neutral-900 text-neutral-200 px-2 py-0.5 text-[11px] font-mono">
-            <Wrench className="w-3 h-3 text-neutral-400" />
-            <span>Service</span>
-          </span>
-        );
-      default:
-        return (
-          <span className="inline-flex items-center space-x-1 border border-neutral-700 bg-neutral-900 text-neutral-200 px-2 py-0.5 text-[11px] font-mono">
-            <Grid className="w-3 h-3 text-neutral-400" />
-            <span>Other</span>
-          </span>
-        );
+  const getCategoryBadge = (cat: string) => {
+    if (cat === "Food" || cat === "อาหาร") {
+      return (
+        <span className="inline-flex items-center space-x-1 border border-neutral-700 bg-neutral-900 text-neutral-200 px-2 py-0.5 text-[11px] font-mono">
+          <UtensilsCrossed className="w-3 h-3 text-neutral-400" />
+          <span>{cat}</span>
+        </span>
+      );
     }
+    if (cat === "Material" || cat === "อุปกรณ์สำนักงาน") {
+      return (
+        <span className="inline-flex items-center space-x-1 border border-neutral-700 bg-neutral-900 text-neutral-200 px-2 py-0.5 text-[11px] font-mono">
+          <Package className="w-3 h-3 text-neutral-400" />
+          <span>{cat}</span>
+        </span>
+      );
+    }
+    if (cat === "Service" || cat === "บริการ") {
+      return (
+        <span className="inline-flex items-center space-x-1 border border-neutral-700 bg-neutral-900 text-neutral-200 px-2 py-0.5 text-[11px] font-mono">
+          <Wrench className="w-3 h-3 text-neutral-400" />
+          <span>{cat}</span>
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center space-x-1 border border-neutral-700 bg-neutral-900 text-neutral-200 px-2 py-0.5 text-[11px] font-mono">
+        <Grid className="w-3 h-3 text-neutral-400" />
+        <span>{cat}</span>
+      </span>
+    );
   };
 
   return (
@@ -135,7 +139,7 @@ export default function PriceMatrixTable({
         <div className="flex flex-wrap items-center gap-2.5">
           <div className="flex items-center space-x-1 bg-neutral-950 border border-neutral-800 p-1 text-xs font-mono">
             <Filter className="w-3.5 h-3.5 text-neutral-500 ml-1 mr-1" />
-            {["ALL", "Food", "Material", "Service", "Other"].map((cat) => (
+            {["ALL", "อาหาร", "อุปกรณ์สำนักงาน", "บริการ", "อื่นๆ"].map((cat) => (
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
@@ -186,14 +190,14 @@ export default function PriceMatrixTable({
               </th>
               <th className="py-3.5 px-4 font-semibold text-right">
                 <button
-                  onClick={() => toggleSort("unitPrice")}
+                  onClick={() => toggleSort("maxPrice")}
                   className="flex items-center space-x-1.5 hover:text-white transition uppercase ml-auto"
                 >
-                  <span>Unit Price (THB)</span>
+                  <span>Max Price (THB)</span>
                   <ArrowUpDown className="w-3.5 h-3.5" />
                 </button>
               </th>
-              <th className="py-3.5 px-4 font-semibold">Unit Type (หน่วยนับ)</th>
+              <th className="py-3.5 px-4 font-semibold">Unit (หน่วยนับ)</th>
               <th className="py-3.5 px-4 font-semibold text-center">Actions</th>
             </tr>
           </thead>
@@ -219,46 +223,50 @@ export default function PriceMatrixTable({
                 </td>
               </tr>
             ) : (
-              filteredItems.map((item, index) => (
-                <tr
-                  key={item.id}
-                  className="hover:bg-neutral-850/60 transition group font-sans text-neutral-200"
-                >
-                  <td className="py-3.5 px-4 text-xs font-mono text-neutral-500">
-                    {index + 1}
-                  </td>
-                  <td className="py-3.5 px-4 font-medium text-white group-hover:text-white">
-                    {item.itemName}
-                  </td>
-                  <td className="py-3.5 px-4">
-                    {getCategoryBadge(item.category)}
-                  </td>
-                  <td className="py-3.5 px-4 text-right font-mono font-bold text-white">
-                    ฿{item.unitPrice.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                  </td>
-                  <td className="py-3.5 px-4 text-xs font-mono text-neutral-400">
-                    {item.unitType}
-                  </td>
-                  <td className="py-3.5 px-4 text-center">
-                    <div className="flex items-center justify-center space-x-1.5">
-                      <button
-                        onClick={() => onEdit(item)}
-                        className="p-1.5 text-neutral-400 hover:text-white hover:bg-neutral-800 border border-transparent hover:border-neutral-700 transition"
-                        title="Edit Item"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => onDelete(item)}
-                        className="p-1.5 text-neutral-400 hover:text-white hover:bg-neutral-800 border border-transparent hover:border-neutral-700 transition"
-                        title="Delete Item"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
+              filteredItems.map((item, index) => {
+                const price = item.maxPrice ?? item.unitPrice ?? 0;
+                const unitStr = item.unit || item.unitType || "";
+                return (
+                  <tr
+                    key={item.id}
+                    className="hover:bg-neutral-850/60 transition group font-sans text-neutral-200"
+                  >
+                    <td className="py-3.5 px-4 text-xs font-mono text-neutral-500">
+                      {index + 1}
+                    </td>
+                    <td className="py-3.5 px-4 font-medium text-white group-hover:text-white">
+                      {item.itemName}
+                    </td>
+                    <td className="py-3.5 px-4">
+                      {getCategoryBadge(item.category)}
+                    </td>
+                    <td className="py-3.5 px-4 text-right font-mono font-bold text-white">
+                      ฿{price.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="py-3.5 px-4 text-xs font-mono text-neutral-400">
+                      {unitStr}
+                    </td>
+                    <td className="py-3.5 px-4 text-center">
+                      <div className="flex items-center justify-center space-x-1.5">
+                        <button
+                          onClick={() => onEdit(item)}
+                          className="p-1.5 text-neutral-400 hover:text-white hover:bg-neutral-800 border border-transparent hover:border-neutral-700 transition"
+                          title="Edit Item"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => onDelete(item)}
+                          className="p-1.5 text-neutral-400 hover:text-white hover:bg-neutral-800 border border-transparent hover:border-neutral-700 transition"
+                          title="Delete Item"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

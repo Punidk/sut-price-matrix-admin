@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { PriceMatrixItem, PriceMatrixFormData, CategoryType } from "@/lib/types";
+import { PriceMatrixItem, PriceMatrixFormData } from "@/lib/types";
 import { X, Save, PlusCircle, AlertCircle } from "lucide-react";
 
 interface ItemModalProps {
@@ -11,7 +11,7 @@ interface ItemModalProps {
   initialData?: PriceMatrixItem | null;
 }
 
-const CATEGORIES: CategoryType[] = ["Food", "Material", "Service", "Other"];
+const CATEGORIES = ["อาหาร", "อุปกรณ์สำนักงาน", "บริการ", "อื่นๆ", "Food", "Material", "Service", "Other"];
 
 export default function ItemModal({
   isOpen,
@@ -20,9 +20,9 @@ export default function ItemModal({
   initialData,
 }: ItemModalProps) {
   const [itemName, setItemName] = useState("");
-  const [category, setCategory] = useState<CategoryType>("Food");
-  const [unitPrice, setUnitPrice] = useState<string>("");
-  const [unitType, setUnitType] = useState("");
+  const [category, setCategory] = useState<string>("อาหาร");
+  const [maxPrice, setMaxPrice] = useState<string>("");
+  const [unit, setUnit] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -32,13 +32,13 @@ export default function ItemModal({
     if (initialData) {
       setItemName(initialData.itemName);
       setCategory(initialData.category);
-      setUnitPrice(initialData.unitPrice.toString());
-      setUnitType(initialData.unitType);
+      setMaxPrice((initialData.maxPrice || initialData.unitPrice || 0).toString());
+      setUnit(initialData.unit || initialData.unitType || "");
     } else {
       setItemName("");
-      setCategory("Food");
-      setUnitPrice("");
-      setUnitType("");
+      setCategory("อาหาร");
+      setMaxPrice("");
+      setUnit("");
     }
     setError(null);
   }, [initialData, isOpen]);
@@ -49,16 +49,16 @@ export default function ItemModal({
     e.preventDefault();
     setError(null);
 
-    const priceNum = parseFloat(unitPrice);
+    const priceNum = parseFloat(maxPrice);
     if (!itemName.trim()) {
       setError("Please enter a valid item name.");
       return;
     }
     if (isNaN(priceNum) || priceNum < 0) {
-      setError("Unit price must be a valid positive number.");
+      setError("Price limit must be a valid positive number.");
       return;
     }
-    if (!unitType.trim()) {
+    if (!unit.trim()) {
       setError("Please specify the unit type (e.g., บาท/มื้อ, ตร.ม.).");
       return;
     }
@@ -69,8 +69,10 @@ export default function ItemModal({
         {
           itemName: itemName.trim(),
           category,
+          maxPrice: priceNum,
+          unit: unit.trim(),
           unitPrice: priceNum,
-          unitType: unitType.trim(),
+          unitType: unit.trim(),
         },
         initialData?.id
       );
@@ -138,7 +140,7 @@ export default function ItemModal({
             </label>
             <select
               value={category}
-              onChange={(e) => setCategory(e.target.value as CategoryType)}
+              onChange={(e) => setCategory(e.target.value)}
               className="w-full bg-neutral-950 border border-neutral-800 text-white px-3 py-2 text-sm focus:outline-none focus:border-white transition rounded-none font-mono"
             >
               {CATEGORIES.map((cat) => (
@@ -149,19 +151,19 @@ export default function ItemModal({
             </select>
           </div>
 
-          {/* Unit Price & Unit Type Grid */}
+          {/* Max Price & Unit Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="block text-xs font-mono uppercase text-neutral-300">
-                Unit Price (ราคาต่อหน่วย - THB) <span className="text-neutral-400">*</span>
+                Max Price (ราคากลางสูงสุด - THB) <span className="text-neutral-400">*</span>
               </label>
               <input
                 type="number"
                 step="0.01"
                 min="0"
                 required
-                value={unitPrice}
-                onChange={(e) => setUnitPrice(e.target.value)}
+                value={maxPrice}
+                onChange={(e) => setMaxPrice(e.target.value)}
                 placeholder="e.g. 50"
                 className="w-full bg-neutral-950 border border-neutral-800 text-white px-3 py-2 text-sm focus:outline-none focus:border-white transition placeholder-neutral-600 font-mono rounded-none"
               />
@@ -169,13 +171,13 @@ export default function ItemModal({
 
             <div className="space-y-1.5">
               <label className="block text-xs font-mono uppercase text-neutral-300">
-                Unit Type (หน่วยนับ) <span className="text-neutral-400">*</span>
+                Unit (หน่วยนับ) <span className="text-neutral-400">*</span>
               </label>
               <input
                 type="text"
                 required
-                value={unitType}
-                onChange={(e) => setUnitType(e.target.value)}
+                value={unit}
+                onChange={(e) => setUnit(e.target.value)}
                 placeholder="e.g. บาท/มื้อ, ตร.ม., บาท/วัน"
                 className="w-full bg-neutral-950 border border-neutral-800 text-white px-3 py-2 text-sm focus:outline-none focus:border-white transition placeholder-neutral-600 rounded-none"
               />
