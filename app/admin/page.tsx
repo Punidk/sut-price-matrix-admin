@@ -201,14 +201,26 @@ export default function AdminDashboardPage() {
     }
   };
 
-  // Open Create Modal
-  const handleOpenCreateModal = () => {
-    setEditingItem(null);
+  // Reset Form Inputs
+  const resetFormFields = () => {
     setItemName("");
     setCategory("อาหาร");
     setMaxPrice("");
     setUnit("");
+    setEditingItem(null);
     setFormError(null);
+    setFormSubmitting(false);
+  };
+
+  // Close Add/Edit Modal
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    resetFormFields();
+  };
+
+  // Open Create Modal
+  const handleOpenCreateModal = () => {
+    resetFormFields();
     setIsModalOpen(true);
   };
 
@@ -242,57 +254,73 @@ export default function AdminDashboardPage() {
       return;
     }
 
+    // 1. เมื่อเริ่มบันทึก: เซ็ต Loading เป็น true
     setFormSubmitting(true);
+
     try {
+      const formattedName = itemName.trim();
+      const formattedUnit = unit.trim();
+
+      // 2. ใน try: รันคำสั่ง addDoc / updateDoc จาก Firestore
       if (isFirebaseConfigured && db) {
         if (editingItem) {
           const docRef = doc(db, "price_matrix", editingItem.id);
           await updateDoc(docRef, {
-            itemName: itemName.trim(),
+            itemName: formattedName,
             category,
             maxPrice: priceNum,
-            unit: unit.trim(),
+            unit: formattedUnit,
             updatedAt: serverTimestamp(),
           });
         } else {
           const collectionRef = collection(db, "price_matrix");
           await addDoc(collectionRef, {
-            itemName: itemName.trim(),
+            itemName: formattedName,
             category,
             maxPrice: priceNum,
-            unit: unit.trim(),
+            unit: formattedUnit,
             updatedAt: serverTimestamp(),
           });
         }
-      } else {
-        if (editingItem) {
-          const updated = items.map((i) =>
-            i.id === editingItem.id
-              ? { ...i, itemName: itemName.trim(), category, maxPrice: priceNum, unit: unit.trim(), updatedAt: Date.now() }
-              : i
-          );
-          saveDemoData(updated);
-        } else {
-          const newItem: PriceMatrixItem = {
-            id: `pm-${Date.now()}`,
-            itemName: itemName.trim(),
-            category,
-            maxPrice: priceNum,
-            unit: unit.trim(),
-            updatedAt: Date.now(),
-          };
-          saveDemoData([newItem, ...items]);
-        }
       }
 
-      setIsModalOpen(false);
+      // 4. เมื่อเซฟสำเร็จ อัปเดตข้อมูลในตารางหน้าเว็บทันที
+      if (editingItem) {
+        setItems((prevItems) =>
+          prevItems.map((i) =>
+            i.id === editingItem.id
+              ? { ...i, itemName: formattedName, category, maxPrice: priceNum, unit: formattedUnit, updatedAt: Date.now() }
+              : i
+          )
+        );
+      } else {
+        const newItem: PriceMatrixItem = {
+          id: `pm-${Date.now()}`,
+          itemName: formattedName,
+          category,
+          maxPrice: priceNum,
+          unit: formattedUnit,
+          updatedAt: Date.now(),
+        };
+        setItems((prevItems) => [newItem, ...prevItems]);
+      }
     } catch (err: any) {
-      console.error(err);
+      console.error("Save price matrix error:", err);
       setFormError(err.message || "เกิดข้อผิดพลาดในการบันทึกข้อมูล");
     } finally {
+      // 3. ใน block finally {}:
+      // - เซ็ต Loading สถานะปุ่มกลับเป็น false
+      // - สั่งปิดหน้าต่าง Modal ทันที (setIsModalOpen(false))
+      // - เคลียร์ค่าในฟอร์มให้กลับมาเป็นค่าว่าง (Reset form states)
       setFormSubmitting(false);
+      setIsModalOpen(false);
+      resetFormFields();
     }
   };
+
+  const handleSave = handleFormSubmit;
+  const handleAdd = handleFormSubmit;
+  const handleUpdate = handleFormSubmit;
 
   // Open Confirm Delete Modal
   const handleOpenDeleteModal = (item: PriceMatrixItem) => {
