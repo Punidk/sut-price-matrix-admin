@@ -12,7 +12,6 @@ import {
   deleteDoc,
   doc,
   serverTimestamp,
-  getDocs,
 } from "firebase/firestore";
 import {
   ShieldCheck,
@@ -130,12 +129,11 @@ export default function AdminDashboardPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [formSubmitting, setFormSubmitting] = useState(false);
 
-  // Confirm Delete Modal State & Compatibility Aliases
+  // Confirm Delete Modal State
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletingItem, setDeletingItem] = useState<PriceMatrixItem | null>(null);
   const [itemToDelete, setItemToDelete] = useState<PriceMatrixItem | null>(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
 
   // 1. Auth Guard Protection
   useEffect(() => {
@@ -143,30 +141,6 @@ export default function AdminDashboardPage() {
       router.replace("/login");
     }
   }, [user, authLoading, router]);
-
-  // Fetch / Reload Items from Firestore
-  const fetchItems = useCallback(async () => {
-    if (isFirebaseConfigured && db) {
-      try {
-        const matrixCollectionRef = collection(db, "price_matrix");
-        const snapshot = await getDocs(matrixCollectionRef);
-        const list: PriceMatrixItem[] = snapshot.docs.map((docSnap) => {
-          const data = docSnap.data();
-          return {
-            id: docSnap.id,
-            itemName: data.itemName || "",
-            category: data.category || "อื่นๆ",
-            maxPrice: Number(data.maxPrice) || 0,
-            unit: data.unit || "",
-            updatedAt: data.updatedAt?.toMillis ? data.updatedAt.toMillis() : Date.now(),
-          };
-        });
-        setItems(list);
-      } catch (err) {
-        console.error("Fetch items error:", err);
-      }
-    }
-  }, []);
 
   // 2. Real-time Firestore Subscription (Collection: `price_matrix`)
   useEffect(() => {
@@ -326,53 +300,48 @@ export default function AdminDashboardPage() {
     setItemToDelete(item);
     setIsDeleteModalOpen(true);
     setShowDeleteModal(true);
-    setDeleteLoading(false);
   };
 
   // Close Delete Modal
   const handleCloseDeleteModal = () => {
-    if (deleteLoading) return;
     setIsDeleteModalOpen(false);
     setShowDeleteModal(false);
     setDeletingItem(null);
     setItemToDelete(null);
-    setDeleteLoading(false);
   };
 
-  // Strict Delete Action Function (handleDelete / handleConfirmDelete)
-  const handleDelete = async () => {
+  // Optimistic UI Delete Function (Instant Modal Close & Table Row Removal)
+  const handleDelete = () => {
     const targetItem = deletingItem || itemToDelete;
     if (!targetItem) return;
     const targetId = targetItem.id;
 
-    // 1. ก่อนเริ่มลบ: เซ็ต Loading เป็น true
-    setDeleteLoading(true);
+    // 1. ทันทีที่กด "ยืนยันการลบ": สั่งปิด Modal และเคลียร์ State ทันที!
+    setIsDeleteModalOpen(false);
+    setShowDeleteModal(false);
+    setDeletingItem(null);
+    setItemToDelete(null);
 
-    try {
-      // 2. ใน try: รันคำสั่ง deleteDoc จาก Firestore และเรียกฟังก์ชันดึงข้อมูลใหม่มาแสดง
-      if (isFirebaseConfigured && db) {
-        const docRef = doc(db, "price_matrix", targetId);
-        await deleteDoc(docRef);
-        await fetchItems();
-      } else {
-        const updated = items.filter((i) => i.id !== targetId);
-        saveDemoData(updated);
+    // 2. อัปเดต State ของตารางข้อมูลทันทีโดยใช้ .filter() เพื่อให้แถวหายไปทันตาเห็น
+    setItems((prevItems) => prevItems.filter((i) => i.id !== targetId));
+
+    // 3. รันคำสั่งลบข้อมูล (deleteDoc) จาก Firestore ให้ไปทำงานอยู่เบื้องหลังเงียบๆ
+    if (isFirebaseConfigured && db) {
+      const docRef = doc(db, "price_matrix", targetId);
+      deleteDoc(docRef).catch((err) => {
+        console.error("Background deleteDoc error:", err);
+      });
+    } else {
+      if (typeof window !== "undefined") {
+        const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
+        if (stored) {
+          try {
+            const list: PriceMatrixItem[] = JSON.parse(stored);
+            const updated = list.filter((i) => i.id !== targetId);
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
+          } catch {}
+        }
       }
-
-      // อัปเดตข้อมูลตารางแบบ Real-time ทันที
-      setItems((prevItems) => prevItems.filter((i) => i.id !== targetId));
-    } catch (err) {
-      console.error("Delete document error:", err);
-    } finally {
-      // 3. ใน finally (สำคัญมาก):
-      // - เซ็ตสถานะ Loading กลับเป็น false
-      // - เซ็ต State เพื่อปิด Modal ทันที (setIsDeleteModalOpen / setShowDeleteModal)
-      // - เคลียร์ค่า Item ที่เลือกลบให้เป็น null (setDeletingItem / setItemToDelete)
-      setDeleteLoading(false);
-      setIsDeleteModalOpen(false);
-      setShowDeleteModal(false);
-      setDeletingItem(null);
-      setItemToDelete(null);
     }
   };
 
@@ -829,7 +798,7 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* 5. Strict Delete Confirm Modal */}
+      {/* 5. Optimistic Delete Confirm Modal (Instant Close on Click) */}
       {isDeleteActive && activeDeleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs font-sans">
           <div className="bg-neutral-900 border border-neutral-700 w-full max-w-md shadow-2xl rounded-none p-6 space-y-5">
@@ -857,19 +826,17 @@ export default function AdminDashboardPage() {
               <button
                 type="button"
                 onClick={handleCloseDeleteModal}
-                disabled={deleteLoading}
-                className="bg-neutral-950 hover:bg-neutral-800 text-neutral-400 hover:text-white border border-neutral-800 px-4 py-2 text-xs font-mono transition rounded-none disabled:opacity-50"
+                className="bg-neutral-950 hover:bg-neutral-800 text-neutral-400 hover:text-white border border-neutral-800 px-4 py-2 text-xs font-mono transition rounded-none"
               >
                 ยกเลิก
               </button>
               <button
                 type="button"
                 onClick={handleDelete}
-                disabled={deleteLoading}
-                className="bg-white hover:bg-neutral-200 text-black font-semibold border border-white px-5 py-2 text-xs font-mono transition rounded-none flex items-center space-x-1.5 disabled:opacity-50"
+                className="bg-white hover:bg-neutral-200 text-black font-semibold border border-white px-5 py-2 text-xs font-mono transition rounded-none flex items-center space-x-1.5"
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                <span>{deleteLoading ? "กำลังลบ..." : "ยืนยันการลบ"}</span>
+                <span>ยืนยันการลบ</span>
               </button>
             </div>
           </div>
