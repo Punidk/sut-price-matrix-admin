@@ -16,13 +16,20 @@ import {
   TrendingDown,
   Building2,
   Lock,
+  ExternalLink,
+  ImageIcon,
 } from "lucide-react";
+
+const IMGBB_API_KEY = "5f6ccb81e79ea0735182d9a7870bff69";
 
 export default function UserFrontendPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStep, setProcessingStep] = useState(0);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
   const [auditResult, setAuditResult] = useState<null | {
     itemName: string;
     category: string;
@@ -41,11 +48,13 @@ export default function UserFrontendPage() {
     if (file) {
       setSelectedFile(file);
       setAuditResult(null);
+      setUploadedImageUrl(null);
+      setUploadError(null);
+
       if (file.type.startsWith("image/")) {
         const url = URL.createObjectURL(file);
         setPreviewUrl(url);
       } else {
-        // PDF or non-image
         setPreviewUrl(null);
       }
     }
@@ -53,44 +62,91 @@ export default function UserFrontendPage() {
 
   // Sample file preview simulation
   const handleSelectSample = () => {
-    setSelectedFile(new File(["sample"], "ใบเสนอราคา_ข้าวกล่อง_กิจกรรมสโมสร.jpg", { type: "image/jpeg" }));
-    setPreviewUrl("https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80");
-    setAuditResult(null);
+    // Create a dummy image file for sample upload testing
+    const canvas = document.createElement("canvas");
+    canvas.width = 400;
+    canvas.height = 300;
+    const ctx = canvas.getContext("2d");
+    if (ctx) {
+      ctx.fillStyle = "#f97316";
+      ctx.fillRect(0, 0, 400, 300);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 20px sans-serif";
+      ctx.fillText("SUT Sample Receipt", 100, 150);
+    }
+
+    canvas.toBlob((blob) => {
+      if (blob) {
+        const sampleFile = new File([blob], "ใบเสนอราคา_ข้าวกล่อง_มทส.jpg", { type: "image/jpeg" });
+        setSelectedFile(sampleFile);
+        setPreviewUrl(URL.createObjectURL(sampleFile));
+        setAuditResult(null);
+        setUploadedImageUrl(null);
+        setUploadError(null);
+      }
+    }, "image/jpeg");
   };
 
-  // Clear selected file
+  // Clear selected file & reset state
   const handleReset = () => {
     setSelectedFile(null);
     setPreviewUrl(null);
+    setUploadedImageUrl(null);
     setAuditResult(null);
+    setUploadError(null);
     setIsProcessing(false);
     setProcessingStep(0);
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (cameraInputRef.current) cameraInputRef.current.value = "";
   };
 
-  // Start AI Mockup Processing
-  const handleStartAudit = () => {
+  // ImgBB API Upload & Audit Processing Handler
+  const handleStartAudit = async () => {
     if (!selectedFile) return;
 
     setIsProcessing(true);
-    setProcessingStep(1);
+    setProcessingStep(1); // 1. กำลังอัปโหลดเอกสารไปยัง ImgBB API...
+    setUploadError(null);
     setAuditResult(null);
 
-    // Step 1: OCR Reading
-    setTimeout(() => {
+    try {
+      // 1. Construct FormData for ImgBB API
+      const formData = new FormData();
+      formData.append("key", IMGBB_API_KEY);
+      formData.append("image", selectedFile);
+
+      // 2. Send POST Request to ImgBB API
+      const res = await fetch("https://api.imgbb.com/1/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        throw new Error(`อัปโหลดไฟล์ไม่สำเร็จ (HTTP Status ${res.status})`);
+      }
+
+      const responseData = await res.json();
+
+      if (!responseData.success || !responseData.data?.url) {
+        throw new Error(responseData.error?.message || "ไม่สามารถดึง URL รูปภาพจาก ImgBB ได้");
+      }
+
+      // 3. Extract & Store ImgBB Direct Link URL
+      const directUrl = responseData.data.url;
+      setUploadedImageUrl(directUrl);
+
+      // Log direct URL to browser console as requested
+      console.log("ImgBB Uploaded Image Direct URL:", directUrl);
+
+      // 4. Step 2: Compare with Firestore Price Matrix
       setProcessingStep(2);
-    }, 1000);
+      await new Promise((r) => setTimeout(r, 1200));
 
-    // Step 2: Firestore Matrix Comparison
-    setTimeout(() => {
+      // 5. Step 3: Complete Audit Mockup Result
       setProcessingStep(3);
-    }, 2000);
+      await new Promise((r) => setTimeout(r, 800));
 
-    // Step 3: Complete Audit Result (3 seconds total)
-    setTimeout(() => {
-      setIsProcessing(false);
-      setProcessingStep(0);
+      // 6. Set Passed Mockup Result State
       setAuditResult({
         itemName: "ข้าวกล่อง (กระเพราไก่ไข่ดาว)",
         category: "อาหารและเครื่องดื่ม (Food)",
@@ -99,7 +155,13 @@ export default function UserFrontendPage() {
         unitType: "บาท/กล่อง",
         passed: true,
       });
-    }, 3000);
+    } catch (err: any) {
+      console.error("ImgBB Upload Error:", err);
+      setUploadError(err.message || "เกิดข้อผิดพลาดในการอัปโหลดเอกสารไปยัง ImgBB API");
+    } finally {
+      setIsProcessing(false);
+      setProcessingStep(0);
+    }
   };
 
   return (
@@ -145,7 +207,7 @@ export default function UserFrontendPage() {
           <div className="relative z-10 space-y-3">
             <div className="inline-flex items-center space-x-2 bg-orange-500/10 border border-orange-500/20 text-orange-700 text-xs font-semibold px-3 py-1 rounded-full">
               <Sparkles className="w-3.5 h-3.5 text-orange-600" />
-              <span>ระบบตรวจสอบเอกสารใบเสนอราคาอัตโนมัติ</span>
+              <span>ระบบอัปโหลดและตรวจสอบราคากลางผ่าน ImgBB API</span>
             </div>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
               ตรวจสอบราคากลางโครงการนักศึกษา
@@ -169,7 +231,7 @@ export default function UserFrontendPage() {
             isProcessing ? "bg-amber-500 text-white border-amber-500 shadow-sm animate-pulse" : "bg-white text-slate-500 border-slate-200"
           }`}>
             <span className="block font-mono text-[10px] uppercase opacity-80">ขั้นตอน 2</span>
-            2. ประมวลผล AI
+            2. ประมวลผล ImgBB & AI
           </div>
           <div className={`p-3 rounded-xl border text-xs sm:text-sm font-medium transition ${
             auditResult ? "bg-emerald-600 text-white border-emerald-600 shadow-sm" : "bg-white text-slate-500 border-slate-200"
@@ -178,6 +240,17 @@ export default function UserFrontendPage() {
             3. ผลการตรวจสอบ
           </div>
         </div>
+
+        {/* Error Alert Box */}
+        {uploadError && (
+          <div className="bg-rose-50 border border-rose-200 rounded-xl p-4 text-xs font-mono text-rose-700 flex items-start space-x-3">
+            <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <span className="font-bold text-rose-900">[ERROR]: อัปโหลดไฟล์รูปภาพไม่สำเร็จ</span>
+              <p className="font-sans text-xs text-rose-700">{uploadError}</p>
+            </div>
+          </div>
+        )}
 
         {/* Upload Section (2 Large Buttons) */}
         {!selectedFile && (
@@ -260,7 +333,7 @@ export default function UserFrontendPage() {
                     {selectedFile.name}
                   </h4>
                   <p className="text-xs text-slate-500">
-                    {(selectedFile.size / 1024).toFixed(1)} KB • เอกสารพร้อมสำหรับการตรวจสอบ
+                    {(selectedFile.size / 1024).toFixed(1)} KB • เอกสารพร้อมสำหรับการส่งเข้า ImgBB API
                   </p>
                 </div>
               </div>
@@ -285,10 +358,10 @@ export default function UserFrontendPage() {
                   className="max-h-80 object-contain w-full"
                 />
                 {isProcessing && (
-                  <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-xs flex flex-col items-center justify-center text-white space-y-3">
+                  <div className="absolute inset-0 bg-slate-950/75 backdrop-blur-xs flex flex-col items-center justify-center text-white space-y-3 px-4 text-center">
                     <div className="w-10 h-10 border-4 border-orange-500 border-t-transparent animate-spin rounded-full"></div>
-                    <span className="font-mono text-xs tracking-wider text-orange-400">
-                      {processingStep === 1 && "กำลังสแกนอ่านข้อความบนเอกสาร (OCR)..."}
+                    <span className="font-mono text-xs tracking-wider text-orange-400 font-semibold">
+                      {processingStep === 1 && "กำลังอัปโหลดเอกสารไปยัง ImgBB API..."}
                       {processingStep === 2 && "กำลังเปรียบเทียบกับ CENTRAL PRICE MATRIX..."}
                       {processingStep === 3 && "สรุปผลการตรวจสอบอนุมัติ..."}
                     </span>
@@ -297,7 +370,7 @@ export default function UserFrontendPage() {
               </div>
             )}
 
-            {/* Audit Action Button */}
+            {/* Audit Action Button (ImgBB Upload) */}
             <div className="pt-2">
               <button
                 type="button"
@@ -308,7 +381,7 @@ export default function UserFrontendPage() {
                 {isProcessing ? (
                   <>
                     <RefreshCw className="w-5 h-5 animate-spin" />
-                    <span>กำลังประมวลผลราคากลาง (3 วินาที)...</span>
+                    <span>กำลังอัปโหลดเอกสาร...</span>
                   </>
                 ) : (
                   <>
@@ -322,7 +395,7 @@ export default function UserFrontendPage() {
           </div>
         )}
 
-        {/* Audit Result Display (Success - Emerald Theme) */}
+        {/* Audit Result Display (Success - Emerald Theme with ImgBB Direct URL) */}
         {auditResult && (
           <div className="bg-white border-2 border-emerald-500 rounded-2xl shadow-xl overflow-hidden space-y-0 animate-in fade-in slide-in-from-bottom-4 duration-300">
             {/* Success Header */}
@@ -345,6 +418,34 @@ export default function UserFrontendPage() {
 
             {/* Breakdown Card Grid */}
             <div className="p-6 sm:p-8 space-y-6">
+              
+              {/* ImgBB Direct URL Display */}
+              {uploadedImageUrl && (
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 text-xs font-mono text-slate-300 space-y-2">
+                  <div className="flex items-center justify-between text-amber-400 font-bold">
+                    <div className="flex items-center space-x-1.5">
+                      <ImageIcon className="w-4 h-4" />
+                      <span>IMGBB DIRECT LINK URL:</span>
+                    </div>
+                    <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded">STATUS 200 OK</span>
+                  </div>
+                  <div className="flex items-center space-x-2 bg-slate-950 p-2.5 rounded border border-slate-800 overflow-x-auto">
+                    <span className="text-slate-200 select-all font-mono text-[11px] truncate">
+                      {uploadedImageUrl}
+                    </span>
+                    <a
+                      href={uploadedImageUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="ml-auto text-orange-400 hover:text-orange-300 shrink-0 flex items-center space-x-1 text-[11px]"
+                    >
+                      <span>เปิดดูรูป</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                </div>
+              )}
+
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <span className="text-xs text-slate-500 font-medium">รายการสินค้า/บริการ</span>
