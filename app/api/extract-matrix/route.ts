@@ -19,7 +19,7 @@ export async function POST(req: Request) {
 
     // 🚀 ยิงตรงเข้า API ของ Google โดยไม่ใช้ SDK (ข้ามปัญหา Vercel แคชแพ็กเกจเก่า)
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+  	`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-002:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: {
