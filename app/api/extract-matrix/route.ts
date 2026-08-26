@@ -3,36 +3,31 @@ import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
   try {
-    const { imageUrl } = await req.json();
+    const { imageBase64, mimeType } = await req.json();
 
-    if (!imageUrl) {
-      return NextResponse.json({ error: "ไม่พบ URL ของรูปภาพ" }, { status: 400 });
+    if (!imageBase64) {
+      return NextResponse.json({ error: "ไม่พบข้อมูลรูปภาพ (imageBase64)" }, { status: 400 });
     }
 
-    // 1. ไปดาวน์โหลดรูปจาก ImgBB มาแปลงเป็น Base64
-    const imageResp = await fetch(imageUrl);
-    const arrayBuffer = await imageResp.arrayBuffer();
-    const base64Image = Buffer.from(arrayBuffer).toString("base64");
-
-    // 2. เช็กกุญแจ API
-    const apiKey = process.env.GEMINI_API_KEY;
+    // 1. เช็กกุญแจ API
+    const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
     if (!apiKey) {
       return NextResponse.json({ error: "ยังไม่ได้ตั้งค่า GEMINI_API_KEY ในระบบ" }, { status: 500 });
     }
 
-    // 3. เรียกใช้งาน Gemini 1.5 Pro (รุ่นนี้เสถียรและเก่งเรื่องอ่านรูปสุดๆ)
+    // 2. เรียกใช้งาน Gemini 1.5 Pro (รุ่นนี้เสถียรและเก่งเรื่องอ่านรูปสุดๆ)
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
 
-    // 4. สั่งงาน AI
+    // 3. สั่งงาน AI
     const prompt = `จงอ่านตารางราคากลางจากรูปภาพนี้ แล้วสกัดข้อมูลออกมาเป็น JSON Array เท่านั้น โดยแต่ละ object ต้องมีโครงสร้างคือ {"itemName": "ชื่อรายการ", "category": "หมวดหมู่", "maxPrice": ตัวเลข, "unit": "หน่วยนับ"} ห้ามมีข้อความอธิบายอื่นปนเด็ดขาด`;
 
     const result = await model.generateContent([
       prompt,
       {
         inlineData: {
-          data: base64Image,
-          mimeType: "image/jpeg",
+          data: imageBase64,
+          mimeType: mimeType || "image/jpeg",
         },
       },
     ]);

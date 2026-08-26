@@ -44,7 +44,6 @@ export interface PriceMatrixItem {
 }
 
 const CATEGORIES = ["อาหาร", "อุปกรณ์สำนักงาน", "บริการ", "อื่นๆ"];
-const IMGBB_API_KEY = "5f6ccb81e79ea0735182d9a7870bff69";
 
 export default function AdminDashboardPage() {
   const { user, loading: authLoading, logout, isDemoMode } = useAuth();
@@ -70,7 +69,7 @@ export default function AdminDashboardPage() {
   const [isAIScanModalOpen, setIsAIScanModalOpen] = useState(false);
   const [aiScanFile, setAiScanFile] = useState<File | null>(null);
   const [aiScanPreview, setAiScanPreview] = useState<string | null>(null);
-  const [aiScanStep, setAiScanStep] = useState(0); // 0: idle, 1: upload ImgBB, 2: extract Gemini, 3: saving Firestore
+  const [aiScanStep, setAiScanStep] = useState(0); // 0: idle, 1: extract Gemini, 2: saving Firestore
   const [aiScanStatusText, setAiScanStatusText] = useState("");
   const [aiScanError, setAiScanError] = useState<string | null>(null);
 
@@ -270,6 +269,20 @@ export default function AdminDashboardPage() {
     }
   };
 
+  // Helper to convert file to Base64 String (excluding data URL prefix)
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        const base64Data = result.split(",")[1] || result;
+        resolve(base64Data);
+      };
+      reader.onerror = (error) => reject(error);
+      reader.readAsDataURL(file);
+    });
+  };
+
   // Automated AI Extraction & Firestore Batch Upload
   const handleAIScanSubmit = async () => {
     if (!aiScanFile) return;
@@ -277,38 +290,19 @@ export default function AdminDashboardPage() {
     setAiScanError(null);
 
     try {
-      // 1. Uploading image to ImgBB
+      // 1. Convert Image to Base64 and send directly to Gemini AI
       setAiScanStep(1);
-      setAiScanStatusText("กำลังอัปโหลดรูปเอกสารไปยัง ImgBB...");
+      setAiScanStatusText("กำลังแปลงไฟล์รูปภาพและส่งให้ Gemini AI อ่านตารางราคากลาง...");
 
-      const formData = new FormData();
-      formData.append("key", IMGBB_API_KEY);
-      formData.append("image", aiScanFile);
-
-      const resImgBB = await fetch("https://api.imgbb.com/1/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!resImgBB.ok) {
-        throw new Error(`อัปโหลดรูปภาพไปที่ ImgBB ไม่สำเร็จ (HTTP Status ${resImgBB.status})`);
-      }
-
-      const imgBBData = await resImgBB.json();
-      if (!imgBBData.success || !imgBBData.data?.url) {
-        throw new Error(imgBBData.error?.message || "ไม่สามารถรับ URL รูปภาพจาก ImgBB ได้");
-      }
-
-      const directUrl = imgBBData.data.url;
-
-      // 2. Extract Matrix Table via Gemini AI API
-      setAiScanStep(2);
-      setAiScanStatusText("กำลังให้ Gemini AI อ่านและสกัดตารางราคากลาง...");
+      const base64Data = await fileToBase64(aiScanFile);
 
       const resExtract = await fetch("/api/extract-matrix", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageUrl: directUrl }),
+        body: JSON.stringify({
+          imageBase64: base64Data,
+          mimeType: aiScanFile.type || "image/jpeg",
+        }),
       });
 
       if (!resExtract.ok) {
@@ -327,8 +321,8 @@ export default function AdminDashboardPage() {
         throw new Error("Gemini AI ไม่พบข้อมูลรายการราคากลางในรูปภาพนี้");
       }
 
-      // 3. Saving Extracted Items to Firestore collection `price_matrix`
-      setAiScanStep(3);
+      // 2. Saving Extracted Items to Firestore collection `price_matrix`
+      setAiScanStep(2);
       setAiScanStatusText(`กำลังบันทึกรายการราคากลางใหม่ ${extractedItems.length} รายการ ลงฐานข้อมูล Firestore (price_matrix)...`);
 
       const newLocalItems: PriceMatrixItem[] = [];
@@ -757,7 +751,7 @@ export default function AdminDashboardPage() {
                     <div
                       className="bg-amber-400 h-full transition-all duration-300"
                       style={{
-                        width: aiScanStep === 1 ? "35%" : aiScanStep === 2 ? "70%" : "95%",
+                        width: aiScanStep === 1 ? "50%" : "95%",
                       }}
                     ></div>
                   </div>
