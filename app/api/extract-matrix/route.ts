@@ -17,7 +17,7 @@ export async function POST(req: Request) {
 
     // 2. เรียกใช้งาน Gemini 1.5 Pro (รุ่นนี้เสถียรและเก่งเรื่องอ่านรูปสุดๆ)
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     // 3. สั่งงาน AI
     const prompt = `จงอ่านตารางราคากลางจากรูปภาพนี้ แล้วสกัดข้อมูลออกมาเป็น JSON Array เท่านั้น โดยแต่ละ object ต้องมีโครงสร้างคือ {"itemName": "ชื่อรายการ", "category": "หมวดหมู่", "maxPrice": ตัวเลข, "unit": "หน่วยนับ"} ห้ามมีข้อความอธิบายอื่นปนเด็ดขาด`;
