@@ -50,15 +50,25 @@ export async function POST(req: NextRequest) {
     const prompt = `จงตรวจสอบรายการค่าใช้จ่ายจากข้อมูลทั้งหมดที่แนบมานี้ (ทั้งรูปภาพ, PDF, หรือข้อความ) หาว่าแต่ละรายการตรงกับหรือใกล้เคียงกับรายการไหนใน priceMatrix ต่อไปนี้:
 ${matrixContext}
 
+คำสั่งและเงื่อนไขการประเมิน:
+1. สำหรับรายการที่ตรงกับหรือใกล้เคียงกับข้อมูลใน priceMatrix:
+   - หากราคาที่ตรวจพบ (detectedPrice) <= ราคากลางสูงสุด (matrixMaxPrice) ให้กำหนด "status": "PASS"
+   - หากราคาที่ตรวจพบ (detectedPrice) > ราคากลางสูงสุด (matrixMaxPrice) ให้กำหนด "status": "FAIL"
+2. สำหรับรายการในใบเสร็จที่ค้นหาไม่พบ หรือไม่มีความใกล้เคียงกับข้อมูลใน priceMatrix เลย ให้ตอบกลับด้วย:
+   - "status": "NOT_FOUND"
+   - "message": "ไม่อยู่ในฐานข้อมูลราคากลาง"
+   - "matchedMatrixItem": null
+   - "matrixMaxPrice": null
+
 ให้ตอบกลับเป็น JSON Array โครงสร้างคือ:
 [
   {
-    "status": "PASS" | "FAIL",
+    "status": "PASS" | "FAIL" | "NOT_FOUND",
     "message": "คำอธิบายผลการตรวจสอบอย่างละเอียดภาษาไทย",
     "itemInReceipt": "ชื่อที่ตรวจพบ",
-    "matchedMatrixItem": "ชื่อในราคากลาง",
+    "matchedMatrixItem": "ชื่อในราคากลาง หรือ null หากไม่พบ",
     "detectedPrice": ตัวเลขราคาต่อหน่วยที่ตรวจพบ,
-    "matrixMaxPrice": ตัวเลขราคากลางสูงสุด,
+    "matrixMaxPrice": ตัวเลขราคากลางสูงสุด หรือ null หากไม่พบ,
     "unit": "หน่วยนับ เช่น กล่อง, ชิ้น, ครั้ง"
   }
 ]

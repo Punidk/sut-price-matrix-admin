@@ -30,15 +30,16 @@ import {
   Plus,
   Layers,
   FileCheck,
+  AlertTriangle,
 } from "lucide-react";
 
 export interface AnalysisItemResult {
-  status: "PASS" | "FAIL";
+  status: "PASS" | "FAIL" | "NOT_FOUND";
   message: string;
   itemInReceipt: string;
-  matchedMatrixItem?: string;
+  matchedMatrixItem?: string | null;
   detectedPrice: number;
-  matrixMaxPrice: number;
+  matrixMaxPrice?: number | null;
   unit: string;
 }
 
@@ -316,7 +317,10 @@ export default function UserFrontendPage() {
   const totalItemsCount = analysisResults ? analysisResults.length : 0;
   const passItemsCount = analysisResults ? analysisResults.filter((r) => r.status === "PASS").length : 0;
   const failItemsCount = analysisResults ? analysisResults.filter((r) => r.status === "FAIL").length : 0;
-  const isOverallPass = totalItemsCount > 0 && failItemsCount === 0;
+  const notFoundItemsCount = analysisResults ? analysisResults.filter((r) => r.status === "NOT_FOUND").length : 0;
+  const isOverallPass = totalItemsCount > 0 && failItemsCount === 0 && notFoundItemsCount === 0;
+  const isOverallHasFail = failItemsCount > 0;
+  const isOverallPendingReview = totalItemsCount > 0 && failItemsCount === 0 && notFoundItemsCount > 0;
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans selection:bg-orange-500 selection:text-white">
@@ -388,7 +392,13 @@ export default function UserFrontendPage() {
             2. วิเคราะห์ด้วย Gemini AI
           </div>
           <div className={`p-3 rounded-xl border text-xs sm:text-sm font-medium transition ${
-            analysisResults ? (isOverallPass ? "bg-emerald-600 text-white border-emerald-600 shadow-sm" : "bg-rose-600 text-white border-rose-600 shadow-sm") : "bg-white text-slate-500 border-slate-200"
+            analysisResults
+              ? isOverallPass
+                ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
+                : isOverallHasFail
+                ? "bg-rose-600 text-white border-rose-600 shadow-sm"
+                : "bg-amber-500 text-white border-amber-500 shadow-sm"
+              : "bg-white text-slate-500 border-slate-200"
           }`}>
             <span className="block font-mono text-[10px] uppercase opacity-80">ขั้นตอน 3</span>
             3. ผลการตรวจสอบ ({totalItemsCount} รายการ)
@@ -644,28 +654,48 @@ export default function UserFrontendPage() {
             
             {/* Overall Summary Card */}
             <div className={`rounded-2xl border-2 overflow-hidden shadow-lg ${
-              isOverallPass ? "border-emerald-500 bg-white" : "border-rose-500 bg-white"
+              isOverallPass
+                ? "border-emerald-500 bg-white"
+                : isOverallHasFail
+                ? "border-rose-500 bg-white"
+                : "border-amber-400 bg-white"
             }`}>
               <div className={`p-6 sm:p-8 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-gradient-to-r ${
-                isOverallPass ? "from-emerald-600 via-teal-600 to-emerald-700" : "from-rose-600 via-red-600 to-rose-700"
+                isOverallPass
+                  ? "from-emerald-600 via-teal-600 to-emerald-700"
+                  : isOverallHasFail
+                  ? "from-rose-600 via-red-600 to-rose-700"
+                  : "from-amber-500 via-orange-500 to-amber-600"
               }`}>
                 <div className="flex items-center space-x-4">
                   <div className="w-14 h-14 bg-white/15 backdrop-blur-md rounded-2xl flex items-center justify-center text-white shrink-0 shadow-inner">
                     {isOverallPass ? (
                       <CheckCircle2 className="w-9 h-9 stroke-[2.2]" />
-                    ) : (
+                    ) : isOverallHasFail ? (
                       <XCircle className="w-9 h-9 stroke-[2.2]" />
+                    ) : (
+                      <AlertTriangle className="w-9 h-9 stroke-[2.2]" />
                     )}
                   </div>
                   <div className="space-y-1">
                     <div className="inline-block bg-white/20 text-white text-xs font-mono px-2.5 py-0.5 rounded-full font-semibold">
-                      ภาพรวม: {isOverallPass ? "ทุกรายการผ่านเกณฑ์" : "พบรายการที่ไม่ผ่านเกณฑ์"}
+                      ภาพรวม: {isOverallPass
+                        ? "ทุกรายการผ่านเกณฑ์"
+                        : isOverallHasFail
+                        ? "พบรายการที่ไม่ผ่านเกณฑ์"
+                        : "มีรายการต้องใช้ดุลยพินิจ"}
                     </div>
                     <h3 className="text-xl sm:text-2xl font-extrabold text-white">
-                      {isOverallPass ? "ผ่านการตรวจสอบราคากลางทั้งหมด" : `พบ ${failItemsCount} รายการที่เกินเพดานราคากลาง`}
+                      {isOverallPass
+                        ? "ผ่านการตรวจสอบราคากลางทั้งหมด"
+                        : isOverallHasFail
+                        ? `พบ ${failItemsCount} รายการที่เกินเพดานราคากลาง`
+                        : `พบ ${notFoundItemsCount} รายการที่ไม่อยู่ในฐานข้อมูลราคากลาง`}
                     </h3>
                     <p className="text-xs sm:text-sm text-white/90">
-                      ตรวจพบทั้งหมด {totalItemsCount} รายการ (ผ่าน {passItemsCount} รายการ, ไม่ผ่าน {failItemsCount} รายการ)
+                      ตรวจพบทั้งหมด {totalItemsCount} รายการ (ผ่าน {passItemsCount} รายการ
+                      {failItemsCount > 0 && `, ไม่ผ่าน ${failItemsCount} รายการ`}
+                      {notFoundItemsCount > 0 && `, ไม่อยู่ในฐานข้อมูล ${notFoundItemsCount} รายการ`})
                     </p>
                   </div>
                 </div>
@@ -695,22 +725,39 @@ export default function UserFrontendPage() {
               <div className="grid grid-cols-1 gap-4">
                 {analysisResults.map((item, idx) => {
                   const isPass = item.status === "PASS";
-                  const priceDiff = item.detectedPrice - item.matrixMaxPrice;
+                  const isFail = item.status === "FAIL";
+                  const isNotFound = item.status === "NOT_FOUND";
+                  const hasMatrixMax = item.matrixMaxPrice != null && item.matrixMaxPrice > 0;
+                  const priceDiff = hasMatrixMax ? item.detectedPrice - (item.matrixMaxPrice as number) : 0;
 
                   return (
                     <div
                       key={idx}
                       className={`bg-white border-2 rounded-2xl p-5 sm:p-6 shadow-sm transition space-y-4 ${
-                        isPass ? "border-emerald-200 hover:border-emerald-400" : "border-rose-200 hover:border-rose-400"
+                        isPass
+                          ? "border-emerald-200 hover:border-emerald-400"
+                          : isFail
+                          ? "border-rose-200 hover:border-rose-400"
+                          : "border-amber-300 bg-amber-50/30 hover:border-amber-400"
                       }`}
                     >
                       {/* Item Header */}
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
                         <div className="flex items-center space-x-3">
                           <div className={`p-2 rounded-xl shrink-0 ${
-                            isPass ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"
+                            isPass
+                              ? "bg-emerald-100 text-emerald-700"
+                              : isFail
+                              ? "bg-rose-100 text-rose-700"
+                              : "bg-amber-100 text-amber-800"
                           }`}>
-                            {isPass ? <CheckCircle2 className="w-5 h-5" /> : <XCircle className="w-5 h-5" />}
+                            {isPass ? (
+                              <CheckCircle2 className="w-5 h-5" />
+                            ) : isFail ? (
+                              <XCircle className="w-5 h-5" />
+                            ) : (
+                              <AlertTriangle className="w-5 h-5" />
+                            )}
                           </div>
                           <div>
                             <span className="text-[11px] font-mono text-slate-400">รายการที่ {idx + 1}</span>
@@ -730,13 +777,25 @@ export default function UserFrontendPage() {
                             className={`text-xs font-bold font-mono px-3 py-1 rounded-full ${
                               isPass
                                 ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
-                                : "bg-rose-100 text-rose-800 border border-rose-300"
+                                : isFail
+                                ? "bg-rose-100 text-rose-800 border border-rose-300"
+                                : "bg-amber-100 text-amber-900 border border-amber-300"
                             }`}
                           >
-                            {item.status}
+                            {isNotFound ? "NOT FOUND" : item.status}
                           </span>
                         </div>
                       </div>
+
+                      {/* Not Found Special Alert Notice */}
+                      {isNotFound && (
+                        <div className="bg-amber-100/70 border border-amber-300 p-3 rounded-xl flex items-start space-x-2.5 text-xs text-amber-900">
+                          <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                          <span className="font-medium">
+                            รายการนี้ไม่อยู่ในราคากลาง ต้องตรวจสอบด้วยดุลยพินิจของคณะกรรมการ
+                          </span>
+                        </div>
+                      )}
 
                       {/* Pricing Comparison Grid */}
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-100 text-xs">
@@ -750,29 +809,42 @@ export default function UserFrontendPage() {
 
                         <div className="space-y-1">
                           <span className="text-slate-500">เพดานราคากลางสูงสุด:</span>
-                          <div className="text-base font-extrabold text-amber-600 font-mono">
-                            ฿{Number(item.matrixMaxPrice).toFixed(2)}{" "}
-                            <span className="text-xs font-normal text-slate-500">{item.unit || "หน่วย"}</span>
+                          <div className="text-base font-extrabold font-mono text-amber-600">
+                            {hasMatrixMax ? (
+                              <>
+                                ฿{Number(item.matrixMaxPrice).toFixed(2)}{" "}
+                                <span className="text-xs font-normal text-slate-500">{item.unit || "หน่วย"}</span>
+                              </>
+                            ) : (
+                              <span className="text-xs text-slate-400 font-sans font-normal">ไม่มีในฐานราคากลาง</span>
+                            )}
                           </div>
                         </div>
 
                         <div className="space-y-1">
                           <span className="text-slate-500">ส่วนต่างราคา:</span>
-                          <div className={`text-base font-extrabold font-mono flex items-center space-x-1 ${
-                            isPass ? "text-emerald-600" : "text-rose-600"
-                          }`}>
-                            {isPass ? (
-                              <>
-                                <TrendingDown className="w-4 h-4 shrink-0" />
-                                <span>ประหยัด ฿{Math.abs(priceDiff).toFixed(2)}</span>
-                              </>
-                            ) : (
-                              <>
-                                <TrendingUp className="w-4 h-4 shrink-0" />
-                                <span>เกินเกณฑ์ ฿{Math.abs(priceDiff).toFixed(2)}</span>
-                              </>
-                            )}
-                          </div>
+                          {isNotFound ? (
+                            <div className="text-xs font-semibold text-amber-800 flex items-center space-x-1 mt-0.5">
+                              <AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
+                              <span>รอการพิจารณา</span>
+                            </div>
+                          ) : (
+                            <div className={`text-base font-extrabold font-mono flex items-center space-x-1 ${
+                              isPass ? "text-emerald-600" : "text-rose-600"
+                            }`}>
+                              {isPass ? (
+                                <>
+                                  <TrendingDown className="w-4 h-4 shrink-0" />
+                                  <span>ประหยัด ฿{Math.abs(priceDiff).toFixed(2)}</span>
+                                </>
+                              ) : (
+                                <>
+                                  <TrendingUp className="w-4 h-4 shrink-0" />
+                                  <span>เกินเกณฑ์ ฿{Math.abs(priceDiff).toFixed(2)}</span>
+                                </>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
 
