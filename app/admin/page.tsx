@@ -8,6 +8,8 @@ import {
   collection,
   onSnapshot,
   addDoc,
+  setDoc,
+  getDoc,
   updateDoc,
   deleteDoc,
   doc,
@@ -145,8 +147,18 @@ export default function AdminDashboardPage() {
     setIsAddModalOpen(true);
   };
 
-  // 🔥 ฟังก์ชัน Save แบบ Optimistic (ทำงานทันที ไม่ต้องรอเน็ต)
-  const handleFormSubmit = (e?: React.FormEvent) => {
+  // ฟังก์ชันปรับชื่อสินค้าให้เป็น Unique Key มาตรฐาน (Lowercase, Trim, Replace spaces with dashes)
+  const normalizeItemKey = (name: string): string => {
+    return name
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "-")
+      .replace(/[^\w\u0E00-\u0E7F-]/g, "")
+      .replace(/--+/g, "-");
+  };
+
+  // 🔥 ฟังก์ชัน Save พร้อมตรวจสอบชื่อรายการซ้ำในระบบ (Unique Key via setDoc)
+  const handleFormSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setFormError(null);
 
@@ -159,11 +171,84 @@ export default function AdminDashboardPage() {
     const formattedName = itemName.trim();
     const formattedUnit = unit.trim();
     const currentEdit = editingItem;
+    const normalizedKey = normalizeItemKey(formattedName);
 
-    // 1. สั่งปิด Modal ทันที! ป้องกัน UI ค้าง
-    setIsAddModalOpen(false);
+    if (!normalizedKey) {
+      setFormError("ชื่อรายการไม่ถูกต้อง กรุณาระบุชื่อสินค้า");
+      return;
+    }
 
-    // 2. อัปเดตตารางหน้าเว็บให้เห็นผลทันที
+    // 1. ตรวจสอบชื่อรายการซ้ำ
+    if (!currentEdit) {
+      // กรณีกำลังเพิ่มรายการใหม่
+      if (isFirebaseConfigured && db) {
+        try {
+          const docRef = doc(db, "price_matrix", normalizedKey);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            setFormError(`รายการ "${formattedName}" นี้มีอยู่ในระบบแล้ว`);
+            return;
+          }
+        } catch (err: any) {
+          console.error("Duplicate check error:", err);
+        }
+      }
+
+      const isDuplicateLocal = items.some(
+        (i) => normalizeItemKey(i.itemName) === normalizedKey || i.id === normalizedKey
+      );
+      if (isDuplicateLocal) {
+        setFormError(`รายการ "${formattedName}" นี้มีอยู่ในระบบแล้ว`);
+        return;
+      }
+    } else {
+      // กรณีกำลังแก้ไขรายการเดิม (ถ้าเปลี่ยนชื่อใหม่ ต้องไม่ซ้ำกับรายการอื่น)
+      const originalKey = normalizeItemKey(currentEdit.itemName);
+      if (normalizedKey !== originalKey && normalizedKey !== currentEdit.id) {
+        if (isFirebaseConfigured && db) {
+          try {
+            const docRef = doc(db, "price_matrix", normalizedKey);
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+              setFormError(`รายการ "${formattedName}" นี้มีอยู่ในระบบแล้ว`);
+              return;
+            }
+          } catch (err: any) {
+            console.error("Duplicate check error:", err);
+          }
+        }
+
+        const isDuplicateLocal = items.some(
+          (i) => i.id !== currentEdit.id && (normalizeItemKey(i.itemName) === normalizedKey || i.id === normalizedKey)
+        );
+        if (isDuplicateLocal) {
+          setFormError(`รายการ "${formattedName}" นี้มีอยู่ในระบบแล้ว`);
+          return;
+        }
+      }
+    }
+
+    // 2. บันทึกข้อมูลลง Firestore ด้วย setDoc ระบุ Document ID
+    const targetDocId = currentEdit ? currentEdit.id : normalizedKey;
+    const itemData = {
+      itemName: formattedName,
+      category,
+      maxPrice: priceNum,
+      unit: formattedUnit,
+      updatedAt: serverTimestamp(),
+    };
+
+    if (isFirebaseConfigured && db) {
+      try {
+        await setDoc(doc(db, "price_matrix", targetDocId), itemData);
+      } catch (err: any) {
+        console.error("Firestore setDoc error:", err);
+        setFormError(`เกิดข้อผิดพลาดในการบันทึกข้อมูล: ${err.message || err}`);
+        return;
+      }
+    }
+
+    // 3. อัปเดตตารางหน้าเว็บ
     if (currentEdit) {
       setItems((prev) =>
         prev.map((i) =>
@@ -174,38 +259,17 @@ export default function AdminDashboardPage() {
       );
     } else {
       const newItem: PriceMatrixItem = {
-        id: `pm-${Date.now()}`,
+        id: targetDocId,
         itemName: formattedName,
         category,
         maxPrice: priceNum,
         unit: formattedUnit,
         updatedAt: Date.now(),
       };
-      setItems((prev) => [newItem, ...prev]);
+      setItems((prev) => [newItem, ...prev.filter((i) => i.id !== targetDocId)]);
     }
 
-    resetFormFields();
-
-    // 3. ปล่อยให้มันเซฟลง Firebase อยู่เบื้องหลังแบบเงียบๆ
-    if (isFirebaseConfigured && db) {
-      if (currentEdit) {
-        updateDoc(doc(db, "price_matrix", currentEdit.id), {
-          itemName: formattedName,
-          category,
-          maxPrice: priceNum,
-          unit: formattedUnit,
-          updatedAt: serverTimestamp(),
-        }).catch(console.error);
-      } else {
-        addDoc(collection(db, "price_matrix"), {
-          itemName: formattedName,
-          category,
-          maxPrice: priceNum,
-          unit: formattedUnit,
-          updatedAt: serverTimestamp(),
-        }).catch(console.error);
-      }
-    }
+    handleCloseModal();
   };
 
   const handleOpenDeleteModal = (item: PriceMatrixItem) => {
@@ -321,11 +385,12 @@ export default function AdminDashboardPage() {
         throw new Error("Gemini AI ไม่พบข้อมูลรายการราคากลางในรูปภาพนี้");
       }
 
-      // 2. Saving Extracted Items to Firestore collection `price_matrix`
+      // 2. Saving Extracted Items to Firestore collection `price_matrix` using Unique Keys
       setAiScanStep(2);
-      setAiScanStatusText(`กำลังบันทึกรายการราคากลางใหม่ ${extractedItems.length} รายการ ลงฐานข้อมูล Firestore (price_matrix)...`);
+      setAiScanStatusText(`กำลังตรวจสอบและบันทึกรายการราคากลาง ${extractedItems.length} รายการ...`);
 
       const newLocalItems: PriceMatrixItem[] = [];
+      let duplicateCount = 0;
 
       for (const itemData of extractedItems) {
         const formattedItem = {
@@ -335,27 +400,51 @@ export default function AdminDashboardPage() {
           unit: itemData.unit || "รายการ",
         };
 
+        const normalizedKey = normalizeItemKey(formattedItem.itemName) || `pm-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+
         if (isFirebaseConfigured && db) {
-          const docRef = await addDoc(collection(db, "price_matrix"), {
+          const docRef = doc(db, "price_matrix", normalizedKey);
+          const docSnap = await getDoc(docRef);
+
+          if (docSnap.exists()) {
+            duplicateCount++;
+            console.warn(`ข้ามรายการที่มีอยู่แล้วในระบบ: "${formattedItem.itemName}"`);
+            continue;
+          }
+
+          await setDoc(docRef, {
             ...formattedItem,
             updatedAt: serverTimestamp(),
           });
+
           newLocalItems.push({
-            id: docRef.id,
+            id: normalizedKey,
             ...formattedItem,
             updatedAt: Date.now(),
           });
         } else {
+          const isDup = items.some((i) => i.id === normalizedKey || normalizeItemKey(i.itemName) === normalizedKey);
+          if (isDup) {
+            duplicateCount++;
+            continue;
+          }
+
           newLocalItems.push({
-            id: `pm-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+            id: normalizedKey,
             ...formattedItem,
             updatedAt: Date.now(),
           });
         }
       }
 
+      if (duplicateCount > 0 && newLocalItems.length === 0) {
+        throw new Error(`ตรวจพบว่าทั้ง ${duplicateCount} รายการมีอยู่ในระบบแล้ว (รายการซ้ำ)`);
+      }
+
       // Update table local state immediately
-      setItems((prev) => [...newLocalItems, ...prev]);
+      if (newLocalItems.length > 0) {
+        setItems((prev) => [...newLocalItems, ...prev]);
+      }
 
       // Complete & Close Modal
       setIsAIScanModalOpen(false);
@@ -604,9 +693,9 @@ export default function AdminDashboardPage() {
             </div>
             <form onSubmit={handleFormSubmit} className="p-6 space-y-5">
               {formError && (
-                <div className="bg-neutral-950 border border-neutral-700 p-3 text-xs font-mono text-neutral-200 flex items-start space-x-2">
-                  <AlertTriangle className="w-4 h-4 text-white shrink-0 mt-0.5" />
-                  <span>{formError}</span>
+                <div className="bg-rose-950/90 border border-rose-600 p-3.5 text-xs font-mono text-rose-200 flex items-start space-x-2.5 rounded-none shadow-sm animate-in fade-in duration-200">
+                  <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                  <span className="font-semibold text-rose-100">{formError}</span>
                 </div>
               )}
               <div className="space-y-1.5">
