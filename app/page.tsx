@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import * as XLSX from "xlsx";
 import { db, isFirebaseConfigured } from "@/lib/firebase";
-import { collection, onSnapshot } from "firebase/firestore";
+import { collection, onSnapshot, addDoc, serverTimestamp } from "firebase/firestore";
 import { PriceMatrixItem } from "@/lib/types";
 import { initialPriceMatrixData } from "@/lib/mockData";
 import {
@@ -299,6 +299,22 @@ export default function UserFrontendPage() {
 
       const data = await aiRes.json();
       const results: AnalysisItemResult[] = Array.isArray(data) ? data : [data];
+
+      // บันทึกประวัติการตรวจสอบลง Firestore collection `audit_history`
+      if (isFirebaseConfigured && db) {
+        const failCount = results.filter(
+          (item) => item.status === "FAIL" || item.status === "NOT_FOUND"
+        ).length;
+
+        addDoc(collection(db, "audit_history"), {
+          createdAt: serverTimestamp(),
+          itemsAnalyzed: results.length,
+          failCount: failCount,
+          scanResults: results,
+        }).catch((err) => {
+          console.warn("Error saving audit_history:", err);
+        });
+      }
 
       setProcessingStep(3); // 3. สรุปผลการตรวจสอบอนุมัติ...
       await new Promise((r) => setTimeout(r, 400));

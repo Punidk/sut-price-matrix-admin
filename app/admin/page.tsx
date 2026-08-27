@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { db, isFirebaseConfigured } from "@/lib/firebase";
@@ -34,6 +35,7 @@ import {
   RefreshCw,
   FileText,
   CheckCircle2,
+  History,
 } from "lucide-react";
 
 export interface PriceMatrixItem {
@@ -522,6 +524,26 @@ export default function AdminDashboardPage() {
             </div>
           </div>
           <div className="flex items-center space-x-4">
+            {/* Admin Nav Tabs */}
+            <nav className="hidden sm:flex items-center space-x-1">
+              <Link
+                href="/admin"
+                className="px-3 py-1.5 text-xs font-mono font-medium transition flex items-center space-x-1.5 border bg-white text-black border-white"
+              >
+                <Database className="w-3.5 h-3.5" />
+                <span>จัดการราคากลาง</span>
+              </Link>
+              <Link
+                href="/admin/history"
+                className="px-3 py-1.5 text-xs font-mono font-medium transition flex items-center space-x-1.5 border bg-neutral-950 text-neutral-400 border-neutral-800 hover:text-white hover:border-neutral-700"
+              >
+                <History className="w-3.5 h-3.5" />
+                <span>ประวัติการตรวจสอบ</span>
+              </Link>
+            </nav>
+
+            <div className="h-6 w-px bg-neutral-800 hidden sm:block"></div>
+
             <div className="hidden md:flex flex-col items-end text-xs font-mono">
               <span className="text-neutral-500">ADMIN USER</span>
               <span className="text-white font-semibold truncate max-w-[200px]">
