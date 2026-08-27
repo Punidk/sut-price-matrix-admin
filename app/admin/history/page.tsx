@@ -25,14 +25,33 @@ import {
   TrendingUp,
 } from "lucide-react";
 
+export interface ReceiptItemData {
+  itemName: string;
+  qty: number;
+  unit: string;
+  unitPrice: number;
+  totalPrice: number;
+}
+
+export interface MatrixItemData {
+  itemName?: string | null;
+  category?: string | null;
+  maxPrice?: number | null;
+  unit?: string | null;
+}
+
 export interface AuditScanItem {
   status: "PASS" | "FAIL" | "NOT_FOUND";
-  message: string;
-  itemInReceipt: string;
+  errorFlags?: string[];
+  message?: string;
+  receiptData?: ReceiptItemData;
+  matrixData?: MatrixItemData | null;
+  // Fallbacks for compatibility
+  itemInReceipt?: string;
   matchedMatrixItem?: string | null;
-  detectedPrice: number;
+  detectedPrice?: number;
   matrixMaxPrice?: number | null;
-  unit: string;
+  unit?: string;
 }
 
 export interface AuditLogEntry {
@@ -477,23 +496,39 @@ export default function AdminAuditHistoryPage() {
                                     const isPass = item.status === "PASS";
                                     const isFail = item.status === "FAIL";
                                     const isNotFound = item.status === "NOT_FOUND";
-                                    const hasMax = item.matrixMaxPrice != null && item.matrixMaxPrice > 0;
-                                    const diff = hasMax ? item.detectedPrice - (item.matrixMaxPrice as number) : 0;
+
+                                    const itemName = item.receiptData?.itemName || item.itemInReceipt || "รายการที่ตรวจพบ";
+                                    const qty = item.receiptData?.qty != null ? item.receiptData.qty : 1;
+                                    const receiptUnit = item.receiptData?.unit || item.unit || "หน่วย";
+                                    const unitPrice = item.receiptData?.unitPrice != null ? item.receiptData.unitPrice : (item.detectedPrice || 0);
+                                    const totalPrice = item.receiptData?.totalPrice != null ? item.receiptData.totalPrice : (qty * unitPrice);
+
+                                    const matrixName = item.matrixData?.itemName || item.matchedMatrixItem || null;
+                                    const matrixMaxPrice = item.matrixData?.maxPrice != null ? item.matrixData.maxPrice : (item.matrixMaxPrice != null ? item.matrixMaxPrice : null);
+                                    const matrixUnit = item.matrixData?.unit || null;
+
+                                    const errorFlags = Array.isArray(item.errorFlags) ? item.errorFlags : [];
+                                    const isUnitMismatch = !!(matrixUnit && receiptUnit && matrixUnit.trim().toLowerCase() !== receiptUnit.trim().toLowerCase());
+                                    const isMathError = Math.abs(qty * unitPrice - totalPrice) > 0.01;
+
+                                    const hasMax = matrixMaxPrice != null && matrixMaxPrice > 0;
+                                    const diff = hasMax ? unitPrice - matrixMaxPrice : 0;
 
                                     return (
                                       <div
                                         key={itemIdx}
-                                        className={`bg-neutral-900 border p-4 space-y-3 ${
+                                        className={`bg-neutral-900 border p-4 space-y-3.5 ${
                                           isPass
                                             ? "border-neutral-800 hover:border-emerald-800/60"
                                             : isFail
-                                            ? "border-rose-900/80 bg-rose-950/20 hover:border-rose-700"
-                                            : "border-amber-900/80 bg-amber-950/20 hover:border-amber-700"
+                                            ? "border-rose-800/80 bg-rose-950/20 hover:border-rose-700"
+                                            : "border-amber-800/80 bg-amber-950/20 hover:border-amber-700"
                                         }`}
                                       >
-                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-neutral-800">
-                                          <div className="flex items-center space-x-2.5">
-                                            <div className={`p-1.5 shrink-0 ${
+                                        {/* Item Header */}
+                                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2.5 pb-2.5 border-b border-neutral-800">
+                                          <div className="flex items-start space-x-2.5">
+                                            <div className={`p-1.5 shrink-0 mt-0.5 ${
                                               isPass
                                                 ? "bg-emerald-950 text-emerald-400 border border-emerald-800"
                                                 : isFail
@@ -508,22 +543,32 @@ export default function AdminAuditHistoryPage() {
                                                 <AlertTriangle className="w-4 h-4" />
                                               )}
                                             </div>
-                                            <div>
+                                            <div className="space-y-0.5">
                                               <span className="text-[10px] font-mono text-neutral-500">
                                                 รายการที่ {itemIdx + 1}
                                               </span>
                                               <h5 className="text-sm font-bold text-white">
-                                                {item.itemInReceipt || "รายการที่ตรวจพบ"}
+                                                {itemName}
                                               </h5>
+                                              {matrixName && (
+                                                <div className="text-[11px] text-neutral-400 font-mono flex items-center space-x-1.5">
+                                                  <span>จับคู่ราคากลาง:</span>
+                                                  <span className="bg-neutral-950 border border-neutral-800 text-neutral-200 px-1.5 py-0.2">{matrixName}</span>
+                                                </div>
+                                              )}
                                             </div>
                                           </div>
 
-                                          <div className="flex items-center space-x-2">
-                                            {item.matchedMatrixItem && (
-                                              <span className="text-[11px] bg-neutral-950 text-neutral-300 border border-neutral-800 px-2 py-0.5 font-mono">
-                                                จับคู่: {item.matchedMatrixItem}
+                                          <div className="flex flex-wrap items-center gap-1.5 self-start sm:self-auto justify-end">
+                                            {/* Specific Error Flags */}
+                                            {isFail && errorFlags.map((flag, fIdx) => (
+                                              <span
+                                                key={fIdx}
+                                                className="text-[10px] font-mono font-bold px-2 py-0.5 bg-rose-600 text-white"
+                                              >
+                                                [{flag}]
                                               </span>
-                                            )}
+                                            ))}
                                             <span
                                               className={`text-xs font-mono font-bold px-2.5 py-0.5 border ${
                                                 isPass
@@ -548,13 +593,67 @@ export default function AdminAuditHistoryPage() {
                                           </div>
                                         )}
 
+                                        {/* Breakdown calculation box */}
+                                        <div className="bg-neutral-950 border border-neutral-800 p-3 space-y-1.5 text-xs font-mono">
+                                          <div className="flex flex-wrap items-center justify-between gap-2 text-neutral-300">
+                                            <div className="flex items-center space-x-2">
+                                              <span className="text-neutral-500">จำนวน & ราคาในบิล:</span>
+                                              <span className="text-white bg-neutral-900 border border-neutral-700 px-2 py-0.5">
+                                                {qty}{" "}
+                                                {isUnitMismatch ? (
+                                                  <span className="bg-rose-950 text-rose-300 border border-rose-600 px-1 py-0.2 font-bold underline decoration-rose-500">
+                                                    {receiptUnit}
+                                                  </span>
+                                                ) : (
+                                                  receiptUnit
+                                                )}{" "}
+                                                × ฿{Number(unitPrice).toFixed(2)}
+                                              </span>
+                                            </div>
+                                            <div className="text-white font-bold">
+                                              ราคารวมในบิล: ฿{Number(totalPrice).toFixed(2)}
+                                            </div>
+                                          </div>
+
+                                          {/* Math Error Alert */}
+                                          {(isMathError || errorFlags.includes("คำนวณเลขผิด")) && (
+                                            <div className="bg-rose-950/80 border border-rose-600 text-rose-200 p-2 text-[11px] flex items-start space-x-2">
+                                              <AlertTriangle className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />
+                                              <div>
+                                                <span className="font-bold text-rose-100">[คำนวณเลขผิด]: </span>
+                                                คำนวณจริง ({qty} × ฿{Number(unitPrice).toFixed(2)} = ฿{(qty * unitPrice).toFixed(2)}) แต่ระบุในบิลเป็น ฿{Number(totalPrice).toFixed(2)}
+                                              </div>
+                                            </div>
+                                          )}
+
+                                          {/* Unit Mismatch Alert */}
+                                          {isUnitMismatch && (
+                                            <div className="bg-amber-950/80 border border-amber-600 text-amber-200 p-2 text-[11px] flex items-start space-x-2">
+                                              <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                                              <div>
+                                                <span className="font-bold text-amber-100">[หน่วยนับไม่ตรง]: </span>
+                                                ในบิลระบุหน่วย <span className="bg-rose-900 px-1 text-white">{receiptUnit}</span> แต่เพดานราคากลางกำหนดหน่วยเป็น <span className="bg-amber-900 px-1 text-white">{matrixUnit}</span>
+                                              </div>
+                                            </div>
+                                          )}
+                                        </div>
+
                                         {/* Pricing Comparison Grid */}
                                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-neutral-950 p-3 border border-neutral-800 font-mono text-xs">
                                           <div className="space-y-0.5">
-                                            <span className="text-neutral-500 text-[11px]">ราคาเสนอในเอกสาร:</span>
+                                            <span className="text-neutral-500 text-[11px]">ราคาต่อหน่วยในบิล:</span>
                                             <div className="text-sm font-bold text-white">
-                                              ฿{Number(item.detectedPrice).toFixed(2)}{" "}
-                                              <span className="text-xs text-neutral-400 font-normal">{item.unit}</span>
+                                              ฿{Number(unitPrice).toFixed(2)}{" "}
+                                              <span className="text-xs text-neutral-400 font-normal">
+                                                /{" "}
+                                                {isUnitMismatch ? (
+                                                  <span className="bg-rose-950 text-rose-300 border border-rose-600 px-1 font-bold">
+                                                    {receiptUnit}
+                                                  </span>
+                                                ) : (
+                                                  receiptUnit
+                                                )}
+                                              </span>
                                             </div>
                                           </div>
 
@@ -563,8 +662,17 @@ export default function AdminAuditHistoryPage() {
                                             <div className="text-sm font-bold text-amber-400">
                                               {hasMax ? (
                                                 <>
-                                                  ฿{Number(item.matrixMaxPrice).toFixed(2)}{" "}
-                                                  <span className="text-xs text-neutral-400 font-normal">{item.unit}</span>
+                                                  ฿{Number(matrixMaxPrice).toFixed(2)}{" "}
+                                                  <span className="text-xs text-neutral-400 font-normal">
+                                                    /{" "}
+                                                    {isUnitMismatch ? (
+                                                      <span className="bg-amber-950 text-amber-300 border border-amber-600 px-1 font-bold">
+                                                        {matrixUnit}
+                                                      </span>
+                                                    ) : (
+                                                      matrixUnit || receiptUnit
+                                                    )}
+                                                  </span>
                                                 </>
                                               ) : (
                                                 <span className="text-xs text-neutral-500 font-normal">ไม่มีในฐานราคากลาง</span>
@@ -573,14 +681,14 @@ export default function AdminAuditHistoryPage() {
                                           </div>
 
                                           <div className="space-y-0.5">
-                                            <span className="text-neutral-500 text-[11px]">ส่วนต่างราคา:</span>
+                                            <span className="text-neutral-500 text-[11px]">ส่วนต่างราคาต่อหน่วย:</span>
                                             {isNotFound ? (
                                               <div className="text-xs text-amber-400">รอการพิจารณา</div>
                                             ) : (
                                               <div className={`text-sm font-bold flex items-center space-x-1 ${
-                                                isPass ? "text-emerald-400" : "text-rose-400"
+                                                diff <= 0 ? "text-emerald-400" : "text-rose-400"
                                               }`}>
-                                                {isPass ? (
+                                                {diff <= 0 ? (
                                                   <>
                                                     <TrendingDown className="w-3.5 h-3.5" />
                                                     <span>ประหยัด ฿{Math.abs(diff).toFixed(2)}</span>

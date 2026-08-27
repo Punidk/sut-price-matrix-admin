@@ -46,30 +46,37 @@ export async function POST(req: NextRequest) {
     // 2. แปลงข้อมูล priceMatrix เป็น String
     const matrixContext = JSON.stringify(priceMatrix || [], null, 2);
 
-    // 3. คำสั่ง Prompt (Part 1)
-    const prompt = `จงตรวจสอบรายการค่าใช้จ่ายจากข้อมูลทั้งหมดที่แนบมานี้ (ทั้งรูปภาพ, PDF, หรือข้อความ) หาว่าแต่ละรายการตรงกับหรือใกล้เคียงกับรายการไหนใน priceMatrix ต่อไปนี้:
+    // 3. คำสั่ง Prompt (Part 1) - Auditor System Persona with 4 Check Conditions
+    const prompt = `คุณคือผู้ตรวจสอบบัญชี (Auditor) หน้าที่ของคุณคือตรวจสอบรายการค่าใช้จ่ายจากเอกสารที่แนบมา เทียบกับฐานข้อมูลราคากลาง (priceMatrix):
 ${matrixContext}
 
-คำสั่งและเงื่อนไขการประเมิน:
-1. สำหรับรายการที่ตรงกับหรือใกล้เคียงกับข้อมูลใน priceMatrix:
-   - หากราคาที่ตรวจพบ (detectedPrice) <= ราคากลางสูงสุด (matrixMaxPrice) ให้กำหนด "status": "PASS"
-   - หากราคาที่ตรวจพบ (detectedPrice) > ราคากลางสูงสุด (matrixMaxPrice) ให้กำหนด "status": "FAIL"
-2. สำหรับรายการในใบเสร็จที่ค้นหาไม่พบ หรือไม่มีความใกล้เคียงกับข้อมูลใน priceMatrix เลย ให้ตอบกลับด้วย:
-   - "status": "NOT_FOUND"
-   - "message": "ไม่อยู่ในฐานข้อมูลราคากลาง"
-   - "matchedMatrixItem": null
-   - "matrixMaxPrice": null
+โดยต้องตรวจสอบ 4 เงื่อนไขอย่างละเอียด:
+1. ไม่อยู่ในราคากลาง (Not Found): ค้นหาไม่พบหรือไม่มีความใกล้เคียงกับข้อมูลใน priceMatrix -> กำหนด "status": "NOT_FOUND", "errorFlags": [], และให้ข้อมูลใน matrixData เป็น null ทั้งหมด
+2. ราคาต่อหน่วยเกินราคากลาง (Price Exceeded): ราคาต่อหน่วยในบิล (receiptData.unitPrice) สูงกว่าเพดานราคากลาง (matrixData.maxPrice) -> กำหนด "status": "FAIL" และเพิ่ม "ราคาเกินเกณฑ์" ใน errorFlags
+3. หน่วยนับไม่ตรงกับราคากลาง (Unit Mismatch): หน่วยในบิล (receiptData.unit) ไม่ตรงกับหน่วยในราคากลาง (matrixData.unit) เช่น กล่อง vs ชิ้น -> กำหนด "status": "FAIL" และเพิ่ม "หน่วยไม่ตรง" ใน errorFlags
+4. คำนวณเลขผิด (Math Error): ตรวจสอบความถูกต้องทางคณิตศาสตร์ หาก จำนวน (receiptData.qty) * ราคาต่อหน่วย (receiptData.unitPrice) ไม่เท่ากับ ราคารวม (receiptData.totalPrice) ที่ระบุในเอกสาร -> กำหนด "status": "FAIL" และเพิ่ม "คำนวณเลขผิด" ใน errorFlags
 
-ให้ตอบกลับเป็น JSON Array โครงสร้างคือ:
+หากผ่านเกณฑ์ทั้งหมดทุกข้อ ให้กำหนด "status": "PASS" และ "errorFlags": []
+
+ตอบกลับเป็น JSON Array ตามโครงสร้างนี้เท่านั้น:
 [
   {
     "status": "PASS" | "FAIL" | "NOT_FOUND",
+    "errorFlags": ["ราคาเกินเกณฑ์", "หน่วยไม่ตรง", "คำนวณเลขผิด"],
     "message": "คำอธิบายผลการตรวจสอบอย่างละเอียดภาษาไทย",
-    "itemInReceipt": "ชื่อที่ตรวจพบ",
-    "matchedMatrixItem": "ชื่อในราคากลาง หรือ null หากไม่พบ",
-    "detectedPrice": ตัวเลขราคาต่อหน่วยที่ตรวจพบ,
-    "matrixMaxPrice": ตัวเลขราคากลางสูงสุด หรือ null หากไม่พบ,
-    "unit": "หน่วยนับ เช่น กล่อง, ชิ้น, ครั้ง"
+    "receiptData": {
+      "itemName": "ชื่อในบิล",
+      "qty": จำนวน (ตัวเลข),
+      "unit": "หน่วยในบิล",
+      "unitPrice": ราคาต่อหน่วยในบิล,
+      "totalPrice": ราคารวมของรายการนี้ในบิล
+    },
+    "matrixData": {
+      "itemName": "ชื่อในฐานข้อมูล (null ถ้าไม่เจอ)",
+      "category": "หมวดหมู่ (null ถ้าไม่เจอ)",
+      "maxPrice": ราคากลางสูงสุด (null ถ้าไม่เจอ),
+      "unit": "หน่วยนับในฐานข้อมูล (null ถ้าไม่เจอ)"
+    }
   }
 ]
 ห้ามมีข้อความอื่นปนเด็ดขาด`;

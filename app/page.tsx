@@ -33,14 +33,33 @@ import {
   AlertTriangle,
 } from "lucide-react";
 
+export interface ReceiptItemData {
+  itemName: string;
+  qty: number;
+  unit: string;
+  unitPrice: number;
+  totalPrice: number;
+}
+
+export interface MatrixItemData {
+  itemName?: string | null;
+  category?: string | null;
+  maxPrice?: number | null;
+  unit?: string | null;
+}
+
 export interface AnalysisItemResult {
   status: "PASS" | "FAIL" | "NOT_FOUND";
-  message: string;
-  itemInReceipt: string;
+  errorFlags?: string[];
+  message?: string;
+  receiptData?: ReceiptItemData;
+  matrixData?: MatrixItemData | null;
+  // Fallbacks for compatibility
+  itemInReceipt?: string;
   matchedMatrixItem?: string | null;
-  detectedPrice: number;
+  detectedPrice?: number;
   matrixMaxPrice?: number | null;
-  unit: string;
+  unit?: string;
 }
 
 export interface UploadedFileItem {
@@ -743,8 +762,23 @@ export default function UserFrontendPage() {
                   const isPass = item.status === "PASS";
                   const isFail = item.status === "FAIL";
                   const isNotFound = item.status === "NOT_FOUND";
-                  const hasMatrixMax = item.matrixMaxPrice != null && item.matrixMaxPrice > 0;
-                  const priceDiff = hasMatrixMax ? item.detectedPrice - (item.matrixMaxPrice as number) : 0;
+
+                  const itemName = item.receiptData?.itemName || item.itemInReceipt || "รายการที่ตรวจพบ";
+                  const qty = item.receiptData?.qty != null ? item.receiptData.qty : 1;
+                  const receiptUnit = item.receiptData?.unit || item.unit || "หน่วย";
+                  const unitPrice = item.receiptData?.unitPrice != null ? item.receiptData.unitPrice : (item.detectedPrice || 0);
+                  const totalPrice = item.receiptData?.totalPrice != null ? item.receiptData.totalPrice : (qty * unitPrice);
+
+                  const matrixName = item.matrixData?.itemName || item.matchedMatrixItem || null;
+                  const matrixMaxPrice = item.matrixData?.maxPrice != null ? item.matrixData.maxPrice : (item.matrixMaxPrice != null ? item.matrixMaxPrice : null);
+                  const matrixUnit = item.matrixData?.unit || null;
+
+                  const errorFlags = Array.isArray(item.errorFlags) ? item.errorFlags : [];
+                  const isUnitMismatch = !!(matrixUnit && receiptUnit && matrixUnit.trim().toLowerCase() !== receiptUnit.trim().toLowerCase());
+                  const isMathError = Math.abs(qty * unitPrice - totalPrice) > 0.01;
+
+                  const hasMatrixMax = matrixMaxPrice != null && matrixMaxPrice > 0;
+                  const priceDiff = hasMatrixMax ? unitPrice - matrixMaxPrice : 0;
 
                   return (
                     <div
@@ -753,14 +787,14 @@ export default function UserFrontendPage() {
                         isPass
                           ? "border-emerald-200 hover:border-emerald-400"
                           : isFail
-                          ? "border-rose-200 hover:border-rose-400"
+                          ? "border-rose-300 hover:border-rose-500 bg-rose-50/10"
                           : "border-amber-300 bg-amber-50/30 hover:border-amber-400"
                       }`}
                     >
                       {/* Item Header */}
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
-                        <div className="flex items-center space-x-3">
-                          <div className={`p-2 rounded-xl shrink-0 ${
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 pb-3 border-b border-slate-100">
+                        <div className="flex items-start space-x-3">
+                          <div className={`p-2.5 rounded-xl shrink-0 mt-0.5 ${
                             isPass
                               ? "bg-emerald-100 text-emerald-700"
                               : isFail
@@ -775,20 +809,30 @@ export default function UserFrontendPage() {
                               <AlertTriangle className="w-5 h-5" />
                             )}
                           </div>
-                          <div>
+                          <div className="space-y-1">
                             <span className="text-[11px] font-mono text-slate-400">รายการที่ {idx + 1}</span>
-                            <h5 className="text-base font-bold text-slate-900">
-                              {item.itemInReceipt || "รายการที่ตรวจพบ"}
+                            <h5 className="text-base font-bold text-slate-900 leading-snug">
+                              {itemName}
                             </h5>
+                            {matrixName && (
+                              <div className="text-xs text-slate-500 font-mono flex items-center space-x-1.5">
+                                <span>จับคู่ราคากลาง:</span>
+                                <span className="bg-slate-100 text-slate-800 px-2 py-0.5 rounded font-semibold">{matrixName}</span>
+                              </div>
+                            )}
                           </div>
                         </div>
 
-                        <div className="flex items-center space-x-2">
-                          {item.matchedMatrixItem && (
-                            <span className="text-xs bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg font-mono">
-                              จับคู่: {item.matchedMatrixItem}
+                        <div className="flex flex-wrap items-center gap-1.5 self-start sm:self-auto justify-end">
+                          {/* Specific Error Flags Badges */}
+                          {isFail && errorFlags.map((flag, fIdx) => (
+                            <span
+                              key={fIdx}
+                              className="text-xs font-bold font-mono px-2.5 py-0.5 rounded-full bg-rose-600 text-white shadow-xs"
+                            >
+                              [{flag}]
                             </span>
-                          )}
+                          ))}
                           <span
                             className={`text-xs font-bold font-mono px-3 py-1 rounded-full ${
                               isPass
@@ -813,23 +857,86 @@ export default function UserFrontendPage() {
                         </div>
                       )}
 
+                      {/* Receipt Math & Qty Calculation Breakdown Box */}
+                      <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 space-y-1.5 text-xs">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex items-center space-x-2 text-slate-700">
+                            <span className="font-semibold text-slate-900">จำนวน & ราคาในบิล:</span>
+                            <span className="font-mono bg-white px-2 py-0.5 border border-slate-200 rounded text-slate-900">
+                              {qty}{" "}
+                              {isUnitMismatch ? (
+                                <span className="bg-rose-100 text-rose-800 border border-rose-300 px-1 py-0.2 rounded font-bold underline decoration-rose-500">
+                                  {receiptUnit}
+                                </span>
+                              ) : (
+                                receiptUnit
+                              )}{" "}
+                              × ฿{Number(unitPrice).toFixed(2)}
+                            </span>
+                          </div>
+                          <div className="text-slate-900 font-mono font-bold text-sm">
+                            ราคารวมในบิล: ฿{Number(totalPrice).toFixed(2)}
+                          </div>
+                        </div>
+
+                        {/* Math Error Highlight */}
+                        {(isMathError || errorFlags.includes("คำนวณเลขผิด")) && (
+                          <div className="bg-rose-50 border border-rose-300 text-rose-800 p-2.5 rounded-lg flex items-start space-x-2 text-[11px] font-mono">
+                            <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                            <div>
+                              <span className="font-bold">[ข้อผิดพลาดทางคณิตศาสตร์]: </span>
+                              คำนวณจริง ({qty} × ฿{Number(unitPrice).toFixed(2)} = ฿{(qty * unitPrice).toFixed(2)}) แต่ระบุในบิลเป็น ฿{Number(totalPrice).toFixed(2)}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Unit Mismatch Highlight Note */}
+                        {isUnitMismatch && (
+                          <div className="bg-amber-50 border border-amber-300 text-amber-900 p-2.5 rounded-lg flex items-start space-x-2 text-[11px] font-mono">
+                            <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                            <div>
+                              <span className="font-bold">[หน่วยนับไม่ตรง]: </span>
+                              ในบิลระบุหน่วย <span className="bg-rose-200/80 px-1 rounded font-bold text-rose-900">{receiptUnit}</span> แต่เพดานราคากลางกำหนดหน่วยเป็น <span className="bg-amber-200/80 px-1 rounded font-bold text-amber-900">{matrixUnit}</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
                       {/* Pricing Comparison Grid */}
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-100 text-xs">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-white p-4 rounded-xl border border-slate-200 text-xs">
                         <div className="space-y-1">
-                          <span className="text-slate-500">ราคาเสนอในเอกสาร:</span>
+                          <span className="text-slate-500">ราคาต่อหน่วยในบิล:</span>
                           <div className="text-base font-extrabold text-slate-900 font-mono">
-                            ฿{Number(item.detectedPrice).toFixed(2)}{" "}
-                            <span className="text-xs font-normal text-slate-500">{item.unit || "หน่วย"}</span>
+                            ฿{Number(unitPrice).toFixed(2)}{" "}
+                            <span className="text-xs font-normal text-slate-500">
+                              /{" "}
+                              {isUnitMismatch ? (
+                                <span className="bg-rose-100 text-rose-800 font-bold px-1 py-0.2 rounded border border-rose-300">
+                                  {receiptUnit}
+                                </span>
+                              ) : (
+                                receiptUnit
+                              )}
+                            </span>
                           </div>
                         </div>
 
                         <div className="space-y-1">
-                          <span className="text-slate-500">เพดานราคากลางสูงสุด:</span>
+                          <span className="text-slate-500">เพดานราคากลาง:</span>
                           <div className="text-base font-extrabold font-mono text-amber-600">
                             {hasMatrixMax ? (
                               <>
-                                ฿{Number(item.matrixMaxPrice).toFixed(2)}{" "}
-                                <span className="text-xs font-normal text-slate-500">{item.unit || "หน่วย"}</span>
+                                ฿{Number(matrixMaxPrice).toFixed(2)}{" "}
+                                <span className="text-xs font-normal text-slate-500">
+                                  /{" "}
+                                  {isUnitMismatch ? (
+                                    <span className="bg-amber-100 text-amber-900 font-bold px-1 py-0.2 rounded border border-amber-300">
+                                      {matrixUnit}
+                                    </span>
+                                  ) : (
+                                    matrixUnit || receiptUnit
+                                  )}
+                                </span>
                               </>
                             ) : (
                               <span className="text-xs text-slate-400 font-sans font-normal">ไม่มีในฐานราคากลาง</span>
@@ -838,7 +945,7 @@ export default function UserFrontendPage() {
                         </div>
 
                         <div className="space-y-1">
-                          <span className="text-slate-500">ส่วนต่างราคา:</span>
+                          <span className="text-slate-500">ส่วนต่างราคาต่อหน่วย:</span>
                           {isNotFound ? (
                             <div className="text-xs font-semibold text-amber-800 flex items-center space-x-1 mt-0.5">
                               <AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
@@ -846,9 +953,9 @@ export default function UserFrontendPage() {
                             </div>
                           ) : (
                             <div className={`text-base font-extrabold font-mono flex items-center space-x-1 ${
-                              isPass ? "text-emerald-600" : "text-rose-600"
+                              priceDiff <= 0 ? "text-emerald-600" : "text-rose-600"
                             }`}>
-                              {isPass ? (
+                              {priceDiff <= 0 ? (
                                 <>
                                   <TrendingDown className="w-4 h-4 shrink-0" />
                                   <span>ประหยัด ฿{Math.abs(priceDiff).toFixed(2)}</span>
@@ -865,8 +972,8 @@ export default function UserFrontendPage() {
                       </div>
 
                       {/* Message Explanation */}
-                      <div className="text-xs text-slate-600 bg-white p-3 rounded-lg border border-slate-200/80 leading-relaxed">
-                        <span className="font-semibold text-slate-800">ผลการวิเคราะห์: </span>
+                      <div className="text-xs text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-200/80 leading-relaxed">
+                        <span className="font-semibold text-slate-800 font-mono text-[11px]">ผลการวิเคราะห์: </span>
                         {item.message}
                       </div>
                     </div>
