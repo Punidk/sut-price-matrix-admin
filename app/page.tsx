@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import * as XLSX from "xlsx";
 import { db, isFirebaseConfigured } from "@/lib/firebase";
-import { collection, getDocs, onSnapshot } from "firebase/firestore";
+import { collection, onSnapshot } from "firebase/firestore";
 import { PriceMatrixItem } from "@/lib/types";
 import { initialPriceMatrixData } from "@/lib/mockData";
 import {
@@ -22,26 +23,37 @@ import {
   TrendingUp,
   Building2,
   Lock,
-  ExternalLink,
   ImageIcon,
   Brain,
+  FileSpreadsheet,
+  Trash2,
+  Plus,
+  Layers,
+  FileCheck,
 } from "lucide-react";
 
-const IMGBB_API_KEY = "5f6ccb81e79ea0735182d9a7870bff69";
-
-interface AnalysisResult {
+export interface AnalysisItemResult {
   status: "PASS" | "FAIL";
   message: string;
-  item: string;
+  itemInReceipt: string;
+  matchedMatrixItem?: string;
   detectedPrice: number;
   matrixMaxPrice: number;
   unit: string;
 }
 
+export interface UploadedFileItem {
+  id: string;
+  file: File;
+  type: "image" | "pdf" | "excel" | "other";
+  name: string;
+  size: number;
+  previewUrl?: string;
+  mimeType: string;
+}
+
 export default function UserFrontendPage() {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<UploadedFileItem[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStep, setProcessingStep] = useState(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -49,8 +61,8 @@ export default function UserFrontendPage() {
   // Firestore Price Matrix items state
   const [priceMatrix, setPriceMatrix] = useState<PriceMatrixItem[]>([]);
 
-  // AI Analysis Result state
-  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+  // AI Analysis Results state (Array of items)
+  const [analysisResults, setAnalysisResults] = useState<AnalysisItemResult[] | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -86,56 +98,149 @@ export default function UserFrontendPage() {
     }
   }, []);
 
-  // File selection handler
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-      setAnalysisResult(null);
-      setUploadedImageUrl(null);
-      setUploadError(null);
+  // Helper to convert Image / PDF File to Base64 String (excluding data URL prefix)
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        const base64Data = result.split(",")[1] || result;
+        resolve(base64Data);
+      };
+      reader.onerror = (err) => reject(err);
+      reader.readAsDataURL(file);
+    });
+  };
 
-      if (file.type.startsWith("image/")) {
-        const url = URL.createObjectURL(file);
-        setPreviewUrl(url);
+  // Helper to read Excel / CSV File via SheetJS and convert to CSV text
+  const processExcelFile = async (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: "array" });
+          let combinedCsv = "";
+          workbook.SheetNames.forEach((sheetName) => {
+            const worksheet = workbook.Sheets[sheetName];
+            const csv = XLSX.utils.sheet_to_csv(worksheet);
+            if (csv.trim()) {
+              combinedCsv += `\n--- Sheet: ${sheetName} ---\n` + csv;
+            }
+          });
+          resolve(combinedCsv.trim());
+        } catch (err) {
+          reject(err);
+        }
+      };
+      reader.onerror = (err) => reject(err);
+      reader.readAsArrayBuffer(file);
+    });
+  };
+
+  // Handle adding new files to list
+  const addFiles = (fileList: FileList | File[]) => {
+    const newItems: UploadedFileItem[] = [];
+    setUploadError(null);
+    setAnalysisResults(null);
+
+    for (let i = 0; i < fileList.length; i++) {
+      const file = fileList[i];
+      const isImage = file.type.startsWith("image/");
+      const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+      const isExcel =
+        file.name.toLowerCase().endsWith(".xlsx") ||
+        file.name.toLowerCase().endsWith(".xls") ||
+        file.name.toLowerCase().endsWith(".csv") ||
+        file.type.includes("spreadsheet") ||
+        file.type.includes("excel") ||
+        file.type.includes("csv");
+
+      const id = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
+      if (isImage) {
+        newItems.push({
+          id,
+          file,
+          type: "image",
+          name: file.name,
+          size: file.size,
+          previewUrl: URL.createObjectURL(file),
+          mimeType: file.type || "image/jpeg",
+        });
+      } else if (isPdf) {
+        newItems.push({
+          id,
+          file,
+          type: "pdf",
+          name: file.name,
+          size: file.size,
+          mimeType: "application/pdf",
+        });
+      } else if (isExcel) {
+        newItems.push({
+          id,
+          file,
+          type: "excel",
+          name: file.name,
+          size: file.size,
+          mimeType: file.type || "text/csv",
+        });
       } else {
-        setPreviewUrl(null);
+        newItems.push({
+          id,
+          file,
+          type: "other",
+          name: file.name,
+          size: file.size,
+          mimeType: file.type || "application/octet-stream",
+        });
       }
     }
+
+    setSelectedFiles((prev) => [...prev, ...newItems]);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      addFiles(e.target.files);
+    }
+  };
+
+  const handleRemoveFile = (id: string) => {
+    setSelectedFiles((prev) => prev.filter((item) => item.id !== id));
   };
 
   // Sample file preview simulation
   const handleSelectSample = () => {
     const canvas = document.createElement("canvas");
-    canvas.width = 400;
-    canvas.height = 300;
+    canvas.width = 500;
+    canvas.height = 350;
     const ctx = canvas.getContext("2d");
     if (ctx) {
       ctx.fillStyle = "#ea580c";
-      ctx.fillRect(0, 0, 400, 300);
+      ctx.fillRect(0, 0, 500, 350);
       ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 20px sans-serif";
-      ctx.fillText("SUT Receipt Sample", 100, 150);
+      ctx.font = "bold 22px sans-serif";
+      ctx.fillText("ใบเสนอราคาโครงการกิจกรรมนักศึกษา มทส.", 30, 80);
+      ctx.font = "16px sans-serif";
+      ctx.fillText("1. ข้าวกล่อง (กระเพราไก่ไข่ดาว) - 45 บาท/กล่อง", 30, 140);
+      ctx.fillText("2. น้ำดื่มขวด 600ml - 7 บาท/ขวด", 30, 180);
+      ctx.fillText("3. ป้ายไวนิลโครงการ 1x3m - 350 บาท/ผืน", 30, 220);
     }
 
     canvas.toBlob((blob) => {
       if (blob) {
-        const sampleFile = new File([blob], "ใบเสนอราคา_ข้าวกล่อง_มทส.jpg", { type: "image/jpeg" });
-        setSelectedFile(sampleFile);
-        setPreviewUrl(URL.createObjectURL(sampleFile));
-        setAnalysisResult(null);
-        setUploadedImageUrl(null);
-        setUploadError(null);
+        const sampleFile = new File([blob], "ใบเสนอราคา_กิจกรรมนักศึกษา_มทส.jpg", { type: "image/jpeg" });
+        addFiles([sampleFile]);
       }
     }, "image/jpeg");
   };
 
-  // Clear selected file & reset state
+  // Clear selected files & reset state
   const handleReset = () => {
-    setSelectedFile(null);
-    setPreviewUrl(null);
-    setUploadedImageUrl(null);
-    setAnalysisResult(null);
+    setSelectedFiles([]);
+    setAnalysisResults(null);
     setUploadError(null);
     setIsProcessing(false);
     setProcessingStep(0);
@@ -143,44 +248,36 @@ export default function UserFrontendPage() {
     if (cameraInputRef.current) cameraInputRef.current.value = "";
   };
 
-  // ImgBB API Upload & Gemini AI Analysis Handler
+  // Multiple Files Analysis Handler
   const handleStartAudit = async () => {
-    if (!selectedFile) return;
+    if (selectedFiles.length === 0) return;
 
     setIsProcessing(true);
-    setProcessingStep(1); // 1. กำลังอัปโหลดเอกสารไปยัง ImgBB API...
+    setProcessingStep(1); // 1. กำลังประมวลผลไฟล์ (แปลงภาพ/PDF เป็น Base64 และอ่าน Excel)...
     setUploadError(null);
-    setAnalysisResult(null);
+    setAnalysisResults(null);
 
     try {
-      // 1. Construct FormData for ImgBB API
-      const formData = new FormData();
-      formData.append("key", IMGBB_API_KEY);
-      formData.append("image", selectedFile);
+      const payloadFiles: Array<{ mimeType: string; base64Data: string }> = [];
+      let combinedExcelText = "";
 
-      // 2. Send POST Request to ImgBB API
-      const resImgBB = await fetch("https://api.imgbb.com/1/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!resImgBB.ok) {
-        throw new Error(`อัปโหลดไฟล์ไปที่ ImgBB ไม่สำเร็จ (Status ${resImgBB.status})`);
+      for (const item of selectedFiles) {
+        if (item.type === "image" || item.type === "pdf") {
+          const base64 = await fileToBase64(item.file);
+          payloadFiles.push({
+            mimeType: item.mimeType,
+            base64Data: base64,
+          });
+        } else if (item.type === "excel") {
+          const csvText = await processExcelFile(item.file);
+          if (csvText) {
+            combinedExcelText += `\n[ไฟล์ Excel: ${item.name}]\n` + csvText + "\n";
+          }
+        }
       }
 
-      const imgBBData = await resImgBB.json();
-
-      if (!imgBBData.success || !imgBBData.data?.url) {
-        throw new Error(imgBBData.error?.message || "ไม่สามารถดึง URL รูปภาพจาก ImgBB ได้");
-      }
-
-      // Extract Direct Link URL
-      const directUrl = imgBBData.data.url;
-      setUploadedImageUrl(directUrl);
-      console.log("ImgBB Uploaded Image Direct URL:", directUrl);
-
-      // 3. Step 2: Send Image URL & Price Matrix to Gemini AI Route (/api/analyze)
-      setProcessingStep(2); // 2. กำลังวิเคราะห์ใบเสร็จด้วย Gemini AI...
+      // Step 2: Send to Native Gemini Fetch API (/api/analyze)
+      setProcessingStep(2); // 2. กำลังวิเคราะห์และจับคู่ราคากลางด้วย Gemini AI...
 
       const aiRes = await fetch("/api/analyze", {
         method: "POST",
@@ -188,7 +285,8 @@ export default function UserFrontendPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          imageUrl: directUrl,
+          files: payloadFiles,
+          excelText: combinedExcelText.trim(),
           priceMatrix: priceMatrix,
         }),
       });
@@ -198,14 +296,13 @@ export default function UserFrontendPage() {
         throw new Error(errorJson.details || errorJson.error || `AI API returned status ${aiRes.status}`);
       }
 
-      const aiData: AnalysisResult = await aiRes.json();
-      console.log("Gemini AI Analysis Result:", aiData);
+      const data = await aiRes.json();
+      const results: AnalysisItemResult[] = Array.isArray(data) ? data : [data];
 
       setProcessingStep(3); // 3. สรุปผลการตรวจสอบอนุมัติ...
       await new Promise((r) => setTimeout(r, 400));
 
-      // 4. Update Result State with Real Gemini AI Output
-      setAnalysisResult(aiData);
+      setAnalysisResults(results);
     } catch (err: any) {
       console.error("Audit Processing Error:", err);
       setUploadError(err.message || "เกิดข้อผิดพลาดในการประมวลผลวิเคราะห์เอกสาร");
@@ -214,6 +311,12 @@ export default function UserFrontendPage() {
       setProcessingStep(0);
     }
   };
+
+  // Summary calculation
+  const totalItemsCount = analysisResults ? analysisResults.length : 0;
+  const passItemsCount = analysisResults ? analysisResults.filter((r) => r.status === "PASS").length : 0;
+  const failItemsCount = analysisResults ? analysisResults.filter((r) => r.status === "FAIL").length : 0;
+  const isOverallPass = totalItemsCount > 0 && failItemsCount === 0;
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans selection:bg-orange-500 selection:text-white">
@@ -258,13 +361,13 @@ export default function UserFrontendPage() {
           <div className="relative z-10 space-y-3">
             <div className="inline-flex items-center space-x-2 bg-orange-500/10 border border-orange-500/20 text-orange-700 text-xs font-semibold px-3 py-1 rounded-full">
               <Brain className="w-3.5 h-3.5 text-orange-600" />
-              <span>ระบบวิเคราะห์ใบเสร็จอัตโนมัติด้วย Gemini 1.5 Flash AI</span>
+              <span>ระบบวิเคราะห์ใบเสร็จ & ราคากลางด้วย Gemini AI</span>
             </div>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
               ตรวจสอบราคากลางโครงการนักศึกษา
             </h2>
             <p className="text-sm text-slate-600 leading-relaxed max-w-2xl">
-              อัปโหลดใบเสนอราคาหรือถ่ายรูปเอกสารโครงการเพื่อเปรียบเทียบกับฐานข้อมูลราคากลาง (<code className="text-orange-700 font-semibold font-mono">price_matrix</code>) 
+              รองรับการอัปโหลดหลายไฟล์พร้อมกัน ทั้งภาพใบเสร็จ (JPG, PNG), เอกสาร PDF และตารางงบประมาณ Excel (.xlsx, .csv) เพื่อเปรียบเทียบกับฐานข้อมูลราคากลาง (<code className="text-orange-700 font-semibold font-mono">price_matrix</code>) 
               ของสโมสรนักศึกษา มหาวิทยาลัยเทคโนโลยีสุรนารี
             </p>
           </div>
@@ -273,10 +376,10 @@ export default function UserFrontendPage() {
         {/* Step Process Bar */}
         <div className="grid grid-cols-3 gap-2 sm:gap-4 text-center">
           <div className={`p-3 rounded-xl border text-xs sm:text-sm font-medium transition ${
-            selectedFile ? "bg-orange-500 text-white border-orange-500 shadow-sm" : "bg-white text-slate-500 border-slate-200"
+            selectedFiles.length > 0 ? "bg-orange-500 text-white border-orange-500 shadow-sm" : "bg-white text-slate-500 border-slate-200"
           }`}>
             <span className="block font-mono text-[10px] uppercase opacity-80">ขั้นตอน 1</span>
-            1. อัปโหลดเอกสาร
+            1. แนบเอกสาร ({selectedFiles.length} ไฟล์)
           </div>
           <div className={`p-3 rounded-xl border text-xs sm:text-sm font-medium transition ${
             isProcessing ? "bg-amber-500 text-white border-amber-500 shadow-sm animate-pulse" : "bg-white text-slate-500 border-slate-200"
@@ -285,10 +388,10 @@ export default function UserFrontendPage() {
             2. วิเคราะห์ด้วย Gemini AI
           </div>
           <div className={`p-3 rounded-xl border text-xs sm:text-sm font-medium transition ${
-            analysisResult ? (analysisResult.status === "PASS" ? "bg-emerald-600 text-white border-emerald-600 shadow-sm" : "bg-rose-600 text-white border-rose-600 shadow-sm") : "bg-white text-slate-500 border-slate-200"
+            analysisResults ? (isOverallPass ? "bg-emerald-600 text-white border-emerald-600 shadow-sm" : "bg-rose-600 text-white border-rose-600 shadow-sm") : "bg-white text-slate-500 border-slate-200"
           }`}>
             <span className="block font-mono text-[10px] uppercase opacity-80">ขั้นตอน 3</span>
-            3. ผลการตรวจสอบ
+            3. ผลการตรวจสอบ ({totalItemsCount} รายการ)
           </div>
         </div>
 
@@ -303,8 +406,8 @@ export default function UserFrontendPage() {
           </div>
         )}
 
-        {/* Upload Section (2 Large Buttons) */}
-        {!selectedFile && (
+        {/* Upload Section (Dropzone & Selection) */}
+        {selectedFiles.length === 0 && (
           <div className="bg-white border-2 border-dashed border-orange-200 rounded-2xl p-6 sm:p-10 shadow-sm text-center space-y-6">
             <div className="w-16 h-16 bg-gradient-to-br from-orange-500 to-amber-500 text-white rounded-2xl mx-auto flex items-center justify-center shadow-md">
               <UploadCloud className="w-8 h-8 stroke-[2]" />
@@ -312,10 +415,10 @@ export default function UserFrontendPage() {
 
             <div className="space-y-1">
               <h3 className="text-lg font-bold text-slate-900">
-                เลือกวิธีอัปโหลดเอกสารใบเสนอราคา
+                เลือกวิธีอัปโหลดเอกสารตรวจสอบราคากลาง
               </h3>
               <p className="text-xs text-slate-500">
-                รองรับไฟล์ภาพ (JPG, PNG) และเอกสาร PDF
+                รองรับหลายไฟล์พร้อมกัน: รูปภาพ (JPG, PNG), เอกสาร PDF และไฟล์ Excel (.xlsx, .csv)
               </p>
             </div>
 
@@ -323,7 +426,8 @@ export default function UserFrontendPage() {
             <input
               type="file"
               ref={fileInputRef}
-              accept="image/*,.pdf"
+              multiple
+              accept="image/*, application/pdf, .xlsx, .xls, .csv"
               onChange={handleFileChange}
               className="hidden"
             />
@@ -336,15 +440,15 @@ export default function UserFrontendPage() {
               className="hidden"
             />
 
-            {/* 2 Main Action Buttons */}
+            {/* Main Action Buttons */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-lg mx-auto pt-2">
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-semibold py-4 px-5 rounded-xl shadow-sm hover:shadow-md transition flex items-center justify-center space-x-3 group"
               >
-                <FileText className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                <span className="text-sm">อัปโหลดไฟล์ (PDF/รูปภาพ)</span>
+                <Layers className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                <span className="text-sm">เลือกไฟล์ (รูป/PDF/Excel)</span>
               </button>
 
               <button
@@ -353,7 +457,7 @@ export default function UserFrontendPage() {
                 className="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-4 px-5 rounded-xl shadow-sm hover:shadow-md transition flex items-center justify-center space-x-3 group"
               >
                 <Camera className="w-5 h-5 group-hover:scale-110 transition-transform text-amber-400" />
-                <span className="text-sm">ถ่ายรูปด้วยมือถือ</span>
+                <span className="text-sm">ถ่ายรูปด้วยกล้อง</span>
               </button>
             </div>
 
@@ -365,68 +469,156 @@ export default function UserFrontendPage() {
                 className="inline-flex items-center space-x-2 text-xs font-medium text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100/80 px-4 py-2 rounded-lg transition"
               >
                 <Zap className="w-3.5 h-3.5" />
-                <span>ทดลองใช้เอกสารตัวอย่าง (ใบเสนอราคาข้าวกล่อง)</span>
+                <span>ทดลองใช้เอกสารตัวอย่าง (ใบเสนอราคาโครงการ มทส.)</span>
               </button>
             </div>
           </div>
         )}
 
-        {/* Selected File & Preview Section */}
-        {selectedFile && !analysisResult && (
+        {/* Selected Files List & Preview Section */}
+        {selectedFiles.length > 0 && !analysisResults && (
           <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div className="flex items-center space-x-3">
                 <div className="p-2 bg-orange-100 text-orange-600 rounded-lg">
-                  <FileText className="w-5 h-5" />
+                  <FileCheck className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="text-sm font-bold text-slate-900 truncate max-w-xs sm:max-w-md">
-                    {selectedFile.name}
+                  <h4 className="text-sm font-bold text-slate-900">
+                    รายการไฟล์ที่เลือก ({selectedFiles.length} ไฟล์)
                   </h4>
                   <p className="text-xs text-slate-500">
-                    {(selectedFile.size / 1024).toFixed(1)} KB • เอกสารพร้อมสำหรับวิเคราะห์ด้วย Gemini AI
+                    พร้อมสำหรับการส่งไปสกัดและตรวจสอบราคากลางด้วย Gemini AI
                   </p>
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={handleReset}
-                disabled={isProcessing}
-                className="text-xs text-slate-500 hover:text-rose-600 bg-slate-100 hover:bg-rose-50 px-3 py-1.5 rounded-lg transition border border-slate-200 disabled:opacity-50"
-              >
-                เปลี่ยนไฟล์
-              </button>
+              <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isProcessing}
+                  className="text-xs text-orange-700 hover:text-orange-800 bg-orange-50 hover:bg-orange-100 px-3 py-1.5 rounded-lg transition border border-orange-200 font-medium flex items-center space-x-1.5 disabled:opacity-50"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>เพิ่มไฟล์</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  disabled={isProcessing}
+                  className="text-xs text-slate-500 hover:text-rose-600 bg-slate-100 hover:bg-rose-50 px-3 py-1.5 rounded-lg transition border border-slate-200 disabled:opacity-50"
+                >
+                  ล้างทั้งหมด
+                </button>
+              </div>
             </div>
 
-            {/* Image Preview Window */}
-            {previewUrl && (
-              <div className="relative rounded-xl overflow-hidden border border-slate-200 bg-slate-900 max-h-80 flex items-center justify-center">
-                {/* eslint-disable-next-html-element-suppression */}
-                <img
-                  src={previewUrl}
-                  alt="Document Preview"
-                  className="max-h-80 object-contain w-full"
-                />
-                {isProcessing && (
-                  <div className="absolute inset-0 bg-slate-950/75 backdrop-blur-xs flex flex-col items-center justify-center text-white space-y-3 px-4 text-center">
-                    <div className="w-10 h-10 border-4 border-orange-500 border-t-transparent animate-spin rounded-full"></div>
-                    <span className="font-mono text-xs tracking-wider text-orange-400 font-semibold">
-                      {processingStep === 1 && "กำลังอัปโหลดเอกสารไปยัง ImgBB API..."}
-                      {processingStep === 2 && "กำลังวิเคราะห์ข้อความและเปรียบเทียบด้วย Gemini 1.5 Flash AI..."}
-                      {processingStep === 3 && "สรุปผลการตรวจสอบอนุมัติ..."}
-                    </span>
+            {/* Hidden Input Elements for Additional Files */}
+            <input
+              type="file"
+              ref={fileInputRef}
+              multiple
+              accept="image/*, application/pdf, .xlsx, .xls, .csv"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+
+            {/* Grid of Selected Files */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {selectedFiles.map((item) => (
+                <div
+                  key={item.id}
+                  className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 flex flex-col justify-between space-y-3 relative group hover:border-orange-300 transition"
+                >
+                  <div className="flex items-start space-x-3">
+                    <div className="p-2.5 rounded-lg shrink-0 flex items-center justify-center">
+                      {item.type === "image" && (
+                        item.previewUrl ? (
+                          <img
+                            src={item.previewUrl}
+                            alt={item.name}
+                            className="w-10 h-10 object-cover rounded-md border border-slate-200"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 bg-orange-100 text-orange-600 rounded-md flex items-center justify-center">
+                            <ImageIcon className="w-5 h-5" />
+                          </div>
+                        )
+                      )}
+                      {item.type === "pdf" && (
+                        <div className="w-10 h-10 bg-rose-100 text-rose-600 rounded-md flex items-center justify-center">
+                          <FileText className="w-5 h-5" />
+                        </div>
+                      )}
+                      {item.type === "excel" && (
+                        <div className="w-10 h-10 bg-emerald-100 text-emerald-700 rounded-md flex items-center justify-center">
+                          <FileSpreadsheet className="w-5 h-5" />
+                        </div>
+                      )}
+                      {item.type === "other" && (
+                        <div className="w-10 h-10 bg-slate-200 text-slate-600 rounded-md flex items-center justify-center">
+                          <FileText className="w-5 h-5" />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-slate-900 truncate" title={item.name}>
+                        {item.name}
+                      </p>
+                      <div className="flex items-center space-x-2 mt-0.5">
+                        <span className="text-[10px] uppercase font-mono px-1.5 py-0.2 bg-slate-200/80 text-slate-700 rounded">
+                          {item.type}
+                        </span>
+                        <span className="text-[11px] text-slate-500">
+                          {(item.size / 1024).toFixed(1)} KB
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveFile(item.id)}
+                      disabled={isProcessing}
+                      className="text-slate-400 hover:text-rose-600 p-1 rounded transition disabled:opacity-30"
+                      title="ลบไฟล์นี้"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
-                )}
+                </div>
+              ))}
+            </div>
+
+            {/* Processing Progress Status */}
+            {isProcessing && (
+              <div className="bg-slate-900 text-white rounded-xl p-4 space-y-3 font-mono text-xs">
+                <div className="flex items-center space-x-2 text-amber-400 font-bold">
+                  <RefreshCw className="w-4 h-4 animate-spin shrink-0" />
+                  <span>
+                    {processingStep === 1 && "กำลังเตรียมข้อมูลไฟล์ (แปลงรูปภาพ/PDF เป็น Base64 & อ่าน Excel)..."}
+                    {processingStep === 2 && "กำลังให้ Gemini AI อ่านและเปรียบเทียบกับฐานข้อมูลราคากลาง..."}
+                    {processingStep === 3 && "กำลังประมวลผลและจัดทำรายงานสรุป..."}
+                  </span>
+                </div>
+                <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                  <div
+                    className="bg-amber-400 h-full transition-all duration-300"
+                    style={{
+                      width: processingStep === 1 ? "35%" : processingStep === 2 ? "70%" : "95%",
+                    }}
+                  ></div>
+                </div>
               </div>
             )}
 
-            {/* Audit Action Button (ImgBB + Gemini AI) */}
+            {/* Audit Action Button */}
             <div className="pt-2">
               <button
                 type="button"
                 onClick={handleStartAudit}
-                disabled={isProcessing}
+                disabled={isProcessing || selectedFiles.length === 0}
                 className="w-full bg-gradient-to-r from-orange-500 via-orange-600 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold text-base py-4 px-6 rounded-xl shadow-md hover:shadow-lg transition flex items-center justify-center space-x-3 disabled:opacity-60 disabled:cursor-not-allowed group"
               >
                 {isProcessing ? (
@@ -437,7 +629,7 @@ export default function UserFrontendPage() {
                 ) : (
                   <>
                     <Sparkles className="w-5 h-5 text-amber-200 group-hover:rotate-12 transition-transform" />
-                    <span>ตรวจสอบราคากลางด้วย Gemini AI</span>
+                    <span>เริ่มตรวจสอบราคากลางด้วย Gemini AI ({selectedFiles.length} ไฟล์)</span>
                     <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                   </>
                 )}
@@ -446,156 +638,173 @@ export default function UserFrontendPage() {
           </div>
         )}
 
-        {/* Real Gemini AI Analysis Result Display */}
-        {analysisResult && (
-          <div className={`bg-white border-2 ${
-            analysisResult.status === "PASS" ? "border-emerald-500" : "border-rose-500"
-          } rounded-2xl shadow-xl overflow-hidden space-y-0 animate-in fade-in slide-in-from-bottom-4 duration-300`}>
+        {/* Real Gemini AI Analysis Results Display (Multiple Items List) */}
+        {analysisResults && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
             
-            {/* Header Banner (Green for PASS / Red for FAIL) */}
-            <div className={`bg-gradient-to-r ${
-              analysisResult.status === "PASS" ? "from-emerald-600 to-teal-600" : "from-rose-600 to-red-700"
-            } text-white p-6 sm:p-8 flex items-center space-x-4`}>
-              <div className={`w-14 h-14 bg-white ${
-                analysisResult.status === "PASS" ? "text-emerald-600" : "text-rose-600"
-              } rounded-2xl flex items-center justify-center shadow-lg shrink-0`}>
-                {analysisResult.status === "PASS" ? (
-                  <CheckCircle2 className="w-9 h-9 stroke-[2.2]" />
-                ) : (
-                  <XCircle className="w-9 h-9 stroke-[2.2]" />
-                )}
-              </div>
-              <div className="space-y-1">
-                <div className={`inline-block ${
-                  analysisResult.status === "PASS" ? "bg-emerald-400/20 text-emerald-100 border-emerald-300/30" : "bg-rose-400/20 text-rose-100 border-rose-300/30"
-                } text-xs font-mono px-2.5 py-0.5 rounded-full border font-semibold`}>
-                  AUDIT RESULT: {analysisResult.status}
+            {/* Overall Summary Card */}
+            <div className={`rounded-2xl border-2 overflow-hidden shadow-lg ${
+              isOverallPass ? "border-emerald-500 bg-white" : "border-rose-500 bg-white"
+            }`}>
+              <div className={`p-6 sm:p-8 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-gradient-to-r ${
+                isOverallPass ? "from-emerald-600 via-teal-600 to-emerald-700" : "from-rose-600 via-red-600 to-rose-700"
+              }`}>
+                <div className="flex items-center space-x-4">
+                  <div className="w-14 h-14 bg-white/15 backdrop-blur-md rounded-2xl flex items-center justify-center text-white shrink-0 shadow-inner">
+                    {isOverallPass ? (
+                      <CheckCircle2 className="w-9 h-9 stroke-[2.2]" />
+                    ) : (
+                      <XCircle className="w-9 h-9 stroke-[2.2]" />
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    <div className="inline-block bg-white/20 text-white text-xs font-mono px-2.5 py-0.5 rounded-full font-semibold">
+                      ภาพรวม: {isOverallPass ? "ทุกรายการผ่านเกณฑ์" : "พบรายการที่ไม่ผ่านเกณฑ์"}
+                    </div>
+                    <h3 className="text-xl sm:text-2xl font-extrabold text-white">
+                      {isOverallPass ? "ผ่านการตรวจสอบราคากลางทั้งหมด" : `พบ ${failItemsCount} รายการที่เกินเพดานราคากลาง`}
+                    </h3>
+                    <p className="text-xs sm:text-sm text-white/90">
+                      ตรวจพบทั้งหมด {totalItemsCount} รายการ (ผ่าน {passItemsCount} รายการ, ไม่ผ่าน {failItemsCount} รายการ)
+                    </p>
+                  </div>
                 </div>
-                <h3 className="text-xl sm:text-2xl font-extrabold text-white">
-                  {analysisResult.status === "PASS" ? "ผ่านเกณฑ์ราคากลาง" : "ไม่ผ่านเกณฑ์ราคากลาง (เกินเพดานราคากลาง)"}
-                </h3>
-                <p className="text-xs sm:text-sm text-white/90">
-                  {analysisResult.message}
-                </p>
+
+                <div className="flex items-center space-x-2 self-stretch sm:self-auto justify-end">
+                  <button
+                    type="button"
+                    onClick={handleReset}
+                    className="bg-white/20 hover:bg-white/30 text-white text-xs font-semibold py-2.5 px-4 rounded-xl backdrop-blur-xs transition flex items-center space-x-1.5"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>ตรวจเอกสารชุดใหม่</span>
+                  </button>
+                </div>
               </div>
             </div>
 
-            {/* Breakdown Card Grid */}
-            <div className="p-6 sm:p-8 space-y-6">
-              
-              {/* ImgBB Direct URL Display */}
-              {uploadedImageUrl && (
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 text-xs font-mono text-slate-300 space-y-2">
-                  <div className="flex items-center justify-between text-amber-400 font-bold">
-                    <div className="flex items-center space-x-1.5">
-                      <ImageIcon className="w-4 h-4" />
-                      <span>IMGBB DIRECT LINK URL:</span>
-                    </div>
-                    <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded">GEMINI ANALYZED</span>
-                  </div>
-                  <div className="flex items-center space-x-2 bg-slate-950 p-2.5 rounded border border-slate-800 overflow-x-auto">
-                    <span className="text-slate-200 select-all font-mono text-[11px] truncate">
-                      {uploadedImageUrl}
-                    </span>
-                    <a
-                      href={uploadedImageUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="ml-auto text-orange-400 hover:text-orange-300 shrink-0 flex items-center space-x-1 text-[11px]"
+            {/* List of Detected Items */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between px-1">
+                <h4 className="text-base font-bold text-slate-900 flex items-center space-x-2">
+                  <Layers className="w-5 h-5 text-orange-600" />
+                  <span>รายละเอียดผลการตรวจสอบแต่ละรายการ ({totalItemsCount})</span>
+                </h4>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4">
+                {analysisResults.map((item, idx) => {
+                  const isPass = item.status === "PASS";
+                  const priceDiff = item.detectedPrice - item.matrixMaxPrice;
+
+                  return (
+                    <div
+                      key={idx}
+                      className={`bg-white border-2 rounded-2xl p-5 sm:p-6 shadow-sm transition space-y-4 ${
+                        isPass ? "border-emerald-200 hover:border-emerald-400" : "border-rose-200 hover:border-rose-400"
+                      }`}
                     >
-                      <span>เปิดดูรูป</span>
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
-                  </div>
-                </div>
-              )}
+                      {/* Item Header */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+                        <div className="flex items-center space-x-3">
+                          <div className={`p-2 rounded-xl shrink-0 ${
+                            isPass ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"
+                          }`}>
+                            {isPass ? <CheckCircle2 className="w-5 h-5" /> : <XCircle className="w-5 h-5" />}
+                          </div>
+                          <div>
+                            <span className="text-[11px] font-mono text-slate-400">รายการที่ {idx + 1}</span>
+                            <h5 className="text-base font-bold text-slate-900">
+                              {item.itemInReceipt || "รายการที่ตรวจพบ"}
+                            </h5>
+                          </div>
+                        </div>
 
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <span className="text-xs text-slate-500 font-medium">รายการที่ตรวจพบ (Gemini AI)</span>
-                  <div className="text-base font-bold text-slate-900">{analysisResult.item || "ไม่ระบุชื่อรายการ"}</div>
-                </div>
-
-                <div className="space-y-1">
-                  <span className="text-xs text-slate-500 font-medium">สถานะการอนุมัติ</span>
-                  <div className={`text-sm font-bold ${analysisResult.status === "PASS" ? "text-emerald-600" : "text-rose-600"}`}>
-                    {analysisResult.status === "PASS" ? "อนุมัติเสนอเบิกจ่ายได้" : "ไม่อนุมัติ (ราคาสูงเกินเกณฑ์)"}
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <span className="text-xs text-slate-500 font-medium">ราคาที่เสนอในใบเสร็จ</span>
-                  <div className="text-lg font-extrabold text-slate-900 font-mono">
-                    ฿{Number(analysisResult.detectedPrice).toFixed(2)}{" "}
-                    <span className="text-xs font-normal text-slate-500">{analysisResult.unit || "กล่อง"}</span>
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <span className="text-xs text-slate-500 font-medium">ราคากลางสูงสุดที่กำหนด</span>
-                  <div className="text-lg font-extrabold text-amber-600 font-mono">
-                    ฿{Number(analysisResult.matrixMaxPrice).toFixed(2)}{" "}
-                    <span className="text-xs font-normal text-slate-500">{analysisResult.unit || "กล่อง"}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Price Difference Highlight Box */}
-              {analysisResult.status === "PASS" ? (
-                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <TrendingDown className="w-6 h-6 text-emerald-600 shrink-0" />
-                    <div>
-                      <div className="text-sm font-bold text-emerald-900">
-                        ประหยัดงบประมาณ ฿{(analysisResult.matrixMaxPrice - analysisResult.detectedPrice).toFixed(2)} / {analysisResult.unit}
+                        <div className="flex items-center space-x-2">
+                          {item.matchedMatrixItem && (
+                            <span className="text-xs bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg font-mono">
+                              จับคู่: {item.matchedMatrixItem}
+                            </span>
+                          )}
+                          <span
+                            className={`text-xs font-bold font-mono px-3 py-1 rounded-full ${
+                              isPass
+                                ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                                : "bg-rose-100 text-rose-800 border border-rose-300"
+                            }`}
+                          >
+                            {item.status}
+                          </span>
+                        </div>
                       </div>
-                      <div className="text-xs text-emerald-700">
-                        ราคาที่ขออนุมัติต่ำกว่าเพดานราคากลางของมหาวิทยาลัย
+
+                      {/* Pricing Comparison Grid */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-100 text-xs">
+                        <div className="space-y-1">
+                          <span className="text-slate-500">ราคาเสนอในเอกสาร:</span>
+                          <div className="text-base font-extrabold text-slate-900 font-mono">
+                            ฿{Number(item.detectedPrice).toFixed(2)}{" "}
+                            <span className="text-xs font-normal text-slate-500">{item.unit || "หน่วย"}</span>
+                          </div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <span className="text-slate-500">เพดานราคากลางสูงสุด:</span>
+                          <div className="text-base font-extrabold text-amber-600 font-mono">
+                            ฿{Number(item.matrixMaxPrice).toFixed(2)}{" "}
+                            <span className="text-xs font-normal text-slate-500">{item.unit || "หน่วย"}</span>
+                          </div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <span className="text-slate-500">ส่วนต่างราคา:</span>
+                          <div className={`text-base font-extrabold font-mono flex items-center space-x-1 ${
+                            isPass ? "text-emerald-600" : "text-rose-600"
+                          }`}>
+                            {isPass ? (
+                              <>
+                                <TrendingDown className="w-4 h-4 shrink-0" />
+                                <span>ประหยัด ฿{Math.abs(priceDiff).toFixed(2)}</span>
+                              </>
+                            ) : (
+                              <>
+                                <TrendingUp className="w-4 h-4 shrink-0" />
+                                <span>เกินเกณฑ์ ฿{Math.abs(priceDiff).toFixed(2)}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Message Explanation */}
+                      <div className="text-xs text-slate-600 bg-white p-3 rounded-lg border border-slate-200/80 leading-relaxed">
+                        <span className="font-semibold text-slate-800">ผลการวิเคราะห์: </span>
+                        {item.message}
                       </div>
                     </div>
-                  </div>
-                  <span className="hidden sm:inline-block bg-emerald-600 text-white text-xs font-bold px-3 py-1 rounded-full">
-                    ผ่านเกณฑ์
-                  </span>
-                </div>
-              ) : (
-                <div className="bg-rose-50 border border-rose-200 rounded-xl p-4 flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <TrendingUp className="w-6 h-6 text-rose-600 shrink-0" />
-                    <div>
-                      <div className="text-sm font-bold text-rose-900">
-                        ราคาสูงเกินเกณฑ์ ฿{(analysisResult.detectedPrice - analysisResult.matrixMaxPrice).toFixed(2)} / {analysisResult.unit}
-                      </div>
-                      <div className="text-xs text-rose-700">
-                        ราคาเสนอขออนุมัติตั้งสูงกว่าเพดานราคากลางที่กำหนดไว้
-                      </div>
-                    </div>
-                  </div>
-                  <span className="hidden sm:inline-block bg-rose-600 text-white text-xs font-bold px-3 py-1 rounded-full">
-                    ไม่ผ่านเกณฑ์
-                  </span>
-                </div>
-              )}
-
-              {/* Actions */}
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={handleReset}
-                  className="w-full sm:w-auto bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-xs py-3 px-5 rounded-xl border border-slate-300 transition flex items-center justify-center space-x-2"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                  <span>ตรวจสอบเอกสารอื่น</span>
-                </button>
-
-                <Link
-                  href="/admin"
-                  className="w-full sm:w-auto bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs py-3 px-5 rounded-xl transition flex items-center justify-center space-x-2"
-                >
-                  <Building2 className="w-4 h-4 text-amber-400" />
-                  <span>เข้าสู่ระบบจัดการ Admin Matrix</span>
-                </Link>
+                  );
+                })}
               </div>
+            </div>
+
+            {/* Bottom Actions */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm">
+              <button
+                type="button"
+                onClick={handleReset}
+                className="w-full sm:w-auto bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-xs py-3 px-5 rounded-xl border border-slate-300 transition flex items-center justify-center space-x-2"
+              >
+                <RefreshCw className="w-4 h-4" />
+                <span>สแกนตรวจสอบเอกสารชุดอื่น</span>
+              </button>
+
+              <Link
+                href="/admin"
+                className="w-full sm:w-auto bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs py-3 px-5 rounded-xl transition flex items-center justify-center space-x-2"
+              >
+                <Building2 className="w-4 h-4 text-amber-400" />
+                <span>เข้าสู่ระบบจัดการฐานข้อมูล Admin</span>
+              </Link>
             </div>
           </div>
         )}
@@ -607,8 +816,8 @@ export default function UserFrontendPage() {
             <span>คำแนะนำเพิ่มเติมสำหรับการจัดเตรียมเอกสาร</span>
           </div>
           <ul className="list-disc pl-5 space-y-1 text-slate-500 leading-relaxed">
-            <li>โปรดถ่ายภาพหรือสแกนเอกสารใบเสนอราคาให้เห็นข้อความและตัวเลขราคาต่อหน่วยชัดเจน</li>
-            <li>ระบบประมวลผลด้วย Gemini 1.5 Flash AI และเปรียบเทียบกับคอลเลกชัน <code className="text-slate-800 font-mono">price_matrix</code> ล่าสุด</li>
+            <li>สามารถอัปโหลดไฟล์พร้อมกันได้หลายไฟล์ ทั้งรูปถ่ายใบเสร็จ (JPG, PNG), เอกสาร PDF และไฟล์ Excel รายการงบประมาณ</li>
+            <li>ระบบใช้ Gemini AI สกัดชื่อรายการและราคาต่อหน่วย แล้วเทียบกับคอลเลกชัน <code className="text-slate-800 font-mono">price_matrix</code> อัตโนมัติ</li>
           </ul>
         </section>
       </main>
@@ -620,7 +829,7 @@ export default function UserFrontendPage() {
             © {new Date().getFullYear()} สโมสรนักศึกษา มหาวิทยาลัยเทคโนโลยีสุรนารี (SUT Student Council)
           </div>
           <div className="flex items-center space-x-4 font-mono text-[11px] text-slate-500">
-            <span>Pre-Audit System v1.0</span>
+            <span>Pre-Audit System v2.0 (Multi-File & Excel)</span>
             <span>•</span>
             <Link href="/login" className="hover:text-amber-400 transition">
               Admin Login

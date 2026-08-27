@@ -3,26 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { imageUrl, priceMatrix } = body;
+    const { files = [], excelText = "", priceMatrix = [], imageUrl, imageBase64, mimeType } = body;
 
-    if (!imageUrl) {
-      return NextResponse.json(
-        { error: "Missing imageUrl parameter" },
-        { status: 400 }
-      );
-    }
-
-    // 1. Fetch image from ImgBB direct URL and convert to Base64
-    const imageRes = await fetch(imageUrl);
-    if (!imageRes.ok) {
-      throw new Error(`Failed to fetch image from URL: ${imageUrl} (Status: ${imageRes.status})`);
-    }
-
-    const arrayBuffer = await imageRes.arrayBuffer();
-    const base64Data = Buffer.from(arrayBuffer).toString("base64");
-    const mimeType = imageRes.headers.get("content-type") || "image/jpeg";
-
-    // 2. เช็ก API Key
+    // 1. เช็ก API Key
     const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY || "";
     if (!apiKey) {
       return NextResponse.json(
@@ -31,23 +14,77 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 3. แปลงข้อมูล priceMatrix เป็น String
+    // เตรียมรายการไฟล์มีเดีย (รูปภาพ / PDF)
+    const mediaFiles: Array<{ mimeType: string; base64Data: string }> = [...files];
+
+    // รองรับ fallback กรณีส่งแบบเดี่ยว imageBase64 หรือ imageUrl มา
+    if (imageBase64) {
+      mediaFiles.push({
+        mimeType: mimeType || "image/jpeg",
+        base64Data: imageBase64,
+      });
+    } else if (imageUrl) {
+      const imageRes = await fetch(imageUrl);
+      if (imageRes.ok) {
+        const arrayBuffer = await imageRes.arrayBuffer();
+        const b64 = Buffer.from(arrayBuffer).toString("base64");
+        const detectedMime = imageRes.headers.get("content-type") || "image/jpeg";
+        mediaFiles.push({
+          mimeType: detectedMime,
+          base64Data: b64,
+        });
+      }
+    }
+
+    if (mediaFiles.length === 0 && !excelText) {
+      return NextResponse.json(
+        { error: "กรุณาแนบไฟล์รูปภาพ, PDF หรือ Excel เพื่อวิเคราะห์" },
+        { status: 400 }
+      );
+    }
+
+    // 2. แปลงข้อมูล priceMatrix เป็น String
     const matrixContext = JSON.stringify(priceMatrix || [], null, 2);
 
-    // 4. คำสั่ง Prompt
-    const prompt = `จงอ่านรายการในรูปใบเสร็จนี้ หาว่าตรงกับรายการไหนในข้อมูล priceMatrix ต่อไปนี้บ้าง:
+    // 3. คำสั่ง Prompt (Part 1)
+    const prompt = `จงตรวจสอบรายการค่าใช้จ่ายจากข้อมูลทั้งหมดที่แนบมานี้ (ทั้งรูปภาพ, PDF, หรือข้อความ) หาว่าแต่ละรายการตรงกับหรือใกล้เคียงกับรายการไหนใน priceMatrix ต่อไปนี้:
 ${matrixContext}
 
-สกัดราคาที่ตรวจพบ และเปรียบเทียบว่าเกิน maxPrice หรือไม่ ให้ตอบกลับมาเป็น JSON ล้วนๆ ในรูปแบบ:
-{
-  "status": "PASS" | "FAIL",
-  "message": "คำอธิบายผลการตรวจสอบอย่างละเอียดภาษาไทย",
-  "item": "ชื่อรายการ",
-  "detectedPrice": ตัวเลข,
-  "matrixMaxPrice": ตัวเลข,
-  "unit": "หน่วย"
-}
+ให้ตอบกลับเป็น JSON Array โครงสร้างคือ:
+[
+  {
+    "status": "PASS" | "FAIL",
+    "message": "คำอธิบายผลการตรวจสอบอย่างละเอียดภาษาไทย",
+    "itemInReceipt": "ชื่อที่ตรวจพบ",
+    "matchedMatrixItem": "ชื่อในราคากลาง",
+    "detectedPrice": ตัวเลขราคาต่อหน่วยที่ตรวจพบ,
+    "matrixMaxPrice": ตัวเลขราคากลางสูงสุด,
+    "unit": "หน่วยนับ เช่น กล่อง, ชิ้น, ครั้ง"
+  }
+]
 ห้ามมีข้อความอื่นปนเด็ดขาด`;
+
+    // 4. เตรียมโครงสร้าง parts สำหรับส่งให้ Gemini API
+    const parts: any[] = [{ text: prompt }];
+
+    // Part 2: แนบข้อมูล Text จาก Excel (ถ้ามี)
+    if (excelText && excelText.trim().length > 0) {
+      parts.push({
+        text: `ข้อมูลบิลจากไฟล์ Excel:\n${excelText}`,
+      });
+    }
+
+    // Part 3: แนบไฟล์รูปภาพ / PDF ผ่าน inline_data
+    for (const file of mediaFiles) {
+      if (file.base64Data) {
+        parts.push({
+          inline_data: {
+            mime_type: file.mimeType || "image/jpeg",
+            data: file.base64Data,
+          },
+        });
+      }
+    }
 
     // 5. ยิง Native Fetch ตรงไปที่ Google Generative Language API
     const response = await fetch(
@@ -60,15 +97,7 @@ ${matrixContext}
         body: JSON.stringify({
           contents: [
             {
-              parts: [
-                { text: prompt },
-                {
-                  inline_data: {
-                    mime_type: mimeType,
-                    data: base64Data,
-                  },
-                },
-              ],
+              parts: parts,
             },
           ],
         }),
@@ -83,17 +112,20 @@ ${matrixContext}
 
     // แกะ JSON ที่ได้จาก AI ตอบกลับมา
     const data = await response.json();
-    let text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    let text = data.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
     text = text.replace(/```json/g, "").replace(/```/g, "").trim();
 
-    const parsedData = JSON.parse(text);
-    return NextResponse.json(parsedData);
+    let parsedData = JSON.parse(text);
+    if (!Array.isArray(parsedData)) {
+      parsedData = [parsedData];
+    }
 
+    return NextResponse.json(parsedData);
   } catch (error: any) {
     console.error("Gemini Analyze API Error:", error);
     return NextResponse.json(
       {
-        error: "เกิดข้อผิดพลาดในการวิเคราะห์ใบเสร็จด้วย Gemini AI",
+        error: "เกิดข้อผิดพลาดในการวิเคราะห์เอกสารด้วย Gemini AI",
         details: error.message || String(error),
       },
       { status: 500 }
