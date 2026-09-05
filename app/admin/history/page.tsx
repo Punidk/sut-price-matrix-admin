@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { db, isFirebaseConfigured } from "@/lib/firebase";
-import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, deleteDoc, doc } from "firebase/firestore";
 import {
   ShieldCheck,
   LogOut,
@@ -23,6 +23,8 @@ import {
   FileText,
   TrendingDown,
   TrendingUp,
+  Trash2,
+  X,
 } from "lucide-react";
 
 export interface ReceiptItemData {
@@ -71,6 +73,7 @@ export default function AdminAuditHistoryPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [onlyIssues, setOnlyIssues] = useState(false);
   const [expandedRowIds, setExpandedRowIds] = useState<Record<string, boolean>>({});
+  const [notification, setNotification] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   // 1. Authentication Check
   useEffect(() => {
@@ -78,6 +81,46 @@ export default function AdminAuditHistoryPage() {
       router.replace("/login");
     }
   }, [user, authLoading, router]);
+
+  // ฟังก์ชันลบประวัติการตรวจสอบ (Delete Log) พร้อม Confirmation & Optimistic UI
+  const handleDeleteLog = async (log: AuditLogEntry) => {
+    const confirmDelete = window.confirm(
+      `คุณแน่ใจหรือไม่ว่าต้องการลบประวัติการตรวจสอบนี้?\n(Doc ID: ${log.id} | ตรวจพบ ${log.itemsAnalyzed} รายการ)`
+    );
+    if (!confirmDelete) return;
+
+    const targetId = log.id;
+
+    // 1. อัปเดตหน้าจอทันที (Optimistic UI)
+    setLogs((prev) => prev.filter((item) => item.id !== targetId));
+    setExpandedRowIds((prev) => {
+      const next = { ...prev };
+      delete next[targetId];
+      return next;
+    });
+
+    setNotification({
+      message: `ลบประวัติการตรวจสอบ (${targetId}) เรียบร้อยแล้ว`,
+      type: "success",
+    });
+
+    setTimeout(() => {
+      setNotification(null);
+    }, 4000);
+
+    // 2. ส่งคำสั่งลบข้อมูลออกจาก Firestore
+    if (isFirebaseConfigured && db) {
+      try {
+        await deleteDoc(doc(db, "audit_history", targetId));
+      } catch (err: any) {
+        console.error("Error deleting audit log:", err);
+        setNotification({
+          message: `เกิดข้อผิดพลาดในการลบข้อมูล: ${err.message || err}`,
+          type: "error",
+        });
+      }
+    }
+  };
 
   // 2. Real-time fetch audit_history from Firestore
   useEffect(() => {
@@ -324,6 +367,33 @@ export default function AdminAuditHistoryPage() {
           </div>
         </div>
 
+        {/* Notification Alert Banner */}
+        {notification && (
+          <div
+            className={`p-3.5 border text-xs font-mono flex items-center justify-between transition animate-in fade-in slide-in-from-top-2 duration-200 ${
+              notification.type === "success"
+                ? "bg-neutral-900 border-emerald-500/60 text-emerald-300"
+                : "bg-rose-950/80 border-rose-600 text-rose-200"
+            }`}
+          >
+            <div className="flex items-center space-x-2.5">
+              {notification.type === "success" ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              ) : (
+                <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+              )}
+              <span>{notification.message}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setNotification(null)}
+              className="text-neutral-400 hover:text-white p-1"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
         {/* Search & Filter Controls Bar */}
         <div className="bg-neutral-900 border border-neutral-800 p-4 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
           <div className="relative flex-1">
@@ -380,7 +450,7 @@ export default function AdminAuditHistoryPage() {
                   <th className="py-3.5 px-4 w-36 text-center">จำนวนที่ตรวจ</th>
                   <th className="py-3.5 px-4 w-48 text-center">สถานะภาพรวม</th>
                   <th className="py-3.5 px-4">ตัวอย่างรายการในบิล</th>
-                  <th className="py-3.5 px-4 w-28 text-center">การกระทำ</th>
+                  <th className="py-3.5 px-4 w-40 text-center">การกระทำ</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-800/80">
@@ -447,8 +517,8 @@ export default function AdminAuditHistoryPage() {
                           </td>
                           <td className="py-4 px-4 text-neutral-300 max-w-xs truncate">
                             {log.scanResults && log.scanResults.length > 0 ? (
-                              <span className="text-neutral-400 text-xs truncate block" title={log.scanResults.map((s) => s.itemInReceipt).join(", ")}>
-                                {log.scanResults.map((s) => s.itemInReceipt).slice(0, 3).join(", ")}
+                              <span className="text-neutral-400 text-xs truncate block" title={log.scanResults.map((s) => (s.receiptData?.itemName || s.itemInReceipt || "")).join(", ")}>
+                                {log.scanResults.map((s) => (s.receiptData?.itemName || s.itemInReceipt || "")).slice(0, 3).join(", ")}
                                 {log.scanResults.length > 3 && ` และอีก ${log.scanResults.length - 3} รายการ...`}
                               </span>
                             ) : (
@@ -456,18 +526,31 @@ export default function AdminAuditHistoryPage() {
                             )}
                           </td>
                           <td className="py-4 px-4 text-center" onClick={(e) => e.stopPropagation()}>
-                            <button
-                              type="button"
-                              onClick={() => toggleRow(log.id)}
-                              className="inline-flex items-center space-x-1 text-[11px] font-mono bg-neutral-950 hover:bg-neutral-800 text-neutral-300 border border-neutral-800 hover:border-neutral-700 px-2.5 py-1 transition"
-                            >
-                              <span>{isExpanded ? "ย่อ" : "ดูผล"}</span>
-                              {isExpanded ? (
-                                <ChevronUp className="w-3.5 h-3.5" />
-                              ) : (
-                                <ChevronDown className="w-3.5 h-3.5" />
-                              )}
-                            </button>
+                            <div className="flex items-center justify-center space-x-1.5">
+                              <button
+                                type="button"
+                                onClick={() => toggleRow(log.id)}
+                                className="inline-flex items-center space-x-1 text-[11px] font-mono bg-neutral-950 hover:bg-neutral-800 text-neutral-300 border border-neutral-800 hover:border-neutral-700 px-2.5 py-1.5 transition"
+                                title={isExpanded ? "ย่อรายละเอียด" : "ดูรายละเอียด"}
+                              >
+                                <span>{isExpanded ? "ย่อ" : "ดูผล"}</span>
+                                {isExpanded ? (
+                                  <ChevronUp className="w-3.5 h-3.5" />
+                                ) : (
+                                  <ChevronDown className="w-3.5 h-3.5" />
+                                )}
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteLog(log)}
+                                className="inline-flex items-center space-x-1 text-[11px] font-mono bg-neutral-950 hover:bg-rose-950/60 text-neutral-400 hover:text-rose-400 border border-neutral-800 hover:border-rose-800/80 px-2.5 py-1.5 transition group"
+                                title="ลบประวัติการตรวจสอบนี้"
+                              >
+                                <Trash2 className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
+                                <span className="hidden sm:inline">ลบ</span>
+                              </button>
+                            </div>
                           </td>
                         </tr>
 
