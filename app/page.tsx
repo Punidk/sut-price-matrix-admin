@@ -33,6 +33,7 @@ import {
   FileCheck,
   AlertTriangle,
   Printer,
+  FileWarning,
 } from "lucide-react";
 
 export interface ReceiptItemData {
@@ -436,6 +437,7 @@ export default function UserFrontendPage() {
   const isOverallPass = totalItemsCount > 0 && failItemsCount === 0 && notFoundItemsCount === 0;
   const isOverallHasFail = failItemsCount > 0;
   const isOverallPendingReview = totalItemsCount > 0 && failItemsCount === 0 && notFoundItemsCount > 0;
+  const isInvalidDocument = overallStatus === "INVALID_DOCUMENT";
 
   // Financial summary for print report & UI
   const calculatedItemsTotal = analysisResults
@@ -820,7 +822,46 @@ export default function UserFrontendPage() {
 
         {/* Real Gemini AI Analysis Results Display (Multiple Items List) */}
         {analysisResults && (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300 print:hidden">
+          isInvalidDocument ? (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300 print:hidden">
+              {/* Minimalist Gray/Dark Alert Box */}
+              <div className="bg-neutral-900 border border-neutral-700 text-neutral-100 rounded-2xl p-6 sm:p-8 space-y-5 shadow-sm font-mono">
+                <div className="flex items-start space-x-4">
+                  <div className="p-3 bg-neutral-800 border border-neutral-700 text-neutral-300 rounded-xl shrink-0">
+                    <FileWarning className="w-7 h-7 text-neutral-300" />
+                  </div>
+                  <div className="space-y-2 flex-1">
+                    <div className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full bg-neutral-800 border border-neutral-700 text-[11px] font-mono font-semibold text-neutral-300">
+                      <span>INVALID DOCUMENT</span>
+                    </div>
+                    <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight font-sans">
+                      เอกสารไม่ถูกต้อง: กรุณาอัปโหลดภาพใบเสร็จรับเงิน
+                    </h3>
+                    <p className="text-xs sm:text-sm text-neutral-400 leading-relaxed font-sans">
+                      {documentWarnings && documentWarnings.length > 0
+                        ? documentWarnings[0]
+                        : "รูปภาพที่ส่งเข้ามาไม่ใช่เอกสารทางการเงินหรือใบเสร็จรับเงิน กรุณาถ่ายภาพใบเสร็จให้ชัดเจน"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-neutral-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                  <span className="text-neutral-500 font-sans">
+                    ระบบรองรับ: ใบเสร็จรับเงิน, บิลเงินสด, ใบกำกับภาษี, ใบเสนอราคา, หรือเอกสารการเบิกจ่าย
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleReset}
+                    className="self-start sm:self-auto bg-neutral-100 hover:bg-white text-neutral-900 font-bold text-xs py-2.5 px-4 rounded-xl transition flex items-center space-x-2 cursor-pointer shadow-xs"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>อัปโหลดภาพใหม่</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300 print:hidden">
             
             {/* Overall Summary Card */}
             <div className={`rounded-2xl border-2 overflow-hidden shadow-lg ${
@@ -1241,12 +1282,13 @@ export default function UserFrontendPage() {
               </Link>
             </div>
           </div>
-        )}
+        )
+      )}
 
         {/* ========================================================================= */}
         {/* PRINTABLE A4 AUDIT SUMMARY (VISIBLE ONLY ON PRINT: @media print)          */}
         {/* ========================================================================= */}
-        {analysisResults && (
+        {analysisResults && overallStatus !== "INVALID_DOCUMENT" && (
           <div
             id="printable-audit-summary"
             className="hidden print:block text-black bg-white w-full max-w-[210mm] mx-auto p-0 font-sans leading-normal"
