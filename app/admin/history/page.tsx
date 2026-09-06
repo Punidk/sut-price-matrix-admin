@@ -481,7 +481,7 @@ export default function AdminAuditHistoryPage() {
                                 <XCircle className="w-3.5 h-3.5 shrink-0 text-rose-400" />
                                 <span>เอกสารไม่ถูกต้อง</span>
                               </span>
-                            ) : log.financialSummary?.isMathCorrect === false ? (
+                            ) : (log.overallStatus !== "INVALID_DOCUMENT" && (log.itemsAnalyzed ?? 0) > 0 && log.financialSummary?.isMathCorrect === false) ? (
                               <span className="inline-flex items-center space-x-1 border border-rose-600/80 bg-rose-950/60 text-rose-300 text-[11px] font-mono px-2.5 py-1">
                                 <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-rose-400" />
                                 <span>คำนวณเลขผิด</span>
@@ -604,7 +604,11 @@ export default function AdminAuditHistoryPage() {
                                           {log.merchant.hasReceiptSign ? "✓ พบลายเซ็น/ตรายาง" : "✗ ขาดลายเซ็นผู้รับเงิน"}
                                         </span>
                                         <span className="px-2 py-0.5 border border-neutral-700 bg-neutral-950 text-neutral-300 text-[10px]">
-                                          {log.merchant.isHandwritten ? "บิลเขียนมือ" : "บิลพิมพ์/คอมพิวเตอร์"}
+                                          {log.overallStatus === "INVALID_DOCUMENT"
+                                            ? "-"
+                                            : log.merchant.isHandwritten
+                                            ? "บิลเขียนมือ"
+                                            : "บิลพิมพ์/คอมพิวเตอร์"}
                                         </span>
                                       </div>
                                     </div>

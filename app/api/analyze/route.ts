@@ -283,7 +283,7 @@ ${matrixContext}
       return NextResponse.json({
         overallStatus: "INVALID_DOCUMENT",
         merchant: {
-          name: parsedData.merchant?.name || "ไม่พบข้อมูล",
+          name: parsedData.merchant?.name && parsedData.merchant.name !== "ไม่พบข้อมูล" ? parsedData.merchant.name : "-",
           date: parsedData.merchant?.date || "-",
           hasSignature: false,
           hasReceiptSign: false,
@@ -297,11 +297,13 @@ ${matrixContext}
           total: 0,
           grandTotal: 0,
           approvedTotal: 0,
-          isMathCorrect: false,
+          isMathCorrect: true,
         },
         warnings:
           Array.isArray(parsedData.warnings) && parsedData.warnings.length > 0
-            ? parsedData.warnings
+            ? parsedData.warnings.filter(
+                (w: string) => typeof w === "string" && !w.includes("คณิตศาสตร์")
+              )
             : ["รูปภาพที่ส่งเข้ามาไม่ใช่เอกสารทางการเงินหรือใบเสร็จรับเงิน กรุณาถ่ายภาพใบเสร็จให้ชัดเจน"],
       });
     }
@@ -394,7 +396,8 @@ ${matrixContext}
     }
 
     // Double-check: ตรวจสอบความถูกต้องทางคณิตศาสตร์ของผลรวมท้ายบิล (Math Error Detection)
-    if (parsedData.items.length > 0) {
+    // เงื่อนไข Math Error (!isMathCorrect): ให้ทำงานเฉพาะเมื่อเอกสารเป็นใบเสร็จที่ถูกต้อง (overallStatus !== 'INVALID_DOCUMENT' และมี items.length > 0) เท่านั้น
+    if (parsedData.overallStatus !== "INVALID_DOCUMENT" && parsedData.items.length > 0) {
       const lineItemsSum = parsedData.items.reduce((acc: number, it: any) => {
         const q = it.receiptData?.qty != null ? Number(it.receiptData.qty) : 1;
         const u = it.receiptData?.unitPrice != null ? Number(it.receiptData.unitPrice) : 0;

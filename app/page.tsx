@@ -388,8 +388,12 @@ export default function UserFrontendPage() {
         results = data;
       }
 
-      // หาก financialSummary.isMathCorrect === false ให้ปรับ overallStatus เป็น FAIL ทันที
-      if (finSummary?.isMathCorrect === false) {
+      // เงื่อนไข Math Error (!isMathCorrect) ให้ทำงานเฉพาะเมื่อเอกสารเป็นใบเสร็จที่ถูกต้อง (overallStatus !== 'INVALID_DOCUMENT' และมี items.length > 0) เท่านั้น
+      if (
+        overallStatusStr !== "INVALID_DOCUMENT" &&
+        results.length > 0 &&
+        finSummary?.isMathCorrect === false
+      ) {
         overallStatusStr = "FAIL";
       }
 
@@ -458,10 +462,14 @@ export default function UserFrontendPage() {
     ? financialSummary.total
     : calculatedItemsTotal;
 
-  // กฎ: ห้ามแสดงเป็นสีเขียว "ผ่านเกณฑ์ทั้งหมด" หากไม่มีรายการที่อนุมัติจริง หรือยอดเงินเป็น 0 หรือเอกสารไม่ถูกต้อง หรือยอดคำนวณท้ายบิลไม่ถูกต้อง
+  // กฎ: เงื่อนไข Math Error (!isMathCorrect) ให้ทำงานเฉพาะเมื่อเอกสารเป็นใบเสร็จที่ถูกต้อง (overallStatus !== 'INVALID_DOCUMENT' และมี items.length > 0) เท่านั้น
   const hasApprovedItems = passItemsCount > 0;
   const hasValidAmount = totalBillAmount > 0;
-  const isMathError = financialSummary?.isMathCorrect === false;
+  const isMathError =
+    !isInvalidDocument &&
+    totalItemsCount > 0 &&
+    financialSummary?.isMathCorrect === false;
+
   const isOverallPass =
     !isInvalidDocument &&
     !isMathError &&
@@ -846,60 +854,24 @@ export default function UserFrontendPage() {
           </div>
         )}
 
-        {/* Real Gemini AI Analysis Results Display (Multiple Items List) */}
+        {/* Real Gemini AI Analysis Results Display */}
         {analysisResults && (
-          isInvalidDocument ? (
-            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300 print:hidden">
-              {/* Minimalist Gray/Dark Alert Box */}
-              <div className="bg-neutral-900 border border-neutral-700 text-neutral-100 rounded-2xl p-6 sm:p-8 space-y-5 shadow-sm font-mono">
-                <div className="flex items-start space-x-4">
-                  <div className="p-3 bg-neutral-800 border border-neutral-700 text-neutral-300 rounded-xl shrink-0">
-                    <FileWarning className="w-7 h-7 text-neutral-300" />
-                  </div>
-                  <div className="space-y-2 flex-1">
-                    <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-rose-950/80 border border-rose-700 text-xs font-mono font-bold text-rose-300">
-                      <XCircle className="w-3.5 h-3.5 text-rose-400" />
-                      <span>เอกสารไม่ถูกต้อง</span>
-                    </div>
-                    <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight font-sans">
-                      เอกสารไม่ถูกต้อง: กรุณาอัปโหลดภาพใบเสร็จรับเงิน
-                    </h3>
-                    <p className="text-xs sm:text-sm text-neutral-400 leading-relaxed font-sans">
-                      {documentWarnings && documentWarnings.length > 0
-                        ? documentWarnings[0]
-                        : "รูปภาพที่ส่งเข้ามาไม่ใช่เอกสารทางการเงินหรือใบเสร็จรับเงิน กรุณาถ่ายภาพใบเสร็จให้ชัดเจน"}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t border-neutral-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-                  <span className="text-neutral-500 font-sans">
-                    ระบบรองรับ: ใบเสร็จรับเงิน, บิลเงินสด, ใบกำกับภาษี, ใบเสนอราคา, หรือเอกสารการเบิกจ่าย
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleReset}
-                    className="self-start sm:self-auto bg-neutral-100 hover:bg-white text-neutral-900 font-bold text-xs py-2.5 px-4 rounded-xl transition flex items-center space-x-2 cursor-pointer shadow-xs"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                    <span>อัปโหลดภาพใหม่</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300 print:hidden">
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300 print:hidden">
             
-            {/* Overall Summary Card */}
+            {/* Overall Summary Card (แถบสถานะด้านบน) */}
             <div className={`rounded-2xl border-2 overflow-hidden shadow-lg ${
-              isOverallPass
+              isInvalidDocument
+                ? "border-rose-500 bg-white"
+                : isOverallPass
                 ? "border-emerald-500 bg-white"
                 : isOverallHasFail
                 ? "border-rose-500 bg-white"
                 : "border-amber-400 bg-white"
             }`}>
               <div className={`p-6 sm:p-8 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-gradient-to-r ${
-                isOverallPass
+                isInvalidDocument
+                  ? "from-rose-600 via-red-600 to-rose-700"
+                  : isOverallPass
                   ? "from-emerald-600 via-teal-600 to-emerald-700"
                   : isOverallHasFail
                   ? "from-rose-600 via-red-600 to-rose-700"
@@ -907,7 +879,9 @@ export default function UserFrontendPage() {
               }`}>
                 <div className="flex items-center space-x-4">
                   <div className="w-14 h-14 bg-white/15 backdrop-blur-md rounded-2xl flex items-center justify-center text-white shrink-0 shadow-inner">
-                    {isOverallPass ? (
+                    {isInvalidDocument ? (
+                      <FileWarning className="w-9 h-9 stroke-[2.2]" />
+                    ) : isOverallPass ? (
                       <CheckCircle2 className="w-9 h-9 stroke-[2.2]" />
                     ) : isOverallHasFail ? (
                       <XCircle className="w-9 h-9 stroke-[2.2]" />
@@ -917,7 +891,9 @@ export default function UserFrontendPage() {
                   </div>
                   <div className="space-y-1">
                     <div className="inline-block bg-white/20 text-white text-xs font-mono px-2.5 py-0.5 rounded-full font-semibold">
-                      ภาพรวม: {isOverallPass
+                      ภาพรวม: {isInvalidDocument
+                        ? "เอกสารไม่ถูกต้อง"
+                        : isOverallPass
                         ? "ทุกรายการผ่านเกณฑ์"
                         : isMathError
                         ? "คำนวณเลขท้ายบิลไม่ถูกต้อง"
@@ -926,7 +902,9 @@ export default function UserFrontendPage() {
                         : "มีรายการต้องใช้ดุลยพินิจ"}
                     </div>
                     <h3 className="text-xl sm:text-2xl font-extrabold text-white">
-                      {isOverallPass
+                      {isInvalidDocument
+                        ? "เอกสารไม่ถูกต้อง / ไม่ใช่ใบเสร็จรับเงิน"
+                        : isOverallPass
                         ? "ผ่านการตรวจสอบราคากลางทั้งหมด"
                         : isMathError
                         ? "พบข้อผิดพลาด: ยอดคำนวณท้ายบิลไม่ถูกต้อง"
@@ -935,27 +913,37 @@ export default function UserFrontendPage() {
                         : `พบ ${notFoundItemsCount} รายการที่ไม่อยู่ในฐานข้อมูลราคากลาง`}
                     </h3>
                     <p className="text-xs sm:text-sm text-white/90">
-                      ตรวจพบทั้งหมด {totalItemsCount} รายการ (ผ่าน {passItemsCount} รายการ
-                      {failItemsCount > 0 && `, ไม่ผ่าน ${failItemsCount} รายการ`}
-                      {notFoundItemsCount > 0 && `, ไม่อยู่ในฐานข้อมูล ${notFoundItemsCount} รายการ`})
+                      {isInvalidDocument
+                        ? (documentWarnings && documentWarnings.length > 0
+                            ? documentWarnings[0]
+                            : "รูปภาพที่ส่งเข้ามาไม่ใช่เอกสารทางการเงินหรือใบเสร็จรับเงิน กรุณาถ่ายภาพใบเสร็จให้ชัดเจน")
+                        : `ตรวจพบทั้งหมด ${totalItemsCount} รายการ (ผ่าน ${passItemsCount} รายการ${
+                            failItemsCount > 0 ? `, ไม่ผ่าน ${failItemsCount} รายการ` : ""
+                          }${notFoundItemsCount > 0 ? `, ไม่อยู่ในฐานข้อมูล ${notFoundItemsCount} รายการ` : ""})`}
                     </p>
                   </div>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2 self-stretch sm:self-auto justify-end">
-                  <button
-                    type="button"
-                    onClick={() => window.print()}
-                    className="bg-white hover:bg-slate-100 text-slate-900 border border-slate-300 text-xs font-semibold py-2.5 px-4 rounded-xl shadow-xs transition flex items-center space-x-1.5 cursor-pointer"
-                  >
-                    <Printer className="w-3.5 h-3.5 text-slate-700" />
-                    <span>พิมพ์ใบสรุปผล (Export PDF)</span>
-                  </button>
+                  {!isInvalidDocument && (
+                    <button
+                      type="button"
+                      onClick={() => window.print()}
+                      className="bg-white hover:bg-slate-100 text-slate-900 border border-slate-300 text-xs font-semibold py-2.5 px-4 rounded-xl shadow-xs transition flex items-center space-x-1.5 cursor-pointer"
+                    >
+                      <Printer className="w-3.5 h-3.5 text-slate-700" />
+                      <span>พิมพ์ใบสรุปผล (Export PDF)</span>
+                    </button>
+                  )}
 
                   <button
                     type="button"
                     onClick={handleReset}
-                    className="bg-white/20 hover:bg-white/30 text-white text-xs font-semibold py-2.5 px-4 rounded-xl backdrop-blur-xs transition flex items-center space-x-1.5 cursor-pointer"
+                    className={`${
+                      isInvalidDocument
+                        ? "bg-white hover:bg-slate-100 text-slate-900 font-bold"
+                        : "bg-white/20 hover:bg-white/30 text-white font-semibold"
+                    } text-xs py-2.5 px-4 rounded-xl backdrop-blur-xs transition flex items-center space-x-1.5 cursor-pointer shadow-xs`}
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
                     <span>ตรวจเอกสารชุดใหม่</span>
@@ -971,23 +959,25 @@ export default function UserFrontendPage() {
                   ? "bg-rose-50 border-rose-400 text-rose-900"
                   : "bg-amber-50 border-amber-400 text-amber-900"
               }`}>
-                {/* Red Alert Bar for Math Error */}
-                {isMathError && (
+                {/* Red Alert Bar for Math Error - ซ่อนหาก isInvalidDocument */}
+                {!isInvalidDocument && isMathError && (
                   <div className="bg-rose-600 text-white font-bold text-xs sm:text-sm py-2.5 px-4 rounded-xl flex items-center space-x-2 shadow-xs">
                     <AlertTriangle className="w-4 h-4 shrink-0 text-white" />
                     <span>⚠️ ยอดคำนวณท้ายบิลไม่ถูกต้อง: ผลรวมรายการไม่ตรงกับยอดสุทธิ</span>
                   </div>
                 )}
 
-                <div className={`flex items-center space-x-2.5 font-bold text-sm ${isMathError ? "text-rose-800" : "text-amber-800"}`}>
-                  <AlertTriangle className={`w-5 h-5 shrink-0 ${isMathError ? "text-rose-600" : "text-amber-600"}`} />
+                <div className={`flex items-center space-x-2.5 font-bold text-sm ${isInvalidDocument || isMathError ? "text-rose-800" : "text-amber-800"}`}>
+                  <AlertTriangle className={`w-5 h-5 shrink-0 ${isInvalidDocument || isMathError ? "text-rose-600" : "text-amber-600"}`} />
                   <span>แจ้งเตือนความสมบูรณ์ของเอกสาร (Document Integrity Warnings):</span>
                 </div>
                 {documentWarnings && documentWarnings.length > 0 && (
-                  <ul className={`list-disc list-inside text-xs font-semibold space-y-1.5 pl-1.5 ${isMathError ? "text-rose-900" : "text-amber-900"}`}>
-                    {documentWarnings.map((warning, wIdx) => (
-                      <li key={wIdx}>{warning}</li>
-                    ))}
+                  <ul className={`list-disc list-inside text-xs font-semibold space-y-1.5 pl-1.5 ${isInvalidDocument || isMathError ? "text-rose-900" : "text-amber-900"}`}>
+                    {documentWarnings
+                      .filter((warning) => !isInvalidDocument || !warning.includes("คณิตศาสตร์"))
+                      .map((warning, wIdx) => (
+                        <li key={wIdx}>{warning}</li>
+                      ))}
                   </ul>
                 )}
               </div>
@@ -1005,22 +995,40 @@ export default function UserFrontendPage() {
                   <div className="grid grid-cols-2 gap-3 text-xs">
                     <div>
                       <span className="text-slate-500 block text-[11px]">ร้านค้า / ผู้ให้บริการ:</span>
-                      <span className="font-bold text-slate-900 text-sm">{merchantInfo?.name || "ไม่ระบุ"}</span>
+                      <span className="font-bold text-slate-900 text-sm">
+                        {isInvalidDocument ? "-" : (merchantInfo?.name || "ไม่ระบุ")}
+                      </span>
                     </div>
                     <div>
                       <span className="text-slate-500 block text-[11px]">วันที่ในเอกสาร:</span>
-                      <span className="font-medium text-slate-800">{merchantInfo?.date || "ไม่ระบุ"}</span>
+                      <span className="font-medium text-slate-800">
+                        {isInvalidDocument ? "-" : (merchantInfo?.date || "ไม่ระบุ")}
+                      </span>
                     </div>
                     <div>
                       <span className="text-slate-500 block text-[11px]">ประเภทเอกสาร:</span>
                       <span className="text-slate-800 font-medium">
-                        {merchantInfo?.isHandwritten ? "บิลเงินสดเขียนมือ" : "ใบเสร็จพิมพ์ / POS"}
+                        {isInvalidDocument
+                          ? "-"
+                          : merchantInfo?.isHandwritten
+                          ? "บิลเงินสดเขียนมือ"
+                          : "ใบเสร็จพิมพ์ / POS"}
                       </span>
                     </div>
                     <div>
                       <span className="text-slate-500 block text-[11px]">ลายเซ็นผู้รับเงิน:</span>
-                      <span className={`font-semibold inline-flex items-center space-x-1 ${merchantInfo?.hasReceiptSign ? "text-emerald-700" : "text-rose-600 font-bold"}`}>
-                        {merchantInfo?.hasReceiptSign ? "✓ พบลายเซ็น/ตรายาง" : "✕ ไม่พบลายเซ็น"}
+                      <span className={`font-semibold inline-flex items-center space-x-1 ${
+                        isInvalidDocument
+                          ? "text-slate-500 font-medium"
+                          : merchantInfo?.hasReceiptSign
+                          ? "text-emerald-700"
+                          : "text-rose-600 font-bold"
+                      }`}>
+                        {isInvalidDocument
+                          ? "-"
+                          : merchantInfo?.hasReceiptSign
+                          ? "✓ พบลายเซ็น/ตรายาง"
+                          : "✕ ไม่พบลายเซ็น"}
                       </span>
                     </div>
                   </div>
@@ -1036,25 +1044,37 @@ export default function UserFrontendPage() {
                     <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
                       <span className="text-slate-500 block text-[10px]">ยอดรวมก่อนลด:</span>
                       <span className="font-mono font-bold text-slate-800 text-xs">
-                        ฿{(financialSummary?.subtotal || calculatedItemsTotal).toLocaleString("th-TH", { minimumFractionDigits: 2 })}
+                        {isInvalidDocument
+                          ? "-"
+                          : `฿${(financialSummary?.subtotal || calculatedItemsTotal).toLocaleString("th-TH", { minimumFractionDigits: 2 })}`}
                       </span>
                     </div>
                     <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
                       <span className="text-slate-500 block text-[10px]">ส่วนลด (Discount):</span>
-                      <span className={`font-mono font-bold text-xs ${(financialSummary?.discount || 0) > 0 ? "text-emerald-600" : "text-slate-400"}`}>
-                        {(financialSummary?.discount || 0) > 0 ? `-฿${financialSummary?.discount?.toLocaleString("th-TH", { minimumFractionDigits: 2 })}` : "฿0.00"}
+                      <span className={`font-mono font-bold text-xs ${!isInvalidDocument && (financialSummary?.discount || 0) > 0 ? "text-emerald-600" : "text-slate-400"}`}>
+                        {isInvalidDocument
+                          ? "-"
+                          : (financialSummary?.discount || 0) > 0
+                          ? `-฿${financialSummary?.discount?.toLocaleString("th-TH", { minimumFractionDigits: 2 })}`
+                          : "฿0.00"}
                       </span>
                     </div>
                     <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
                       <span className="text-slate-500 block text-[10px]">ภาษีมูลค่าเพิ่ม (VAT):</span>
-                      <span className={`font-mono font-bold text-xs ${(financialSummary?.vat || 0) > 0 ? "text-blue-600" : "text-slate-400"}`}>
-                        {(financialSummary?.vat || 0) > 0 ? `+฿${financialSummary?.vat?.toLocaleString("th-TH", { minimumFractionDigits: 2 })}` : "฿0.00"}
+                      <span className={`font-mono font-bold text-xs ${!isInvalidDocument && (financialSummary?.vat || 0) > 0 ? "text-blue-600" : "text-slate-400"}`}>
+                        {isInvalidDocument
+                          ? "-"
+                          : (financialSummary?.vat || 0) > 0
+                          ? `+฿${financialSummary?.vat?.toLocaleString("th-TH", { minimumFractionDigits: 2 })}`
+                          : "฿0.00"}
                       </span>
                     </div>
                     <div className="bg-orange-50/60 p-2.5 rounded-xl border border-orange-200">
                       <span className="text-orange-900 block text-[10px] font-semibold">ยอดสุทธิรวม:</span>
                       <span className="font-mono font-bold text-orange-800 text-xs">
-                        ฿{totalBillAmount.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
+                        {isInvalidDocument
+                          ? "-"
+                          : `฿${totalBillAmount.toLocaleString("th-TH", { minimumFractionDigits: 2 })}`}
                       </span>
                     </div>
                   </div>
@@ -1063,16 +1083,37 @@ export default function UserFrontendPage() {
             )}
 
             {/* List of Detected Items */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between px-1">
-                <h4 className="text-base font-bold text-slate-900 flex items-center space-x-2">
-                  <Layers className="w-5 h-5 text-orange-600" />
-                  <span>รายละเอียดผลการตรวจสอบแต่ละรายการ ({totalItemsCount})</span>
-                </h4>
+            {isInvalidDocument ? (
+              <div className="bg-white border border-slate-200 rounded-2xl p-8 sm:p-10 text-center text-slate-500 space-y-3 shadow-sm">
+                <div className="w-12 h-12 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center mx-auto">
+                  <FileWarning className="w-6 h-6" />
+                </div>
+                <h4 className="font-bold text-slate-800 text-base">ไม่สามารถวิเคราะห์รายการสินค้า/บริการได้</h4>
+                <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto">
+                  เนื่องจากเอกสารที่อัปโหลดไม่ใช่ใบเสร็จรับเงินหรือเอกสารการเบิกจ่ายทางการเงิน กรุณากดปุ่ม &ldquo;ตรวจเอกสารชุดใหม่&rdquo; เพื่ออัปโหลดเอกสารที่ถูกต้อง
+                </p>
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={handleReset}
+                    className="inline-flex items-center space-x-2 bg-slate-900 hover:bg-black text-white text-xs font-semibold py-2.5 px-4 rounded-xl transition cursor-pointer"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>ตรวจเอกสารชุดใหม่</span>
+                  </button>
+                </div>
               </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between px-1">
+                  <h4 className="text-base font-bold text-slate-900 flex items-center space-x-2">
+                    <Layers className="w-5 h-5 text-orange-600" />
+                    <span>รายละเอียดผลการตรวจสอบแต่ละรายการ ({totalItemsCount})</span>
+                  </h4>
+                </div>
 
-              <div className="grid grid-cols-1 gap-4">
-                {analysisResults.map((item, idx) => {
+                <div className="grid grid-cols-1 gap-4">
+                  {analysisResults.map((item, idx) => {
                   const isPass = item.status === "PASS";
                   const isFail = item.status === "FAIL";
                   const isNotFound = item.status === "NOT_FOUND";
@@ -1295,18 +1336,21 @@ export default function UserFrontendPage() {
                 })}
               </div>
             </div>
+          )}
 
             {/* Bottom Actions */}
             <div className="bg-white border border-slate-200 rounded-2xl p-6 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm">
               <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
-                <button
-                  type="button"
-                  onClick={() => window.print()}
-                  className="w-full sm:w-auto bg-white hover:bg-slate-100 text-slate-900 font-semibold text-xs py-3 px-5 rounded-xl border border-slate-300 transition flex items-center justify-center space-x-2 shadow-xs cursor-pointer"
-                >
-                  <Printer className="w-4 h-4 text-slate-700" />
-                  <span>พิมพ์ใบสรุปผล (Export PDF)</span>
-                </button>
+                {!isInvalidDocument && (
+                  <button
+                    type="button"
+                    onClick={() => window.print()}
+                    className="w-full sm:w-auto bg-white hover:bg-slate-100 text-slate-900 font-semibold text-xs py-3 px-5 rounded-xl border border-slate-300 transition flex items-center justify-center space-x-2 shadow-xs cursor-pointer"
+                  >
+                    <Printer className="w-4 h-4 text-slate-700" />
+                    <span>พิมพ์ใบสรุปผล (Export PDF)</span>
+                  </button>
+                )}
 
                 <button
                   type="button"
@@ -1314,7 +1358,7 @@ export default function UserFrontendPage() {
                   className="w-full sm:w-auto bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-xs py-3 px-5 rounded-xl border border-slate-300 transition flex items-center justify-center space-x-2 cursor-pointer"
                 >
                   <RefreshCw className="w-4 h-4" />
-                  <span>สแกนตรวจสอบเอกสารชุดอื่น</span>
+                  <span>ตรวจเอกสารชุดใหม่</span>
                 </button>
               </div>
 
@@ -1327,8 +1371,7 @@ export default function UserFrontendPage() {
               </Link>
             </div>
           </div>
-        )
-      )}
+        )}
 
         {/* ========================================================================= */}
         {/* PRINTABLE A4 AUDIT SUMMARY (VISIBLE ONLY ON PRINT: @media print)          */}
