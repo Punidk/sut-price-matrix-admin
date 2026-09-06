@@ -68,6 +68,7 @@ export interface FinancialSummaryData {
   discount: number;
   vat: number;
   total: number;
+  isMathCorrect?: boolean;
 }
 
 export interface AuditLogEntry {
@@ -243,7 +244,7 @@ export default function AdminAuditHistoryPage() {
   const filteredLogs = useMemo(() => {
     return logs.filter((log) => {
       // 1. Filter only issues
-      if (onlyIssues && log.failCount === 0) {
+      if (onlyIssues && log.failCount === 0 && log.overallStatus !== "INVALID_DOCUMENT") {
         return false;
       }
 
@@ -274,8 +275,16 @@ export default function AdminAuditHistoryPage() {
   // Stats calculation
   const totalScans = logs.length;
   const totalItemsCount = logs.reduce((acc, curr) => acc + curr.itemsAnalyzed, 0);
-  const totalIssuesCount = logs.filter((l) => l.failCount > 0).length;
-  const totalPassedCount = logs.filter((l) => l.failCount === 0).length;
+  const totalIssuesCount = logs.filter(
+    (l) => l.failCount > 0 || l.overallStatus === "INVALID_DOCUMENT"
+  ).length;
+  const totalPassedCount = logs.filter(
+    (l) =>
+      l.overallStatus !== "INVALID_DOCUMENT" &&
+      l.itemsAnalyzed > 0 &&
+      l.failCount === 0 &&
+      (!l.financialSummary || Number(l.financialSummary.total) > 0)
+  ).length;
 
   return (
     <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
@@ -467,10 +476,25 @@ export default function AdminAuditHistoryPage() {
                             </span>
                           </td>
                           <td className="py-4 px-4 text-center">
-                            {hasIssues ? (
+                            {log.overallStatus === "INVALID_DOCUMENT" ? (
+                              <span className="inline-flex items-center space-x-1 border border-rose-600/80 bg-rose-950/60 text-rose-300 text-[11px] font-mono px-2.5 py-1">
+                                <XCircle className="w-3.5 h-3.5 shrink-0 text-rose-400" />
+                                <span>เอกสารไม่ถูกต้อง</span>
+                              </span>
+                            ) : log.financialSummary?.isMathCorrect === false ? (
+                              <span className="inline-flex items-center space-x-1 border border-rose-600/80 bg-rose-950/60 text-rose-300 text-[11px] font-mono px-2.5 py-1">
+                                <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-rose-400" />
+                                <span>คำนวณเลขผิด</span>
+                              </span>
+                            ) : hasIssues ? (
                               <span className="inline-flex items-center space-x-1 border border-rose-600/80 bg-rose-950/60 text-rose-300 text-[11px] font-mono px-2.5 py-1">
                                 <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-rose-400" />
                                 <span>พบปัญหา {log.failCount} รายการ</span>
+                              </span>
+                            ) : log.itemsAnalyzed === 0 || passCount === 0 || (log.financialSummary && Number(log.financialSummary.total) <= 0) ? (
+                              <span className="inline-flex items-center space-x-1 border border-neutral-700 bg-neutral-900 text-neutral-400 text-[11px] font-mono px-2.5 py-1">
+                                <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-neutral-400" />
+                                <span>ไม่มีรายการอนุมัติ</span>
                               </span>
                             ) : (
                               <span className="inline-flex items-center space-x-1 border border-emerald-500/60 bg-emerald-950/60 text-emerald-300 text-[11px] font-mono px-2.5 py-1">
@@ -535,6 +559,19 @@ export default function AdminAuditHistoryPage() {
                                   <span className="text-rose-400">ไม่ผ่าน/ไม่อยู่ในฐาน: {log.failCount}</span>
                                 </div>
                               </div>
+
+                              {/* Invalid Document Notice */}
+                              {log.overallStatus === "INVALID_DOCUMENT" && (
+                                <div className="bg-rose-950/40 border border-rose-600/80 p-3.5 space-y-1 font-mono text-xs text-rose-200">
+                                  <div className="flex items-center space-x-2 font-bold text-rose-300">
+                                    <XCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                                    <span>สถานะเอกสาร: เอกสารไม่ถูกต้อง (ไม่ใช่เอกสารทางการเงิน / ใบเสร็จ)</span>
+                                  </div>
+                                  <p className="text-[11px] text-rose-200/90">
+                                    ภาพเอกสารนี้ไม่ใช่ใบเสร็จรับเงิน บิลเงินสด หรือเอกสารเบิกจ่ายทางการเงิน
+                                  </p>
+                                </div>
+                              )}
 
                               {/* Document Warnings Banner */}
                               {log.warnings && log.warnings.length > 0 && (

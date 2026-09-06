@@ -129,7 +129,14 @@ ${matrixContext}
   * discount = ยอดส่วนลดท้ายบิล (ถ้ามี ให้ระบุเป็นตัวเลขบวก >= 0, ถ้าไม่มีให้ใส่ 0)
   * vat = ยอดภาษีมูลค่าเพิ่ม (เช่น VAT 7% ถ้ามีระบุในบิลหรือคำนวณจากยอดหลังลด ให้ระบุตัวเลข >= 0, ถ้าไม่มีให้ใส่ 0)
   * total = ยอดเงินสุทธิรวมท้ายบิลที่ต้องจ่ายจริง (subtotal - discount + vat)
-  * [สำคัญยิ่ง]: การที่ยอดรวมสุทธิท้ายบิล (Grand Total) เกิดจากการนำ Subtotal มาหักส่วนลด (Discount) หรือบวกภาษีมูลค่าเพิ่ม (VAT 7%) "ถือว่าเป็นการคำนวณที่ถูกต้องตามมาตรฐานการบัญชี ห้ามตีความเป็นคำนวณเลขผิดเด็ดขาด"
+  * isMathCorrect = ตรวจสอบความถูกต้องทางคณิตศาสตร์ (boolean true/false)
+  * [กฎเข้มงวดการตรวจจับผลรวมตัวเลขผิดพลาด]:
+    - หากผลรวมของรายการย่อย (Subtotal) ไม่เท่ากับ ยอดสุทธิท้ายบิล (Grand Total / total) และบนบิล "ไม่มีการระบุรายการส่วนลดอย่างชัดเจน":
+      * ให้ตั้งค่า financialSummary.isMathCorrect = false ทันที
+      * และต้องใส่ข้อความลงในอาร์เรย์ warnings ด้วยเสมอ เช่น: "[ข้อผิดพลาดทางคณิตศาสตร์: ยอดรวมรายการย่อย (1,750) ไม่ตรงกับยอดสุทธิท้ายบิล (1,650)]" โดยระบุตัวเลขจริงที่ตรวจพบ
+      * กำหนด overallStatus = "FAIL"
+    - หากการคำนวณถูกต้อง (Subtotal - Discount + VAT = Total) ให้ตั้งค่า financialSummary.isMathCorrect = true และไม่ต้องใส่ warning
+  * [สำคัญยิ่ง]: การที่ยอดรวมสุทธิท้ายบิล (Grand Total) เกิดจากการนำ Subtotal มาหักส่วนลด (Discount) หรือบวกภาษีมูลค่าเพิ่ม (VAT 7%) ที่ระบุไว้ชัดเจนในบิล "ถือว่าเป็นการคำนวณที่ถูกต้องตามมาตรฐานการบัญชี (isMathCorrect: true)"
 
 ========================================
 2. การตรวจสอบความสมบูรณ์ของเอกสาร (Document Integrity & Handwritten Signature Rules):
@@ -176,10 +183,12 @@ ${matrixContext}
     "subtotal": 0.00,
     "discount": 0.00,
     "vat": 0.00,
-    "total": 0.00
+    "total": 0.00,
+    "isMathCorrect": true
   },
   "overallStatus": "PASS" | "FAIL" | "NOT_FOUND" | "INVALID_DOCUMENT",
   "warnings": [
+    "[ข้อผิดพลาดทางคณิตศาสตร์: ยอดรวมรายการย่อย (1,750) ไม่ตรงกับยอดสุทธิท้ายบิล (1,650)]",
     "[เอกสารไม่สมบูรณ์: ขาดลายเซ็นผู้รับเงิน]"
   ],
   "items": [
@@ -384,8 +393,44 @@ ${matrixContext}
       }
     }
 
+    // Double-check: ตรวจสอบความถูกต้องทางคณิตศาสตร์ของผลรวมท้ายบิล (Math Error Detection)
+    if (parsedData.items.length > 0) {
+      const lineItemsSum = parsedData.items.reduce((acc: number, it: any) => {
+        const q = it.receiptData?.qty != null ? Number(it.receiptData.qty) : 1;
+        const u = it.receiptData?.unitPrice != null ? Number(it.receiptData.unitPrice) : 0;
+        const t = it.receiptData?.totalPrice != null ? Number(it.receiptData.totalPrice) : (q * u);
+        return acc + t;
+      }, 0);
+
+      const subtotal = Number(parsedData.financialSummary?.subtotal) || lineItemsSum;
+      const discount = Number(parsedData.financialSummary?.discount) || 0;
+      const vat = Number(parsedData.financialSummary?.vat) || 0;
+      const reportedTotal = Number(parsedData.financialSummary?.total) || lineItemsSum;
+
+      // ตรวจสอบว่าผลรวมรายการย่อยตรงกับยอดสุทธิหรือไม่
+      const expectedTotal = subtotal - discount + vat;
+      const hasMathMismatch = Math.abs(expectedTotal - reportedTotal) > 0.5;
+      const hasUnexplainedDiff = (discount === 0 && vat === 0) && Math.abs(subtotal - reportedTotal) > 0.5;
+
+      if (parsedData.financialSummary?.isMathCorrect === false || hasMathMismatch || hasUnexplainedDiff) {
+        if (reportedTotal > 0) {
+          parsedData.financialSummary.isMathCorrect = false;
+          const warningMsg = `[ข้อผิดพลาดทางคณิตศาสตร์: ยอดรวมรายการย่อย (${Math.round(subtotal).toLocaleString()}) ไม่ตรงกับยอดสุทธิท้ายบิล (${Math.round(reportedTotal).toLocaleString()})]`;
+          if (!parsedData.warnings.some((w: string) => w.includes("ข้อผิดพลาดทางคณิตศาสตร์"))) {
+            parsedData.warnings.unshift(warningMsg);
+          }
+          parsedData.overallStatus = "FAIL";
+        }
+      } else {
+        parsedData.financialSummary.isMathCorrect = true;
+      }
+    }
+
     // สรุป Overall Status ให้แม่นยำ
-    if (parsedData.items.some((i: any) => i.status === "FAIL")) {
+    if (
+      parsedData.financialSummary?.isMathCorrect === false ||
+      parsedData.items.some((i: any) => i.status === "FAIL")
+    ) {
       parsedData.overallStatus = "FAIL";
     } else if (parsedData.items.some((i: any) => i.status === "NOT_FOUND")) {
       parsedData.overallStatus = "NOT_FOUND";

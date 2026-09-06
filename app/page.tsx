@@ -77,6 +77,9 @@ export interface FinancialSummaryData {
   discount?: number;
   vat?: number;
   total?: number;
+  grandTotal?: number;
+  approvedTotal?: number;
+  isMathCorrect?: boolean;
 }
 
 export interface UploadedFileItem {
@@ -385,13 +388,18 @@ export default function UserFrontendPage() {
         results = data;
       }
 
+      // หาก financialSummary.isMathCorrect === false ให้ปรับ overallStatus เป็น FAIL ทันที
+      if (finSummary?.isMathCorrect === false) {
+        overallStatusStr = "FAIL";
+      }
+
       setMerchantInfo(merchant);
       setFinancialSummary(finSummary);
       setDocumentWarnings(warningsList);
       setOverallStatus(overallStatusStr);
 
-      // บันทึกประวัติการตรวจสอบลง Firestore collection `audit_history`
-      if (isFirebaseConfigured && db) {
+      // บันทึกประวัติการตรวจสอบลง Firestore collection `audit_history` (ข้ามหากเอกสารไม่ใช่ใบเสร็จ)
+      if (isFirebaseConfigured && db && overallStatusStr !== "INVALID_DOCUMENT") {
         const failCount = results.filter(
           (item) => item.status === "FAIL" || item.status === "NOT_FOUND"
         ).length;
@@ -434,9 +442,6 @@ export default function UserFrontendPage() {
   const passItemsCount = analysisResults ? analysisResults.filter((r) => r.status === "PASS").length : 0;
   const failItemsCount = analysisResults ? analysisResults.filter((r) => r.status === "FAIL").length : 0;
   const notFoundItemsCount = analysisResults ? analysisResults.filter((r) => r.status === "NOT_FOUND").length : 0;
-  const isOverallPass = totalItemsCount > 0 && failItemsCount === 0 && notFoundItemsCount === 0;
-  const isOverallHasFail = failItemsCount > 0;
-  const isOverallPendingReview = totalItemsCount > 0 && failItemsCount === 0 && notFoundItemsCount > 0;
   const isInvalidDocument = overallStatus === "INVALID_DOCUMENT";
 
   // Financial summary for print report & UI
@@ -452,6 +457,27 @@ export default function UserFrontendPage() {
   const totalBillAmount = financialSummary && financialSummary.total && financialSummary.total > 0
     ? financialSummary.total
     : calculatedItemsTotal;
+
+  // กฎ: ห้ามแสดงเป็นสีเขียว "ผ่านเกณฑ์ทั้งหมด" หากไม่มีรายการที่อนุมัติจริง หรือยอดเงินเป็น 0 หรือเอกสารไม่ถูกต้อง หรือยอดคำนวณท้ายบิลไม่ถูกต้อง
+  const hasApprovedItems = passItemsCount > 0;
+  const hasValidAmount = totalBillAmount > 0;
+  const isMathError = financialSummary?.isMathCorrect === false;
+  const isOverallPass =
+    !isInvalidDocument &&
+    !isMathError &&
+    totalItemsCount > 0 &&
+    hasApprovedItems &&
+    hasValidAmount &&
+    failItemsCount === 0 &&
+    notFoundItemsCount === 0;
+
+  const isOverallHasFail = !isInvalidDocument && (failItemsCount > 0 || isMathError);
+  const isOverallPendingReview =
+    !isInvalidDocument &&
+    !isMathError &&
+    totalItemsCount > 0 &&
+    failItemsCount === 0 &&
+    (notFoundItemsCount > 0 || !hasApprovedItems || !hasValidAmount);
 
   const totalPassAmount = analysisResults
     ? analysisResults
@@ -831,8 +857,9 @@ export default function UserFrontendPage() {
                     <FileWarning className="w-7 h-7 text-neutral-300" />
                   </div>
                   <div className="space-y-2 flex-1">
-                    <div className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full bg-neutral-800 border border-neutral-700 text-[11px] font-mono font-semibold text-neutral-300">
-                      <span>INVALID DOCUMENT</span>
+                    <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-rose-950/80 border border-rose-700 text-xs font-mono font-bold text-rose-300">
+                      <XCircle className="w-3.5 h-3.5 text-rose-400" />
+                      <span>เอกสารไม่ถูกต้อง</span>
                     </div>
                     <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight font-sans">
                       เอกสารไม่ถูกต้อง: กรุณาอัปโหลดภาพใบเสร็จรับเงิน
@@ -892,6 +919,8 @@ export default function UserFrontendPage() {
                     <div className="inline-block bg-white/20 text-white text-xs font-mono px-2.5 py-0.5 rounded-full font-semibold">
                       ภาพรวม: {isOverallPass
                         ? "ทุกรายการผ่านเกณฑ์"
+                        : isMathError
+                        ? "คำนวณเลขท้ายบิลไม่ถูกต้อง"
                         : isOverallHasFail
                         ? "พบรายการที่ไม่ผ่านเกณฑ์"
                         : "มีรายการต้องใช้ดุลยพินิจ"}
@@ -899,6 +928,8 @@ export default function UserFrontendPage() {
                     <h3 className="text-xl sm:text-2xl font-extrabold text-white">
                       {isOverallPass
                         ? "ผ่านการตรวจสอบราคากลางทั้งหมด"
+                        : isMathError
+                        ? "พบข้อผิดพลาด: ยอดคำนวณท้ายบิลไม่ถูกต้อง"
                         : isOverallHasFail
                         ? `พบ ${failItemsCount} รายการที่เกินเพดานราคากลาง`
                         : `พบ ${notFoundItemsCount} รายการที่ไม่อยู่ในฐานข้อมูลราคากลาง`}
@@ -934,17 +965,31 @@ export default function UserFrontendPage() {
             </div>
 
             {/* Document Integrity Warnings Alert Box */}
-            {documentWarnings && documentWarnings.length > 0 && (
-              <div className="bg-amber-50 border-2 border-amber-400 p-4 sm:p-5 rounded-2xl space-y-2 text-amber-900 shadow-sm animate-in fade-in duration-300">
-                <div className="flex items-center space-x-2.5 font-bold text-sm text-amber-800">
-                  <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+            {(isMathError || (documentWarnings && documentWarnings.length > 0)) && (
+              <div className={`border-2 p-4 sm:p-5 rounded-2xl space-y-3 shadow-sm animate-in fade-in duration-300 ${
+                isMathError
+                  ? "bg-rose-50 border-rose-400 text-rose-900"
+                  : "bg-amber-50 border-amber-400 text-amber-900"
+              }`}>
+                {/* Red Alert Bar for Math Error */}
+                {isMathError && (
+                  <div className="bg-rose-600 text-white font-bold text-xs sm:text-sm py-2.5 px-4 rounded-xl flex items-center space-x-2 shadow-xs">
+                    <AlertTriangle className="w-4 h-4 shrink-0 text-white" />
+                    <span>⚠️ ยอดคำนวณท้ายบิลไม่ถูกต้อง: ผลรวมรายการไม่ตรงกับยอดสุทธิ</span>
+                  </div>
+                )}
+
+                <div className={`flex items-center space-x-2.5 font-bold text-sm ${isMathError ? "text-rose-800" : "text-amber-800"}`}>
+                  <AlertTriangle className={`w-5 h-5 shrink-0 ${isMathError ? "text-rose-600" : "text-amber-600"}`} />
                   <span>แจ้งเตือนความสมบูรณ์ของเอกสาร (Document Integrity Warnings):</span>
                 </div>
-                <ul className="list-disc list-inside text-xs font-semibold space-y-1.5 pl-1.5 text-amber-900">
-                  {documentWarnings.map((warning, wIdx) => (
-                    <li key={wIdx}>{warning}</li>
-                  ))}
-                </ul>
+                {documentWarnings && documentWarnings.length > 0 && (
+                  <ul className={`list-disc list-inside text-xs font-semibold space-y-1.5 pl-1.5 ${isMathError ? "text-rose-900" : "text-amber-900"}`}>
+                    {documentWarnings.map((warning, wIdx) => (
+                      <li key={wIdx}>{warning}</li>
+                    ))}
+                  </ul>
+                )}
               </div>
             )}
 
