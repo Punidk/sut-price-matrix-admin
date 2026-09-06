@@ -31,6 +31,7 @@ import {
   Layers,
   FileCheck,
   AlertTriangle,
+  Printer,
 } from "lucide-react";
 
 export interface ReceiptItemData {
@@ -83,6 +84,8 @@ export default function UserFrontendPage() {
 
   // AI Analysis Results state (Array of items)
   const [analysisResults, setAnalysisResults] = useState<AnalysisItemResult[] | null>(null);
+  const [auditTimestamp, setAuditTimestamp] = useState<number>(Date.now());
+  const [auditRefCode, setAuditRefCode] = useState<string>("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -338,6 +341,12 @@ export default function UserFrontendPage() {
       setProcessingStep(3); // 3. สรุปผลการตรวจสอบอนุมัติ...
       await new Promise((r) => setTimeout(r, 400));
 
+      const now = Date.now();
+      setAuditTimestamp(now);
+      const datePart = new Date(now).toISOString().slice(2, 10).replace(/-/g, "");
+      const randPart = Math.random().toString(36).substring(2, 6).toUpperCase();
+      setAuditRefCode(`AUD-${datePart}-${randPart}`);
+
       setAnalysisResults(results);
     } catch (err: any) {
       console.error("Audit Processing Error:", err);
@@ -357,10 +366,61 @@ export default function UserFrontendPage() {
   const isOverallHasFail = failItemsCount > 0;
   const isOverallPendingReview = totalItemsCount > 0 && failItemsCount === 0 && notFoundItemsCount > 0;
 
+  // Financial summary for print report & UI
+  const totalBillAmount = analysisResults
+    ? analysisResults.reduce((acc, item) => {
+        const qty = item.receiptData?.qty != null ? item.receiptData.qty : 1;
+        const unitPrice = item.receiptData?.unitPrice != null ? item.receiptData.unitPrice : (item.detectedPrice || 0);
+        const totalPrice = item.receiptData?.totalPrice != null ? item.receiptData.totalPrice : (qty * unitPrice);
+        return acc + Number(totalPrice);
+      }, 0)
+    : 0;
+
+  const totalPassAmount = analysisResults
+    ? analysisResults
+        .filter((item) => item.status === "PASS")
+        .reduce((acc, item) => {
+          const qty = item.receiptData?.qty != null ? item.receiptData.qty : 1;
+          const unitPrice = item.receiptData?.unitPrice != null ? item.receiptData.unitPrice : (item.detectedPrice || 0);
+          const totalPrice = item.receiptData?.totalPrice != null ? item.receiptData.totalPrice : (qty * unitPrice);
+          return acc + Number(totalPrice);
+        }, 0)
+    : 0;
+
+  const totalFailOrPendingAmount = totalBillAmount - totalPassAmount;
+
+  const formatThaiDateTime = (timestamp: number) => {
+    if (!timestamp) return "-";
+    const date = new Date(timestamp);
+    return date.toLocaleDateString("th-TH", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans selection:bg-orange-500 selection:text-white">
+      {/* Print Page Styles */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        @media print {
+          @page {
+            size: A4 portrait;
+            margin: 12mm 15mm;
+          }
+          body {
+            background-color: #ffffff !important;
+            color: #000000 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+        }
+      `}} />
+
       {/* Header Bar (Orange & Amber SUT Identity) */}
-      <header className="bg-gradient-to-r from-orange-600 via-orange-500 to-amber-500 text-white shadow-md sticky top-0 z-50">
+      <header className="bg-gradient-to-r from-orange-600 via-orange-500 to-amber-500 text-white shadow-md sticky top-0 z-50 print:hidden">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl flex items-center justify-center text-white shadow-inner">
@@ -392,10 +452,10 @@ export default function UserFrontendPage() {
       </header>
 
       {/* Main Container */}
-      <main className="flex-1 max-w-4xl w-full mx-auto px-4 py-8 space-y-8">
+      <main className="flex-1 max-w-4xl w-full mx-auto px-4 py-8 space-y-8 print:p-0 print:m-0 print:max-w-none print:space-y-0">
         
         {/* Banner Section */}
-        <section className="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200/80 rounded-2xl p-6 sm:p-8 shadow-xs relative overflow-hidden">
+        <section className="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200/80 rounded-2xl p-6 sm:p-8 shadow-xs relative overflow-hidden print:hidden">
           <div className="absolute top-0 right-0 transform translate-x-4 -translate-y-4 w-40 h-40 bg-orange-500/10 rounded-full blur-2xl pointer-events-none"></div>
           <div className="relative z-10 space-y-3">
             <div className="inline-flex items-center space-x-2 bg-orange-500/10 border border-orange-500/20 text-orange-700 text-xs font-semibold px-3 py-1 rounded-full">
@@ -685,7 +745,7 @@ export default function UserFrontendPage() {
 
         {/* Real Gemini AI Analysis Results Display (Multiple Items List) */}
         {analysisResults && (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300 print:hidden">
             
             {/* Overall Summary Card */}
             <div className={`rounded-2xl border-2 overflow-hidden shadow-lg ${
@@ -735,11 +795,20 @@ export default function UserFrontendPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-2 self-stretch sm:self-auto justify-end">
+                <div className="flex flex-wrap items-center gap-2 self-stretch sm:self-auto justify-end">
+                  <button
+                    type="button"
+                    onClick={() => window.print()}
+                    className="bg-white hover:bg-slate-100 text-slate-900 border border-slate-300 text-xs font-semibold py-2.5 px-4 rounded-xl shadow-xs transition flex items-center space-x-1.5 cursor-pointer"
+                  >
+                    <Printer className="w-3.5 h-3.5 text-slate-700" />
+                    <span>พิมพ์ใบสรุปผล (Export PDF)</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={handleReset}
-                    className="bg-white/20 hover:bg-white/30 text-white text-xs font-semibold py-2.5 px-4 rounded-xl backdrop-blur-xs transition flex items-center space-x-1.5"
+                    className="bg-white/20 hover:bg-white/30 text-white text-xs font-semibold py-2.5 px-4 rounded-xl backdrop-blur-xs transition flex items-center space-x-1.5 cursor-pointer"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
                     <span>ตรวจเอกสารชุดใหม่</span>
@@ -984,14 +1053,25 @@ export default function UserFrontendPage() {
 
             {/* Bottom Actions */}
             <div className="bg-white border border-slate-200 rounded-2xl p-6 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm">
-              <button
-                type="button"
-                onClick={handleReset}
-                className="w-full sm:w-auto bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-xs py-3 px-5 rounded-xl border border-slate-300 transition flex items-center justify-center space-x-2"
-              >
-                <RefreshCw className="w-4 h-4" />
-                <span>สแกนตรวจสอบเอกสารชุดอื่น</span>
-              </button>
+              <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="w-full sm:w-auto bg-white hover:bg-slate-100 text-slate-900 font-semibold text-xs py-3 px-5 rounded-xl border border-slate-300 transition flex items-center justify-center space-x-2 shadow-xs cursor-pointer"
+                >
+                  <Printer className="w-4 h-4 text-slate-700" />
+                  <span>พิมพ์ใบสรุปผล (Export PDF)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  className="w-full sm:w-auto bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-xs py-3 px-5 rounded-xl border border-slate-300 transition flex items-center justify-center space-x-2 cursor-pointer"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  <span>สแกนตรวจสอบเอกสารชุดอื่น</span>
+                </button>
+              </div>
 
               <Link
                 href="/admin"
@@ -1004,8 +1084,216 @@ export default function UserFrontendPage() {
           </div>
         )}
 
+        {/* ========================================================================= */}
+        {/* PRINTABLE A4 AUDIT SUMMARY (VISIBLE ONLY ON PRINT: @media print)          */}
+        {/* ========================================================================= */}
+        {analysisResults && (
+          <div
+            id="printable-audit-summary"
+            className="hidden print:block text-black bg-white w-full max-w-[210mm] mx-auto p-0 font-sans leading-normal"
+          >
+            {/* Header */}
+            <div className="border-b-2 border-black pb-4 mb-5">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h1 className="text-xl font-bold tracking-tight uppercase text-black">
+                    SUT STUDENT COUNCIL - BUDGET PRE-AUDIT SUMMARY
+                  </h1>
+                  <p className="text-sm font-bold text-neutral-800">
+                    สโมสรนักศึกษา มหาวิทยาลัยเทคโนโลยีสุรนารี (Suranaree University of Technology Student Council)
+                  </p>
+                  <p className="text-xs text-neutral-600">
+                    ใบสรุปรายงานผลการตรวจสอบราคากลางและหลักฐานการเบิกจ่ายงบประมาณเบื้องต้น (Pre-Audit Report)
+                  </p>
+                </div>
+                <div className="text-right text-xs font-mono text-neutral-800 space-y-1 shrink-0 ml-4">
+                  <div><span className="font-bold">เลขอ้างอิง:</span> {auditRefCode || "AUD-REF-01"}</div>
+                  <div><span className="font-bold">วันที่พิมพ์:</span> {formatThaiDateTime(auditTimestamp)}</div>
+                </div>
+              </div>
+
+              {/* Meta information bar */}
+              <div className="mt-4 pt-3 border-t border-dashed border-neutral-300 grid grid-cols-3 gap-2 text-xs">
+                <div>
+                  <span className="text-neutral-500">จำนวนรายการที่ตรวจ:</span>{" "}
+                  <span className="font-bold font-mono">{totalItemsCount} รายการ</span>
+                </div>
+                <div>
+                  <span className="text-neutral-500">สถานะภาพรวม:</span>{" "}
+                  <span className="font-bold">
+                    {isOverallPass
+                      ? "ผ่านเกณฑ์ทั้งหมด (PASS)"
+                      : isOverallHasFail
+                      ? `พบปัญหา ${failItemsCount} รายการ (FAIL)`
+                      : `รอดุลยพินิจ ${notFoundItemsCount} รายการ (NOT FOUND)`}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-neutral-500">ไฟล์แนบ:</span>{" "}
+                  <span className="font-mono truncate inline-block max-w-[180px] align-bottom">
+                    {selectedFiles.map((f) => f.name).join(", ") || "-"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Table of items */}
+            <div className="mb-5">
+              <table className="w-full text-left border-collapse text-[11px]">
+                <thead>
+                  <tr className="border-y-2 border-black bg-neutral-100 text-black font-bold uppercase">
+                    <th className="py-2 px-2 text-center w-8">#</th>
+                    <th className="py-2 px-2">รายการในเอกสาร / รายละเอียดการตรวจสอบ</th>
+                    <th className="py-2 px-2 text-right w-28 whitespace-nowrap">จำนวน × ราคาในบิล</th>
+                    <th className="py-2 px-2 text-right w-24">ราคารวมในบิล</th>
+                    <th className="py-2 px-2 text-right w-24">เพดานราคากลาง</th>
+                    <th className="py-2 px-2 text-center w-20">สถานะ</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-300">
+                  {analysisResults.map((item, idx) => {
+                    const isPass = item.status === "PASS";
+                    const isFail = item.status === "FAIL";
+                    const isNotFound = item.status === "NOT_FOUND";
+
+                    const itemName = item.receiptData?.itemName || item.itemInReceipt || "รายการที่ตรวจพบ";
+                    const qty = item.receiptData?.qty != null ? item.receiptData.qty : 1;
+                    const receiptUnit = item.receiptData?.unit || item.unit || "หน่วย";
+                    const unitPrice = item.receiptData?.unitPrice != null ? item.receiptData.unitPrice : (item.detectedPrice || 0);
+                    const totalPrice = item.receiptData?.totalPrice != null ? item.receiptData.totalPrice : (qty * unitPrice);
+
+                    const matrixName = item.matrixData?.itemName || item.matchedMatrixItem || null;
+                    const matrixMaxPrice = item.matrixData?.maxPrice != null ? item.matrixData.maxPrice : (item.matrixMaxPrice != null ? item.matrixMaxPrice : null);
+                    const matrixUnit = item.matrixData?.unit || null;
+
+                    const errorFlags = Array.isArray(item.errorFlags) ? item.errorFlags : [];
+                    const isUnitMismatch = !!(matrixUnit && receiptUnit && matrixUnit.trim().toLowerCase() !== receiptUnit.trim().toLowerCase());
+                    const hasMatrixMax = matrixMaxPrice != null && matrixMaxPrice > 0;
+
+                    return (
+                      <tr key={idx} className="align-top">
+                        <td className="py-2 px-2 text-center font-mono">{idx + 1}</td>
+                        <td className="py-2 px-2">
+                          <div className="font-bold text-black">{itemName}</div>
+                          {matrixName && (
+                            <div className="text-[10px] text-neutral-600">
+                              (เทียบราคากลาง: {matrixName})
+                            </div>
+                          )}
+                          {/* Failure explanation / flags */}
+                          {isFail && (
+                            <div className="mt-1 text-[10px] text-black font-semibold">
+                              <span className="underline">หมายเหตุข้อผิดพลาด:</span>{" "}
+                              {errorFlags.map((flag) => `[${flag}]`).join(" ")}
+                              {item.message && ` - ${item.message}`}
+                            </div>
+                          )}
+                          {isNotFound && (
+                            <div className="mt-1 text-[10px] text-neutral-700 italic">
+                              * ไม่อยู่ในฐานข้อมูลราคากลาง (ต้องใช้ดุลยพินิจของคณะกรรมการ)
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-2 px-2 text-right font-mono whitespace-nowrap">
+                          {qty} {receiptUnit} × ฿{Number(unitPrice).toFixed(2)}
+                          {isUnitMismatch && (
+                            <div className="text-[9px] text-neutral-600 font-sans">
+                              (หน่วยกลาง: {matrixUnit})
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-2 px-2 text-right font-mono font-semibold whitespace-nowrap">
+                          ฿{Number(totalPrice).toLocaleString("th-TH", { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="py-2 px-2 text-right font-mono whitespace-nowrap">
+                          {hasMatrixMax ? (
+                            `฿${Number(matrixMaxPrice).toLocaleString("th-TH", { minimumFractionDigits: 2 })} / ${matrixUnit || receiptUnit}`
+                          ) : (
+                            <span className="text-neutral-400">-</span>
+                          )}
+                        </td>
+                        <td className="py-2 px-2 text-center font-mono">
+                          <span
+                            className={`inline-block px-1.5 py-0.5 text-[10px] font-bold border ${
+                              isPass
+                                ? "border-black bg-neutral-100 text-black"
+                                : isFail
+                                ? "border-black bg-black text-white"
+                                : "border-neutral-500 bg-neutral-200 text-black"
+                            }`}
+                          >
+                            {item.status}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Financial Summary Breakdown */}
+            <div className="border border-black p-4 mb-6 bg-neutral-50">
+              <h3 className="text-xs font-bold uppercase tracking-wider mb-2 border-b border-black pb-1">
+                สรุปยอดเงินสุทธิ (Financial Summary)
+              </h3>
+              <div className="grid grid-cols-3 gap-4 text-xs">
+                <div>
+                  <div className="text-neutral-600 text-[11px]">ยอดรวมขอเบิกในเอกสารทั้งหมด:</div>
+                  <div className="text-base font-bold font-mono">
+                    ฿{totalBillAmount.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-neutral-600 text-[11px]">ยอดรวมเฉพาะรายการที่ผ่านเกณฑ์:</div>
+                  <div className="text-base font-bold font-mono text-black">
+                    ฿{totalPassAmount.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-neutral-600 text-[11px]">ยอดรวมรายการที่เกินเกณฑ์ / รอดุลยพินิจ:</div>
+                  <div className="text-base font-bold font-mono text-black">
+                    ฿{totalFailOrPendingAmount.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Signature Section */}
+            <div className="pt-4 border-t border-neutral-300">
+              <div className="grid grid-cols-2 gap-12 text-center text-xs">
+                {/* Left signature */}
+                <div className="space-y-3">
+                  <p className="font-semibold text-neutral-800">ผู้ยื่นขออนุมัติ / ประธานโครงการ</p>
+                  <div className="pt-10">
+                    <p>ลงชื่อ ................................................................................</p>
+                    <p className="mt-1.5">( ................................................................................ )</p>
+                    <p className="mt-2 text-neutral-600">วันที่ .......... / .......... / ................</p>
+                  </div>
+                </div>
+
+                {/* Right signature */}
+                <div className="space-y-3">
+                  <p className="font-semibold text-neutral-800">ผู้ตรวจสอบ / ตัวแทนฝ่ายงบประมาณสภานักศึกษา</p>
+                  <div className="pt-10">
+                    <p>ลงชื่อ ................................................................................</p>
+                    <p className="mt-1.5">( ................................................................................ )</p>
+                    <p className="mt-2 text-neutral-600">วันที่ .......... / .......... / ................</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Print Footer Note */}
+            <div className="mt-8 pt-3 border-t border-dotted border-neutral-300 flex justify-between items-center text-[10px] text-neutral-500">
+              <span>* เอกสารนี้สร้างขึ้นโดยระบบตรวจสอบราคากลางอัตโนมัติ (SUT Budget Pre-Audit System)</span>
+              <span>หน้า 1 จาก 1</span>
+            </div>
+          </div>
+        )}
+
         {/* Informational Footer Section */}
-        <section className="bg-white border border-slate-200 rounded-2xl p-6 text-xs text-slate-600 space-y-3">
+        <section className="bg-white border border-slate-200 rounded-2xl p-6 text-xs text-slate-600 space-y-3 print:hidden">
           <div className="flex items-center space-x-2 font-bold text-slate-800">
             <AlertCircle className="w-4 h-4 text-orange-500" />
             <span>คำแนะนำเพิ่มเติมสำหรับการจัดเตรียมเอกสาร</span>
@@ -1018,7 +1306,7 @@ export default function UserFrontendPage() {
       </main>
 
       {/* Footer Bar */}
-      <footer className="bg-slate-900 text-slate-400 text-xs py-6 border-t border-slate-800 mt-auto">
+      <footer className="bg-slate-900 text-slate-400 text-xs py-6 border-t border-slate-800 mt-auto print:hidden">
         <div className="max-w-5xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
           <div>
             © {new Date().getFullYear()} สภานักศึกษา มหาวิทยาลัยเทคโนโลยีสุรนารี (SUT Student Council)
