@@ -1100,7 +1100,7 @@ export default function UserFrontendPage() {
                     SUT STUDENT COUNCIL - BUDGET PRE-AUDIT SUMMARY
                   </h1>
                   <p className="text-sm font-bold text-neutral-800">
-                    สโมสรนักศึกษา มหาวิทยาลัยเทคโนโลยีสุรนารี (Suranaree University of Technology Student Council)
+                    สภานักศึกษา มหาวิทยาลัยเทคโนโลยีสุรนารี (Suranaree University of Technology Student Council)
                   </p>
                   <p className="text-xs text-neutral-600">
                     ใบสรุปรายงานผลการตรวจสอบราคากลางและหลักฐานการเบิกจ่ายงบประมาณเบื้องต้น (Pre-Audit Report)
