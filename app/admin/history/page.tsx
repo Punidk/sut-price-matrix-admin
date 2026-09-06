@@ -83,6 +83,8 @@ export interface AuditLogEntry {
   overallStatus?: string | null;
   isDeleted?: boolean;
   deletedAt?: any;
+  isPossibleDuplicate?: boolean;
+  duplicateOfDocId?: string | null;
 }
 
 export default function AdminAuditHistoryPage() {
@@ -187,6 +189,8 @@ export default function AdminAuditHistoryPage() {
                 overallStatus: data.overallStatus || null,
                 isDeleted: data.isDeleted || false,
                 deletedAt: data.deletedAt || null,
+                isPossibleDuplicate: Boolean(data.isPossibleDuplicate),
+                duplicateOfDocId: data.duplicateOfDocId || null,
               };
             });
 
@@ -244,7 +248,7 @@ export default function AdminAuditHistoryPage() {
   const filteredLogs = useMemo(() => {
     return logs.filter((log) => {
       // 1. Filter only issues
-      if (onlyIssues && log.failCount === 0 && log.overallStatus !== "INVALID_DOCUMENT") {
+      if (onlyIssues && log.failCount === 0 && log.overallStatus !== "INVALID_DOCUMENT" && !log.isPossibleDuplicate) {
         return false;
       }
 
@@ -256,6 +260,8 @@ export default function AdminAuditHistoryPage() {
       if (
         dateStr.includes(queryLower) ||
         log.id.toLowerCase().includes(queryLower) ||
+        (log.duplicateOfDocId && log.duplicateOfDocId.toLowerCase().includes(queryLower)) ||
+        (log.isPossibleDuplicate && ("บิลอาจซ้ำซ้อน".includes(queryLower) || "ซ้ำ".includes(queryLower))) ||
         (log.merchant?.name && log.merchant.name.toLowerCase().includes(queryLower)) ||
         (log.warnings && log.warnings.some((w) => w.toLowerCase().includes(queryLower)))
       ) {
@@ -476,37 +482,45 @@ export default function AdminAuditHistoryPage() {
                             </span>
                           </td>
                           <td className="py-4 px-4 text-center">
-                            {log.overallStatus === "INVALID_DOCUMENT" ? (
-                              <span className="inline-flex items-center space-x-1 border border-rose-600/80 bg-rose-950/60 text-rose-300 text-[11px] font-mono px-2.5 py-1">
-                                <XCircle className="w-3.5 h-3.5 shrink-0 text-rose-400" />
-                                <span>เอกสารไม่ถูกต้อง</span>
-                              </span>
-                            ) : (log.overallStatus !== "INVALID_DOCUMENT" && (log.itemsAnalyzed ?? 0) > 0 && log.financialSummary?.isMathCorrect === false) ? (
-                              <span className="inline-flex items-center space-x-1 border border-rose-600/80 bg-rose-950/60 text-rose-300 text-[11px] font-mono px-2.5 py-1">
-                                <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-rose-400" />
-                                <span>คำนวณเลขผิด</span>
-                              </span>
-                            ) : (log.warnings && log.warnings.some((w) => typeof w === "string" && w.includes("ดัดแปลงหรือแก้ไข"))) ? (
-                              <span className="inline-flex items-center space-x-1 border border-rose-600/80 bg-rose-950/60 text-rose-300 text-[11px] font-mono px-2.5 py-1">
-                                <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-rose-400" />
-                                <span>สงสัยดัดแปลง</span>
-                              </span>
-                            ) : hasIssues ? (
-                              <span className="inline-flex items-center space-x-1 border border-rose-600/80 bg-rose-950/60 text-rose-300 text-[11px] font-mono px-2.5 py-1">
-                                <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-rose-400" />
-                                <span>พบปัญหา {log.failCount} รายการ</span>
-                              </span>
-                            ) : log.itemsAnalyzed === 0 || passCount === 0 || (log.financialSummary && Number(log.financialSummary.total) <= 0) ? (
-                              <span className="inline-flex items-center space-x-1 border border-neutral-700 bg-neutral-900 text-neutral-400 text-[11px] font-mono px-2.5 py-1">
-                                <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-neutral-400" />
-                                <span>ไม่มีรายการอนุมัติ</span>
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center space-x-1 border border-emerald-500/60 bg-emerald-950/60 text-emerald-300 text-[11px] font-mono px-2.5 py-1">
-                                <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
-                                <span>ผ่านเกณฑ์ทั้งหมด</span>
-                              </span>
-                            )}
+                            <div className="flex flex-col items-center justify-center gap-1.5">
+                              {log.isPossibleDuplicate && (
+                                <span className="inline-flex items-center space-x-1 border border-amber-500/80 bg-amber-950/60 text-amber-300 text-[11px] font-mono px-2.5 py-1">
+                                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-400" />
+                                  <span>บิลอาจซ้ำซ้อน</span>
+                                </span>
+                              )}
+                              {log.overallStatus === "INVALID_DOCUMENT" ? (
+                                <span className="inline-flex items-center space-x-1 border border-rose-600/80 bg-rose-950/60 text-rose-300 text-[11px] font-mono px-2.5 py-1">
+                                  <XCircle className="w-3.5 h-3.5 shrink-0 text-rose-400" />
+                                  <span>เอกสารไม่ถูกต้อง</span>
+                                </span>
+                              ) : (log.overallStatus !== "INVALID_DOCUMENT" && (log.itemsAnalyzed ?? 0) > 0 && log.financialSummary?.isMathCorrect === false) ? (
+                                <span className="inline-flex items-center space-x-1 border border-rose-600/80 bg-rose-950/60 text-rose-300 text-[11px] font-mono px-2.5 py-1">
+                                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-rose-400" />
+                                  <span>คำนวณเลขผิด</span>
+                                </span>
+                              ) : (log.warnings && log.warnings.some((w) => typeof w === "string" && w.includes("ดัดแปลงหรือแก้ไข"))) ? (
+                                <span className="inline-flex items-center space-x-1 border border-rose-600/80 bg-rose-950/60 text-rose-300 text-[11px] font-mono px-2.5 py-1">
+                                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-rose-400" />
+                                  <span>สงสัยดัดแปลง</span>
+                                </span>
+                              ) : hasIssues ? (
+                                <span className="inline-flex items-center space-x-1 border border-rose-600/80 bg-rose-950/60 text-rose-300 text-[11px] font-mono px-2.5 py-1">
+                                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-rose-400" />
+                                  <span>พบปัญหา {log.failCount} รายการ</span>
+                                </span>
+                              ) : log.itemsAnalyzed === 0 || passCount === 0 || (log.financialSummary && Number(log.financialSummary.total) <= 0) ? (
+                                <span className="inline-flex items-center space-x-1 border border-neutral-700 bg-neutral-900 text-neutral-400 text-[11px] font-mono px-2.5 py-1">
+                                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-neutral-400" />
+                                  <span>ไม่มีรายการอนุมัติ</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center space-x-1 border border-emerald-500/60 bg-emerald-950/60 text-emerald-300 text-[11px] font-mono px-2.5 py-1">
+                                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
+                                  <span>ผ่านเกณฑ์ทั้งหมด</span>
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="py-4 px-4 text-neutral-300 max-w-xs truncate">
                             {log.scanResults && log.scanResults.length > 0 ? (
@@ -575,6 +589,21 @@ export default function AdminAuditHistoryPage() {
                                   <p className="text-[11px] text-rose-200/90">
                                     ภาพเอกสารนี้ไม่ใช่ใบเสร็จรับเงิน บิลเงินสด หรือเอกสารเบิกจ่ายทางการเงิน
                                   </p>
+                                </div>
+                              )}
+
+                              {/* Possible Duplicate Notice */}
+                              {log.isPossibleDuplicate && (
+                                <div className="bg-amber-950/40 border border-amber-500/80 p-3.5 space-y-1 font-mono text-xs text-amber-200">
+                                  <div className="flex items-center space-x-2 font-bold text-amber-300">
+                                    <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                                    <span>คำเตือน: ตรวจพบบิลที่อาจซ้ำซ้อน (พบประวัติบิลยอดนี้จากร้านนี้ในระบบแล้ว)</span>
+                                  </div>
+                                  {log.duplicateOfDocId && (
+                                    <p className="text-[11px] text-amber-300/90">
+                                      อ้างอิง Doc ID ที่ซ้ำในระบบ: <span className="font-bold underline text-white">{log.duplicateOfDocId}</span> (กรุณาตรวจสอบว่าไม่ใช่การนำบิลเก่ามาเบิกซ้ำ)
+                                    </p>
+                                  )}
                                 </div>
                               )}
 

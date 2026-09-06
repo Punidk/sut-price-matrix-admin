@@ -5,7 +5,7 @@ import Link from "next/link";
 import * as XLSX from "xlsx";
 import imageCompression from "browser-image-compression";
 import { db, isFirebaseConfigured } from "@/lib/firebase";
-import { collection, onSnapshot, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, onSnapshot, addDoc, serverTimestamp, getDocs } from "firebase/firestore";
 import { PriceMatrixItem } from "@/lib/types";
 import { initialPriceMatrixData } from "@/lib/mockData";
 import {
@@ -397,6 +397,69 @@ export default function UserFrontendPage() {
         overallStatusStr = "FAIL";
       }
 
+      // ระบบตรวจจับบิลซ้ำ (Duplicate Receipt Detection)
+      let isPossibleDuplicate = false;
+      let duplicateOfDocId: string | null = null;
+      const currentGrandTotal = Number(finSummary?.grandTotal ?? finSummary?.total ?? 0);
+
+      if (
+        overallStatusStr !== "INVALID_DOCUMENT" &&
+        currentGrandTotal > 0 &&
+        isFirebaseConfigured &&
+        db
+      ) {
+        try {
+          const historyRef = collection(db, "audit_history");
+          const snapshot = await getDocs(historyRef);
+
+          const currentMerchantName = (merchant?.name || "").trim().toLowerCase().replace(/\s+/g, " ");
+          const currentDate = (merchant?.date || "").trim().replace(/\s+/g, "");
+
+          for (const docSnap of snapshot.docs) {
+            const docData = docSnap.data();
+            // กรองเอาเฉพาะข้อมูลที่ยังไม่ถูกลบ (isDeleted !== true)
+            if (docData.isDeleted === true) continue;
+
+            const existingTotal = Number(
+              docData.financialSummary?.grandTotal ?? docData.financialSummary?.total ?? 0
+            );
+            const existingMerchantName = (docData.merchant?.name || "").trim().toLowerCase().replace(/\s+/g, " ");
+            const existingDate = (docData.merchant?.date || "").trim().replace(/\s+/g, "");
+
+            // ตรวจสอบว่าชื่อร้านค้า วันที่ในบิล และยอดเงินสุทธิตรงกันหรือไม่
+            const isMerchantMatch =
+              Boolean(currentMerchantName) &&
+              currentMerchantName !== "ไม่ระบุ" &&
+              Boolean(existingMerchantName) &&
+              existingMerchantName !== "ไม่ระบุ" &&
+              currentMerchantName === existingMerchantName;
+
+            const isDateMatch =
+              Boolean(currentDate) &&
+              currentDate !== "ไม่ระบุ" &&
+              Boolean(existingDate) &&
+              existingDate !== "ไม่ระบุ" &&
+              currentDate === existingDate;
+
+            const isTotalMatch = Math.abs(existingTotal - currentGrandTotal) < 0.01;
+
+            if (isMerchantMatch && isDateMatch && isTotalMatch) {
+              isPossibleDuplicate = true;
+              duplicateOfDocId = docSnap.id;
+              break;
+            }
+          }
+        } catch (dupErr) {
+          console.warn("Error checking for duplicate receipts in Firestore:", dupErr);
+        }
+      }
+
+      // หากตรวจพบรายการที่เข้าข่ายซ้ำ: ให้เพิ่มคำเตือนเข้าไปในลิสต์ warnings
+      if (isPossibleDuplicate && duplicateOfDocId) {
+        const duplicateWarningMsg = `⚠️ ตรวจพบบิลที่อาจซ้ำซ้อน: เคยมีประวัติการตรวจสอบบิลยอดนี้จากร้านนี้ในระบบแล้ว (Doc ID ที่ซ้ำ: ${duplicateOfDocId}) กรุณาตรวจสอบว่าไม่ใช่การนำบิลเก่ามาเบิกซ้ำ`;
+        warningsList = [duplicateWarningMsg, ...warningsList];
+      }
+
       setMerchantInfo(merchant);
       setFinancialSummary(finSummary);
       setDocumentWarnings(warningsList);
@@ -417,6 +480,8 @@ export default function UserFrontendPage() {
           financialSummary: finSummary || null,
           warnings: warningsList,
           overallStatus: overallStatusStr || (failCount > 0 ? "FAIL" : "PASS"),
+          isPossibleDuplicate: isPossibleDuplicate,
+          duplicateOfDocId: duplicateOfDocId || null,
         }).catch((err) => {
           console.warn("Error saving audit_history:", err);
         });
@@ -474,10 +539,15 @@ export default function UserFrontendPage() {
     !isInvalidDocument &&
     (documentWarnings?.some((w) => typeof w === "string" && w.includes("ดัดแปลงหรือแก้ไข")) ?? false);
 
+  const duplicateWarningText =
+    documentWarnings?.find((w) => typeof w === "string" && w.includes("ตรวจพบบิลที่อาจซ้ำซ้อน")) || null;
+  const hasDuplicate = !isInvalidDocument && Boolean(duplicateWarningText);
+
   const isOverallPass =
     !isInvalidDocument &&
     !isMathError &&
     !hasTampering &&
+    !hasDuplicate &&
     totalItemsCount > 0 &&
     hasApprovedItems &&
     hasValidAmount &&
@@ -489,9 +559,7 @@ export default function UserFrontendPage() {
     !isInvalidDocument &&
     !isMathError &&
     !hasTampering &&
-    totalItemsCount > 0 &&
-    failItemsCount === 0 &&
-    (notFoundItemsCount > 0 || !hasApprovedItems || !hasValidAmount);
+    (hasDuplicate || (totalItemsCount > 0 && failItemsCount === 0 && (notFoundItemsCount > 0 || !hasApprovedItems || !hasValidAmount)));
 
   const totalPassAmount = analysisResults
     ? analysisResults
@@ -901,6 +969,8 @@ export default function UserFrontendPage() {
                         ? "เอกสารไม่ถูกต้อง"
                         : hasTampering
                         ? "พบข้อสงสัยดัดแปลงเอกสาร"
+                        : hasDuplicate
+                        ? "ตรวจพบบิลที่อาจซ้ำซ้อน"
                         : isOverallPass
                         ? "ทุกรายการผ่านเกณฑ์"
                         : isMathError
@@ -914,6 +984,8 @@ export default function UserFrontendPage() {
                         ? "เอกสารไม่ถูกต้อง / ไม่ใช่ใบเสร็จรับเงิน"
                         : hasTampering
                         ? "พบข้อสงสัย: ตัวเลขในเอกสารอาจมีการดัดแปลงหรือแก้ไข"
+                        : hasDuplicate
+                        ? "ตรวจพบบิลที่อาจซ้ำซ้อน: เคยมีประวัติการตรวจสอบบิลนี้ในระบบแล้ว"
                         : isOverallPass
                         ? "ผ่านการตรวจสอบราคากลางทั้งหมด"
                         : isMathError
@@ -963,7 +1035,7 @@ export default function UserFrontendPage() {
             </div>
 
             {/* Document Integrity Warnings Alert Box */}
-            {(isMathError || hasTampering || (documentWarnings && documentWarnings.length > 0)) && (
+            {(isMathError || hasTampering || hasDuplicate || (documentWarnings && documentWarnings.length > 0)) && (
               <div className={`border-2 p-4 sm:p-5 rounded-2xl space-y-3 shadow-sm animate-in fade-in duration-300 ${
                 isInvalidDocument || isMathError || hasTampering
                   ? "bg-rose-50 border-rose-400 text-rose-900"
@@ -985,6 +1057,14 @@ export default function UserFrontendPage() {
                   </div>
                 )}
 
+                {/* Amber Alert Bar for Duplicate Receipt Detection */}
+                {!isInvalidDocument && hasDuplicate && duplicateWarningText && (
+                  <div className="bg-amber-500 text-white font-bold text-xs sm:text-sm py-2.5 px-4 rounded-xl flex items-center space-x-2 shadow-xs">
+                    <AlertTriangle className="w-4 h-4 shrink-0 text-white" />
+                    <span>{duplicateWarningText}</span>
+                  </div>
+                )}
+
                 <div className={`flex items-center space-x-2.5 font-bold text-sm ${isInvalidDocument || isMathError || hasTampering ? "text-rose-800" : "text-amber-800"}`}>
                   <AlertTriangle className={`w-5 h-5 shrink-0 ${isInvalidDocument || isMathError || hasTampering ? "text-rose-600" : "text-amber-600"}`} />
                   <span>แจ้งเตือนความสมบูรณ์ของเอกสาร (Document Integrity Warnings):</span>
@@ -992,7 +1072,7 @@ export default function UserFrontendPage() {
                 {documentWarnings && documentWarnings.length > 0 && (
                   <ul className={`list-disc list-inside text-xs font-semibold space-y-1.5 pl-1.5 ${isInvalidDocument || isMathError || hasTampering ? "text-rose-900" : "text-amber-900"}`}>
                     {documentWarnings
-                      .filter((warning) => !isInvalidDocument || !warning.includes("คณิตศาสตร์"))
+                      .filter((warning) => (!isInvalidDocument || !warning.includes("คณิตศาสตร์")) && (!hasDuplicate || warning !== duplicateWarningText))
                       .map((warning, wIdx) => (
                         <li key={wIdx}>{warning}</li>
                       ))}

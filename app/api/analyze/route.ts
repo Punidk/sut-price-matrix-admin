@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
+// ขยายเวลา Serverless Function เพื่อป้องกันปัญหา Vercel Timeout (504 Gateway Timeout)
+export const maxDuration = 30;
+
 /**
  * Helper function สำหรับเรียก Gemini API พร้อมระบบ Auto-Retry และ Exponential Backoff + Jitter
  * รองรับการลองซ้ำเมื่อเจอ Error 429 (Rate Limit) หรือ 503 (High Demand / Service Unavailable)
