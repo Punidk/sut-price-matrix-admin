@@ -486,6 +486,11 @@ export default function AdminAuditHistoryPage() {
                                 <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-rose-400" />
                                 <span>คำนวณเลขผิด</span>
                               </span>
+                            ) : (log.warnings && log.warnings.some((w) => typeof w === "string" && w.includes("ดัดแปลงหรือแก้ไข"))) ? (
+                              <span className="inline-flex items-center space-x-1 border border-rose-600/80 bg-rose-950/60 text-rose-300 text-[11px] font-mono px-2.5 py-1">
+                                <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-rose-400" />
+                                <span>สงสัยดัดแปลง</span>
+                              </span>
                             ) : hasIssues ? (
                               <span className="inline-flex items-center space-x-1 border border-rose-600/80 bg-rose-950/60 text-rose-300 text-[11px] font-mono px-2.5 py-1">
                                 <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-rose-400" />

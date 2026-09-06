@@ -49,11 +49,11 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { files = [], excelText = "", priceMatrix = [], imageUrl, imageBase64, mimeType } = body;
 
-    // 1. เช็ก API Key
-    const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY || "";
+    // 1. เช็ก API Key จาก Server-side Environment เท่านั้น (ไม่ดึงจาก Client/NEXT_PUBLIC และไม่มีการส่ง Key หลุดออกไปใน Response)
+    const apiKey = process.env.GEMINI_API_KEY || "";
     if (!apiKey) {
       return NextResponse.json(
-        { error: "ยังไม่ได้ตั้งค่า GEMINI_API_KEY ในระบบ" },
+        { error: "ยังไม่ได้ตั้งค่า GEMINI_API_KEY ในระบบ (Server-side configuration required)" },
         { status: 500 }
       );
     }
@@ -139,13 +139,15 @@ ${matrixContext}
   * [สำคัญยิ่ง]: การที่ยอดรวมสุทธิท้ายบิล (Grand Total) เกิดจากการนำ Subtotal มาหักส่วนลด (Discount) หรือบวกภาษีมูลค่าเพิ่ม (VAT 7%) ที่ระบุไว้ชัดเจนในบิล "ถือว่าเป็นการคำนวณที่ถูกต้องตามมาตรฐานการบัญชี (isMathCorrect: true)"
 
 ========================================
-2. การตรวจสอบความสมบูรณ์ของเอกสาร (Document Integrity & Handwritten Signature Rules):
+2. การตรวจสอบความสมบูรณ์ของเอกสารและการตรวจจับการดัดแปลง (Document Integrity & Anti-Tampering Rules):
 ========================================
 - ตรวจหาข้อมูลหัวบิลและผู้รับเงินในเอกสาร:
   * name: ชื่อร้านค้า / ผู้จำหน่าย / ผู้ให้บริการ (หากไม่ระบุหรืออ่านไม่ได้ ให้ใส่ "ไม่ระบุ")
   * date: วันที่ที่ระบุในเอกสาร (เช่น "15 ม.ค. 2567" หรือ "2024-01-15", หากไม่พบ ให้ใส่ "ไม่ระบุ")
   * hasReceiptSign: ตรวจสอบว่าพบลายมือชื่อ (ลายเซ็นสด) ของผู้รับเงิน หรือมีตรายางประทับ "รับเงินแล้ว / ชำระเงินแล้ว / PAID" หรือไม่ (boolean true/false)
   * isHandwritten: เอกสารเป็นบิลเงินสดเขียนด้วยมือ / ใบเสร็จรับเงินเล่มเขียนมือหรือไม่ (boolean true/false)
+- [กฎการตรวจสอบความผิดปกติและร่องรอยการแก้ไขภาพ / ตัวเลข]:
+  * ให้สังเกตความผิดปกติของตัวเลขและตัวอักษร หากพบร่องรอยการตัดต่อ ดัดแปลง แก้ไขตัวเลข หรือฟอนต์ไม่สม่ำเสมอผิดธรรมชาติ ให้ระบุใน warnings ว่า "[พบข้อสงสัย: ตัวเลขในเอกสารอาจมีการดัดแปลงหรือแก้ไข]"
 - [กฎการแจ้งเตือนความสมบูรณ์]:
   * หากเอกสารเป็นบิลเขียนมือ (isHandwritten: true) แล้ว "ขาดลายเซ็นผู้รับเงิน" (hasReceiptSign: false) ให้เพิ่มข้อความแจ้งเตือนลงใน Array warnings:
     "[เอกสารไม่สมบูรณ์: ขาดลายเซ็นผู้รับเงิน]"
@@ -188,6 +190,7 @@ ${matrixContext}
   },
   "overallStatus": "PASS" | "FAIL" | "NOT_FOUND" | "INVALID_DOCUMENT",
   "warnings": [
+    "[พบข้อสงสัย: ตัวเลขในเอกสารอาจมีการดัดแปลงหรือแก้ไข]",
     "[ข้อผิดพลาดทางคณิตศาสตร์: ยอดรวมรายการย่อย (1,750) ไม่ตรงกับยอดสุทธิท้ายบิล (1,650)]",
     "[เอกสารไม่สมบูรณ์: ขาดลายเซ็นผู้รับเงิน]"
   ],
@@ -429,9 +432,16 @@ ${matrixContext}
       }
     }
 
-    // สรุป Overall Status ให้แม่นยำ
+    // สรุป Overall Status ให้แม่นยำ (หากพบข้อสงสัยดัดแปลงตัวเลข ให้ปรับเป็น FAIL ทันที)
+    const hasTampering =
+      Array.isArray(parsedData.warnings) &&
+      parsedData.warnings.some(
+        (w: string) => typeof w === "string" && w.includes("ดัดแปลงหรือแก้ไข")
+      );
+
     if (
       parsedData.financialSummary?.isMathCorrect === false ||
+      hasTampering ||
       parsedData.items.some((i: any) => i.status === "FAIL")
     ) {
       parsedData.overallStatus = "FAIL";
@@ -444,10 +454,13 @@ ${matrixContext}
     return NextResponse.json(parsedData);
   } catch (error: any) {
     console.error("Gemini Analyze API Error:", error);
+    // ป้องกันการรั่วไหลของ API Key ใน error details
+    const rawMsg = error.message || String(error);
+    const sanitizedMsg = rawMsg.replace(/key=[a-zA-Z0-9_-]+/g, "key=[REDACTED]");
     return NextResponse.json(
       {
         error: "เกิดข้อผิดพลาดในการวิเคราะห์เอกสารด้วย Gemini AI",
-        details: error.message || String(error),
+        details: sanitizedMsg,
       },
       { status: 500 }
     );

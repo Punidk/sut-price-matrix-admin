@@ -470,19 +470,25 @@ export default function UserFrontendPage() {
     totalItemsCount > 0 &&
     financialSummary?.isMathCorrect === false;
 
+  const hasTampering =
+    !isInvalidDocument &&
+    (documentWarnings?.some((w) => typeof w === "string" && w.includes("ดัดแปลงหรือแก้ไข")) ?? false);
+
   const isOverallPass =
     !isInvalidDocument &&
     !isMathError &&
+    !hasTampering &&
     totalItemsCount > 0 &&
     hasApprovedItems &&
     hasValidAmount &&
     failItemsCount === 0 &&
     notFoundItemsCount === 0;
 
-  const isOverallHasFail = !isInvalidDocument && (failItemsCount > 0 || isMathError);
+  const isOverallHasFail = !isInvalidDocument && (failItemsCount > 0 || isMathError || hasTampering);
   const isOverallPendingReview =
     !isInvalidDocument &&
     !isMathError &&
+    !hasTampering &&
     totalItemsCount > 0 &&
     failItemsCount === 0 &&
     (notFoundItemsCount > 0 || !hasApprovedItems || !hasValidAmount);
@@ -893,6 +899,8 @@ export default function UserFrontendPage() {
                     <div className="inline-block bg-white/20 text-white text-xs font-mono px-2.5 py-0.5 rounded-full font-semibold">
                       ภาพรวม: {isInvalidDocument
                         ? "เอกสารไม่ถูกต้อง"
+                        : hasTampering
+                        ? "พบข้อสงสัยดัดแปลงเอกสาร"
                         : isOverallPass
                         ? "ทุกรายการผ่านเกณฑ์"
                         : isMathError
@@ -904,6 +912,8 @@ export default function UserFrontendPage() {
                     <h3 className="text-xl sm:text-2xl font-extrabold text-white">
                       {isInvalidDocument
                         ? "เอกสารไม่ถูกต้อง / ไม่ใช่ใบเสร็จรับเงิน"
+                        : hasTampering
+                        ? "พบข้อสงสัย: ตัวเลขในเอกสารอาจมีการดัดแปลงหรือแก้ไข"
                         : isOverallPass
                         ? "ผ่านการตรวจสอบราคากลางทั้งหมด"
                         : isMathError
@@ -953,26 +963,34 @@ export default function UserFrontendPage() {
             </div>
 
             {/* Document Integrity Warnings Alert Box */}
-            {(isMathError || (documentWarnings && documentWarnings.length > 0)) && (
+            {(isMathError || hasTampering || (documentWarnings && documentWarnings.length > 0)) && (
               <div className={`border-2 p-4 sm:p-5 rounded-2xl space-y-3 shadow-sm animate-in fade-in duration-300 ${
-                isMathError
+                isInvalidDocument || isMathError || hasTampering
                   ? "bg-rose-50 border-rose-400 text-rose-900"
                   : "bg-amber-50 border-amber-400 text-amber-900"
               }`}>
-                {/* Red Alert Bar for Math Error - ซ่อนหาก isInvalidDocument */}
-                {!isInvalidDocument && isMathError && (
+                {/* Red Alert Bar for Tampering Detection */}
+                {!isInvalidDocument && hasTampering && (
+                  <div className="bg-rose-600 text-white font-bold text-xs sm:text-sm py-2.5 px-4 rounded-xl flex items-center space-x-2 shadow-xs">
+                    <AlertTriangle className="w-4 h-4 shrink-0 text-white" />
+                    <span>⚠️ พบข้อสงสัย: ตรวจพบร่องรอยการตัดต่อ ดัดแปลง หรือแก้ไขตัวเลขในเอกสาร</span>
+                  </div>
+                )}
+
+                {/* Red Alert Bar for Math Error - ซ่อนหาก isInvalidDocument หรือมี Tampering */}
+                {!isInvalidDocument && !hasTampering && isMathError && (
                   <div className="bg-rose-600 text-white font-bold text-xs sm:text-sm py-2.5 px-4 rounded-xl flex items-center space-x-2 shadow-xs">
                     <AlertTriangle className="w-4 h-4 shrink-0 text-white" />
                     <span>⚠️ ยอดคำนวณท้ายบิลไม่ถูกต้อง: ผลรวมรายการไม่ตรงกับยอดสุทธิ</span>
                   </div>
                 )}
 
-                <div className={`flex items-center space-x-2.5 font-bold text-sm ${isInvalidDocument || isMathError ? "text-rose-800" : "text-amber-800"}`}>
-                  <AlertTriangle className={`w-5 h-5 shrink-0 ${isInvalidDocument || isMathError ? "text-rose-600" : "text-amber-600"}`} />
+                <div className={`flex items-center space-x-2.5 font-bold text-sm ${isInvalidDocument || isMathError || hasTampering ? "text-rose-800" : "text-amber-800"}`}>
+                  <AlertTriangle className={`w-5 h-5 shrink-0 ${isInvalidDocument || isMathError || hasTampering ? "text-rose-600" : "text-amber-600"}`} />
                   <span>แจ้งเตือนความสมบูรณ์ของเอกสาร (Document Integrity Warnings):</span>
                 </div>
                 {documentWarnings && documentWarnings.length > 0 && (
-                  <ul className={`list-disc list-inside text-xs font-semibold space-y-1.5 pl-1.5 ${isInvalidDocument || isMathError ? "text-rose-900" : "text-amber-900"}`}>
+                  <ul className={`list-disc list-inside text-xs font-semibold space-y-1.5 pl-1.5 ${isInvalidDocument || isMathError || hasTampering ? "text-rose-900" : "text-amber-900"}`}>
                     {documentWarnings
                       .filter((warning) => !isInvalidDocument || !warning.includes("คณิตศาสตร์"))
                       .map((warning, wIdx) => (
