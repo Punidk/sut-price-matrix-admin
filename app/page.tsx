@@ -64,6 +64,20 @@ export interface AnalysisItemResult {
   unit?: string;
 }
 
+export interface MerchantInfo {
+  name?: string;
+  date?: string;
+  hasReceiptSign?: boolean;
+  isHandwritten?: boolean;
+}
+
+export interface FinancialSummaryData {
+  subtotal?: number;
+  discount?: number;
+  vat?: number;
+  total?: number;
+}
+
 export interface UploadedFileItem {
   id: string;
   file: File;
@@ -83,8 +97,13 @@ export default function UserFrontendPage() {
   // Firestore Price Matrix items state
   const [priceMatrix, setPriceMatrix] = useState<PriceMatrixItem[]>([]);
 
-  // AI Analysis Results state (Array of items)
+  // AI Analysis Results state (Array of items + Header metadata)
   const [analysisResults, setAnalysisResults] = useState<AnalysisItemResult[] | null>(null);
+  const [merchantInfo, setMerchantInfo] = useState<MerchantInfo | null>(null);
+  const [financialSummary, setFinancialSummary] = useState<FinancialSummaryData | null>(null);
+  const [documentWarnings, setDocumentWarnings] = useState<string[]>([]);
+  const [overallStatus, setOverallStatus] = useState<string | null>(null);
+
   const [auditTimestamp, setAuditTimestamp] = useState<number>(Date.now());
   const [auditRefCode, setAuditRefCode] = useState<string>("");
 
@@ -265,6 +284,10 @@ export default function UserFrontendPage() {
   const handleReset = () => {
     setSelectedFiles([]);
     setAnalysisResults(null);
+    setMerchantInfo(null);
+    setFinancialSummary(null);
+    setDocumentWarnings([]);
+    setOverallStatus(null);
     setUploadError(null);
     setIsProcessing(false);
     setProcessingStep(0);
@@ -280,6 +303,10 @@ export default function UserFrontendPage() {
     setProcessingStep(1); // 1. กำลังบีบอัดรูปภาพและเตรียมข้อมูลไฟล์ (Client-side Compression & Base64)...
     setUploadError(null);
     setAnalysisResults(null);
+    setMerchantInfo(null);
+    setFinancialSummary(null);
+    setDocumentWarnings([]);
+    setOverallStatus(null);
 
     try {
       const payloadFiles: Array<{ mimeType: string; base64Data: string }> = [];
@@ -341,7 +368,26 @@ export default function UserFrontendPage() {
       }
 
       const data = await aiRes.json();
-      const results: AnalysisItemResult[] = Array.isArray(data) ? data : [data];
+      let results: AnalysisItemResult[] = [];
+      let merchant: MerchantInfo | null = null;
+      let finSummary: FinancialSummaryData | null = null;
+      let warningsList: string[] = [];
+      let overallStatusStr: string | null = null;
+
+      if (data && typeof data === "object" && !Array.isArray(data)) {
+        results = Array.isArray(data.items) ? data.items : [];
+        merchant = data.merchant || null;
+        finSummary = data.financialSummary || null;
+        warningsList = Array.isArray(data.warnings) ? data.warnings : [];
+        overallStatusStr = data.overallStatus || null;
+      } else if (Array.isArray(data)) {
+        results = data;
+      }
+
+      setMerchantInfo(merchant);
+      setFinancialSummary(finSummary);
+      setDocumentWarnings(warningsList);
+      setOverallStatus(overallStatusStr);
 
       // บันทึกประวัติการตรวจสอบลง Firestore collection `audit_history`
       if (isFirebaseConfigured && db) {
@@ -354,6 +400,10 @@ export default function UserFrontendPage() {
           itemsAnalyzed: results.length,
           failCount: failCount,
           scanResults: results,
+          merchant: merchant || null,
+          financialSummary: finSummary || null,
+          warnings: warningsList,
+          overallStatus: overallStatusStr || (failCount > 0 ? "FAIL" : "PASS"),
         }).catch((err) => {
           console.warn("Error saving audit_history:", err);
         });
@@ -388,7 +438,7 @@ export default function UserFrontendPage() {
   const isOverallPendingReview = totalItemsCount > 0 && failItemsCount === 0 && notFoundItemsCount > 0;
 
   // Financial summary for print report & UI
-  const totalBillAmount = analysisResults
+  const calculatedItemsTotal = analysisResults
     ? analysisResults.reduce((acc, item) => {
         const qty = item.receiptData?.qty != null ? item.receiptData.qty : 1;
         const unitPrice = item.receiptData?.unitPrice != null ? item.receiptData.unitPrice : (item.detectedPrice || 0);
@@ -396,6 +446,10 @@ export default function UserFrontendPage() {
         return acc + Number(totalPrice);
       }, 0)
     : 0;
+
+  const totalBillAmount = financialSummary && financialSummary.total && financialSummary.total > 0
+    ? financialSummary.total
+    : calculatedItemsTotal;
 
   const totalPassAmount = analysisResults
     ? analysisResults
@@ -408,7 +462,7 @@ export default function UserFrontendPage() {
         }, 0)
     : 0;
 
-  const totalFailOrPendingAmount = totalBillAmount - totalPassAmount;
+  const totalFailOrPendingAmount = Math.max(0, totalBillAmount - totalPassAmount);
 
   const formatThaiDateTime = (timestamp: number) => {
     if (!timestamp) return "-";
@@ -838,6 +892,90 @@ export default function UserFrontendPage() {
               </div>
             </div>
 
+            {/* Document Integrity Warnings Alert Box */}
+            {documentWarnings && documentWarnings.length > 0 && (
+              <div className="bg-amber-50 border-2 border-amber-400 p-4 sm:p-5 rounded-2xl space-y-2 text-amber-900 shadow-sm animate-in fade-in duration-300">
+                <div className="flex items-center space-x-2.5 font-bold text-sm text-amber-800">
+                  <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+                  <span>แจ้งเตือนความสมบูรณ์ของเอกสาร (Document Integrity Warnings):</span>
+                </div>
+                <ul className="list-disc list-inside text-xs font-semibold space-y-1.5 pl-1.5 text-amber-900">
+                  {documentWarnings.map((warning, wIdx) => (
+                    <li key={wIdx}>{warning}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Merchant & Financial Breakdown Card */}
+            {(merchantInfo || financialSummary) && (
+              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm grid grid-cols-1 md:grid-cols-2 gap-5 text-xs">
+                {/* Merchant Information */}
+                <div className="space-y-3">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 border-b border-slate-100 pb-1.5 flex items-center space-x-1.5">
+                    <Building2 className="w-4 h-4 text-orange-600" />
+                    <span>ข้อมูลร้านค้า / ผู้จำหน่าย (Merchant Details)</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div>
+                      <span className="text-slate-500 block text-[11px]">ร้านค้า / ผู้ให้บริการ:</span>
+                      <span className="font-bold text-slate-900 text-sm">{merchantInfo?.name || "ไม่ระบุ"}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block text-[11px]">วันที่ในเอกสาร:</span>
+                      <span className="font-medium text-slate-800">{merchantInfo?.date || "ไม่ระบุ"}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block text-[11px]">ประเภทเอกสาร:</span>
+                      <span className="text-slate-800 font-medium">
+                        {merchantInfo?.isHandwritten ? "บิลเงินสดเขียนมือ" : "ใบเสร็จพิมพ์ / POS"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block text-[11px]">ลายเซ็นผู้รับเงิน:</span>
+                      <span className={`font-semibold inline-flex items-center space-x-1 ${merchantInfo?.hasReceiptSign ? "text-emerald-700" : "text-rose-600 font-bold"}`}>
+                        {merchantInfo?.hasReceiptSign ? "✓ พบลายเซ็น/ตรายาง" : "✕ ไม่พบลายเซ็น"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Financial Breakdown (Subtotal, Discount, VAT 7%, Total) */}
+                <div className="space-y-3">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 border-b border-slate-100 pb-1.5 flex items-center space-x-1.5">
+                    <FileText className="w-4 h-4 text-orange-600" />
+                    <span>สรุปยอดภาษีและส่วนลด (VAT & Discount Summary)</span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                    <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                      <span className="text-slate-500 block text-[10px]">ยอดรวมก่อนลด:</span>
+                      <span className="font-mono font-bold text-slate-800 text-xs">
+                        ฿{(financialSummary?.subtotal || calculatedItemsTotal).toLocaleString("th-TH", { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                      <span className="text-slate-500 block text-[10px]">ส่วนลด (Discount):</span>
+                      <span className={`font-mono font-bold text-xs ${(financialSummary?.discount || 0) > 0 ? "text-emerald-600" : "text-slate-400"}`}>
+                        {(financialSummary?.discount || 0) > 0 ? `-฿${financialSummary?.discount?.toLocaleString("th-TH", { minimumFractionDigits: 2 })}` : "฿0.00"}
+                      </span>
+                    </div>
+                    <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                      <span className="text-slate-500 block text-[10px]">ภาษีมูลค่าเพิ่ม (VAT):</span>
+                      <span className={`font-mono font-bold text-xs ${(financialSummary?.vat || 0) > 0 ? "text-blue-600" : "text-slate-400"}`}>
+                        {(financialSummary?.vat || 0) > 0 ? `+฿${financialSummary?.vat?.toLocaleString("th-TH", { minimumFractionDigits: 2 })}` : "฿0.00"}
+                      </span>
+                    </div>
+                    <div className="bg-orange-50/60 p-2.5 rounded-xl border border-orange-200">
+                      <span className="text-orange-900 block text-[10px] font-semibold">ยอดสุทธิรวม:</span>
+                      <span className="font-mono font-bold text-orange-800 text-xs">
+                        ฿{totalBillAmount.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* List of Detected Items */}
             <div className="space-y-4">
               <div className="flex items-center justify-between px-1">
@@ -1156,6 +1294,39 @@ export default function UserFrontendPage() {
                   </span>
                 </div>
               </div>
+
+              {/* Merchant Details in Print */}
+              {merchantInfo && (
+                <div className="mt-2 pt-2 border-t border-neutral-300 grid grid-cols-3 gap-2 text-[10px]">
+                  <div>
+                    <span className="text-neutral-500">ร้านค้า/ผู้ให้บริการ:</span>{" "}
+                    <span className="font-bold">{merchantInfo.name || "ไม่ระบุ"}</span>
+                  </div>
+                  <div>
+                    <span className="text-neutral-500">วันที่ในเอกสาร:</span>{" "}
+                    <span>{merchantInfo.date || "ไม่ระบุ"}</span>
+                  </div>
+                  <div>
+                    <span className="text-neutral-500">การลงนามผู้รับเงิน:</span>{" "}
+                    <span className={merchantInfo.hasReceiptSign ? "text-black" : "text-black font-bold"}>
+                      {merchantInfo.hasReceiptSign ? "✓ มีลายเซ็น/ตรายาง" : "✕ ขาดลายเซ็นผู้รับเงิน"}
+                      {merchantInfo.isHandwritten && " (บิลเขียนมือ)"}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Document Warnings Banner in Print */}
+              {documentWarnings && documentWarnings.length > 0 && (
+                <div className="mt-3 p-2 bg-neutral-100 border border-black text-[10px] space-y-1">
+                  <span className="font-bold underline block">ข้อสังเกตความสมบูรณ์ของเอกสาร:</span>
+                  <ul className="list-disc list-inside">
+                    {documentWarnings.map((w, wIdx) => (
+                      <li key={wIdx} className="font-semibold">{w}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
 
             {/* Table of items */}
@@ -1264,6 +1435,13 @@ export default function UserFrontendPage() {
                   <div className="text-base font-bold font-mono">
                     ฿{totalBillAmount.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
                   </div>
+                  {financialSummary && ((financialSummary.discount || 0) > 0 || (financialSummary.vat || 0) > 0) && (
+                    <div className="text-[10px] text-neutral-600 mt-1 font-mono leading-tight">
+                      (ก่อนลด ฿{(financialSummary.subtotal || calculatedItemsTotal).toFixed(2)}
+                      {(financialSummary.discount || 0) > 0 && ` - ลด ฿${financialSummary.discount?.toFixed(2)}`}
+                      {(financialSummary.vat || 0) > 0 && ` + VAT ฿${financialSummary.vat?.toFixed(2)}`})
+                    </div>
+                  )}
                 </div>
                 <div>
                   <div className="text-neutral-600 text-[11px]">ยอดรวมเฉพาะรายการที่ผ่านเกณฑ์:</div>

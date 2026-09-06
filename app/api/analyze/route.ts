@@ -90,40 +90,99 @@ export async function POST(req: NextRequest) {
     // 2. แปลงข้อมูล priceMatrix เป็น String
     const matrixContext = JSON.stringify(priceMatrix || [], null, 2);
 
-    // 3. คำสั่ง Prompt (Part 1) - Auditor System Persona with 4 Check Conditions
-    const prompt = `คุณคือผู้ตรวจสอบบัญชี (Auditor) หน้าที่ของคุณคือตรวจสอบรายการค่าใช้จ่ายจากเอกสารที่แนบมา เทียบกับฐานข้อมูลราคากลาง (priceMatrix):
+    // 3. คำสั่ง System Prompt - ผู้ตรวจสอบบัญชี (Auditor) สภานักศึกษา มทส.
+    const prompt = `คุณคือผู้ตรวจสอบบัญชีและพัสดุ (Auditor) ประจำสภานักศึกษา มหาวิทยาลัยเทคโนโลยีสุรนารี
+หน้าที่ของคุณคือตรวจสอบเอกสารใบเสร็จ / บิลเงินสด / ใบเสนอราคา / เอกสารเบิกจ่ายงบประมาณที่แนบมา เทียบกับฐานข้อมูลราคากลาง (priceMatrix):
 ${matrixContext}
 
-โดยต้องตรวจสอบ 4 เงื่อนไขอย่างละเอียด:
-1. ไม่อยู่ในราคากลาง (Not Found): ค้นหาไม่พบหรือไม่มีความใกล้เคียงกับข้อมูลใน priceMatrix -> กำหนด "status": "NOT_FOUND", "errorFlags": [], และให้ข้อมูลใน matrixData เป็น null ทั้งหมด
-2. ราคาต่อหน่วยเกินราคากลาง (Price Exceeded): ราคาต่อหน่วยในบิล (receiptData.unitPrice) สูงกว่าเพดานราคากลาง (matrixData.maxPrice) -> กำหนด "status": "FAIL" และเพิ่ม "ราคาเกินเกณฑ์" ใน errorFlags
-3. หน่วยนับไม่ตรงกับราคากลาง (Unit Mismatch): หน่วยในบิล (receiptData.unit) ไม่ตรงกับหน่วยในราคากลาง (matrixData.unit) เช่น กล่อง vs ชิ้น -> กำหนด "status": "FAIL" และเพิ่ม "หน่วยไม่ตรง" ใน errorFlags
-4. คำนวณเลขผิด (Math Error): ตรวจสอบความถูกต้องทางคณิตศาสตร์ หาก จำนวน (receiptData.qty) * ราคาต่อหน่วย (receiptData.unitPrice) ไม่เท่ากับ ราคารวม (receiptData.totalPrice) ที่ระบุในเอกสาร -> กำหนด "status": "FAIL" และเพิ่ม "คำนวณเลขผิด" ใน errorFlags
+จงตรวจสอบเอกสารอย่างละเอียดตามกฎระเบียบ 4 ข้อดังต่อไปนี้:
 
-หากผ่านเกณฑ์ทั้งหมดทุกข้อ ให้กำหนด "status": "PASS" และ "errorFlags": []
+========================================
+1. กฎการตรวจสอบคณิตศาสตร์ ภาษี และส่วนลด (Math, Discount & VAT 7% Rules):
+========================================
+- ตรวจสอบระดับรายการย่อย (Line Items):
+  * ตรวจสอบความถูกต้องว่า จำนวน (receiptData.qty) × ราคาต่อหน่วย (receiptData.unitPrice) เท่ากับ ราคารวม (receiptData.totalPrice) หรือไม่
+  * หากคูณแล้วผลลัพธ์ไม่ตรงกับราคารวมในบิลอย่างมีนัยสำคัญ ให้ถือว่า "คำนวณเลขผิด"
+- ตรวจสอบสรุปยอดท้ายบิล (Financial Summary):
+  * บิลอาจมีส่วนลด (Discount ท้ายบิล หรือโปรโมชั่น) และภาษีมูลค่าเพิ่ม (VAT 7% หรือคิดตามระเบียบ)
+  * subtotal = ผลรวมของราคารวมทุกรายการย่อยก่อนหักส่วนลด (number)
+  * discount = ยอดส่วนลดท้ายบิล (ถ้ามี ให้ระบุเป็นตัวเลขบวก >= 0, ถ้าไม่มีให้ใส่ 0)
+  * vat = ยอดภาษีมูลค่าเพิ่ม (เช่น VAT 7% ถ้ามีระบุในบิลหรือคำนวณจากยอดหลังลด ให้ระบุตัวเลข >= 0, ถ้าไม่มีให้ใส่ 0)
+  * total = ยอดเงินสุทธิรวมท้ายบิลที่ต้องจ่ายจริง (subtotal - discount + vat)
+  * [สำคัญยิ่ง]: การที่ยอดรวมสุทธิท้ายบิล (Grand Total) เกิดจากการนำ Subtotal มาหักส่วนลด (Discount) หรือบวกภาษีมูลค่าเพิ่ม (VAT 7%) "ถือว่าเป็นการคำนวณที่ถูกต้องตามมาตรฐานการบัญชี ห้ามตีความเป็นคำนวณเลขผิดเด็ดขาด"
 
-ตอบกลับเป็น JSON Array ตามโครงสร้างนี้เท่านั้น:
-[
-  {
-    "status": "PASS" | "FAIL" | "NOT_FOUND",
-    "errorFlags": ["ราคาเกินเกณฑ์", "หน่วยไม่ตรง", "คำนวณเลขผิด"],
-    "message": "คำอธิบายผลการตรวจสอบอย่างละเอียดภาษาไทย",
-    "receiptData": {
-      "itemName": "ชื่อในบิล",
-      "qty": จำนวน (ตัวเลข),
-      "unit": "หน่วยในบิล",
-      "unitPrice": ราคาต่อหน่วยในบิล,
-      "totalPrice": ราคารวมของรายการนี้ในบิล
-    },
-    "matrixData": {
-      "itemName": "ชื่อในฐานข้อมูล (null ถ้าไม่เจอ)",
-      "category": "หมวดหมู่ (null ถ้าไม่เจอ)",
-      "maxPrice": ราคากลางสูงสุด (null ถ้าไม่เจอ),
-      "unit": "หน่วยนับในฐานข้อมูล (null ถ้าไม่เจอ)"
+========================================
+2. การตรวจสอบความสมบูรณ์ของเอกสาร (Document Integrity & Handwritten Signature Rules):
+========================================
+- ตรวจหาข้อมูลหัวบิลและผู้รับเงินในเอกสาร:
+  * name: ชื่อร้านค้า / ผู้จำหน่าย / ผู้ให้บริการ (หากไม่ระบุหรืออ่านไม่ได้ ให้ใส่ "ไม่ระบุ")
+  * date: วันที่ที่ระบุในเอกสาร (เช่น "15 ม.ค. 2567" หรือ "2024-01-15", หากไม่พบ ให้ใส่ "ไม่ระบุ")
+  * hasReceiptSign: ตรวจสอบว่าพบลายมือชื่อ (ลายเซ็นสด) ของผู้รับเงิน หรือมีตรายางประทับ "รับเงินแล้ว / ชำระเงินแล้ว / PAID" หรือไม่ (boolean true/false)
+  * isHandwritten: เอกสารเป็นบิลเงินสดเขียนด้วยมือ / ใบเสร็จรับเงินเล่มเขียนมือหรือไม่ (boolean true/false)
+- [กฎการแจ้งเตือนความสมบูรณ์]:
+  * หากเอกสารเป็นบิลเขียนมือ (isHandwritten: true) แล้ว "ขาดลายเซ็นผู้รับเงิน" (hasReceiptSign: false) ให้เพิ่มข้อความแจ้งเตือนลงใน Array warnings:
+    "[เอกสารไม่สมบูรณ์: ขาดลายเซ็นผู้รับเงิน]"
+
+========================================
+3. การตรวจสอบรายการและดักจับรายการคลุมเครือ (Item Audit & Ambiguous Item Rules):
+========================================
+สำหรับแต่ละรายการในเอกสาร ให้ตรวจสอบตามเงื่อนไขดังนี้:
+1. [รายการคลุมเครือ]: หากชื่อรายการมีลักษณะกว้าง คลุมเครือ ไม่แจกแจงรายละเอียดว่าคือสิ่งของชนิดใด เช่น "ค่าวัสดุ", "ค่าอุปกรณ์", "วัสดุอุปกรณ์", "ค่าใช้จ่ายเบ็ดเตล็ด", "ค่าสิ่งของ", "ค่าของ", "อุปกรณ์จัดกิจกรรม", "ของใช้":
+   - กำหนด status: "FAIL"
+   - เพิ่ม "[รายการคลุมเครือ: ต้องแนบใบแจกแจงรายการย่อย]" ลงใน errorFlags
+   - ระบุใน message ว่า "รายการมีลักษณะคลุมเครือ ไม่แจกแจงชนิดสิ่งของ ต้องแนบใบแจกแจงรายการย่อยตามระเบียบ"
+2. [ไม่อยู่ในราคากลาง (NOT_FOUND)]: หากค้นหาไม่พบหรือไม่ใกล้เคียงกับรายการใดใน priceMatrix:
+   - กำหนด status: "NOT_FOUND", errorFlags: [], และกำหนดข้อมูลใน matrixData เป็น null ทั้งหมด
+3. [ราคาต่อหน่วยเกินราคากลาง]: ราคาต่อหน่วยในบิล (receiptData.unitPrice) สูงกว่าเพดานราคากลาง (matrixData.maxPrice):
+   - กำหนด status: "FAIL" และเพิ่ม "ราคาเกินเกณฑ์" ลงใน errorFlags
+4. [หน่วยนับไม่ตรง]: หน่วยในบิล (receiptData.unit) ไม่ตรงกับหน่วยในราคากลาง (matrixData.unit) เช่น กล่อง vs ชิ้น:
+   - กำหนด status: "FAIL" และเพิ่ม "หน่วยไม่ตรง" ลงใน errorFlags
+5. [คำนวณเลขผิด]: จำนวน (qty) × ราคาต่อหน่วย (unitPrice) ไม่เท่ากับ ราคารวม (totalPrice):
+   - กำหนด status: "FAIL" และเพิ่ม "คำนวณเลขผิด" ลงใน errorFlags
+- [ผ่านเกณฑ์ (PASS)]: หากไม่มีข้อผิดพลาดใดๆ ให้กำหนด status: "PASS" และ errorFlags: []
+
+========================================
+4. รูปแบบ Response Schema (JSON Object เท่านั้น):
+========================================
+จงส่งคำตอบกลับมาเป็น JSON Object ตามโครงสร้างนี้เท่านั้น (ห้ามครอบ markdown หรือมีข้อความอื่นนอก JSON):
+{
+  "merchant": {
+    "name": "ชื่อร้านค้าหรือผู้ให้บริการ (หรือ 'ไม่ระบุ')",
+    "date": "วันที่ในเอกสาร (หรือ 'ไม่ระบุ')",
+    "hasReceiptSign": true,
+    "isHandwritten": false
+  },
+  "financialSummary": {
+    "subtotal": 0.00,
+    "discount": 0.00,
+    "vat": 0.00,
+    "total": 0.00
+  },
+  "overallStatus": "PASS" | "FAIL" | "NOT_FOUND",
+  "warnings": [
+    "[เอกสารไม่สมบูรณ์: ขาดลายเซ็นผู้รับเงิน]"
+  ],
+  "items": [
+    {
+      "status": "PASS" | "FAIL" | "NOT_FOUND",
+      "errorFlags": ["ราคาเกินเกณฑ์", "หน่วยไม่ตรง", "คำนวณเลขผิด", "[รายการคลุมเครือ: ต้องแนบใบแจกแจงรายการย่อย]"],
+      "message": "คำอธิบายผลการตรวจสอบอย่างละเอียดภาษาไทย",
+      "receiptData": {
+        "itemName": "ชื่อในบิล",
+        "qty": 1,
+        "unit": "หน่วยในบิล",
+        "unitPrice": 0.00,
+        "totalPrice": 0.00
+      },
+      "matrixData": {
+        "itemName": "ชื่อในฐานข้อมูล (null ถ้าไม่เจอ)",
+        "category": "หมวดหมู่ (null ถ้าไม่เจอ)",
+        "maxPrice": 0.00,
+        "unit": "หน่วยนับในฐานข้อมูล (null ถ้าไม่เจอ)"
+      }
     }
-  }
-]
-ห้ามมีข้อความอื่นปนเด็ดขาด`;
+  ]
+}`;
 
     // 4. เตรียมโครงสร้าง parts สำหรับส่งให้ Gemini API
     const parts: any[] = [{ text: prompt }];
@@ -161,6 +220,9 @@ ${matrixContext}
               parts: parts,
             },
           ],
+          generationConfig: {
+            response_mime_type: "application/json",
+          },
         }),
       }
     );
@@ -173,12 +235,105 @@ ${matrixContext}
 
     // แกะ JSON ที่ได้จาก AI ตอบกลับมา
     const data = await response.json();
-    let text = data.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
+    let text = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
     text = text.replace(/```json/g, "").replace(/```/g, "").trim();
 
     let parsedData = JSON.parse(text);
-    if (!Array.isArray(parsedData)) {
-      parsedData = [parsedData];
+
+    // ปรับโครงสร้างข้อมูลให้อยู่ในรูปแบบ Standard Schema เสมอ
+    if (Array.isArray(parsedData)) {
+      parsedData = {
+        merchant: {
+          name: "ไม่ระบุ",
+          date: "ไม่ระบุ",
+          hasReceiptSign: true,
+          isHandwritten: false,
+        },
+        financialSummary: {
+          subtotal: 0,
+          discount: 0,
+          vat: 0,
+          total: 0,
+        },
+        overallStatus: parsedData.some((i: any) => i.status === "FAIL")
+          ? "FAIL"
+          : parsedData.some((i: any) => i.status === "NOT_FOUND")
+          ? "NOT_FOUND"
+          : "PASS",
+        warnings: [],
+        items: parsedData,
+      };
+    } else {
+      if (!Array.isArray(parsedData.items)) {
+        parsedData.items = [];
+      }
+      if (!Array.isArray(parsedData.warnings)) {
+        parsedData.warnings = [];
+      }
+      if (!parsedData.merchant) {
+        parsedData.merchant = {
+          name: "ไม่ระบุ",
+          date: "ไม่ระบุ",
+          hasReceiptSign: true,
+          isHandwritten: false,
+        };
+      }
+      if (!parsedData.financialSummary) {
+        parsedData.financialSummary = {
+          subtotal: 0,
+          discount: 0,
+          vat: 0,
+          total: 0,
+        };
+      }
+    }
+
+    // Double-check: ดักจับรายการคลุมเครือเพิ่มเติม (เช่น ค่าวัสดุ, ค่าอุปกรณ์ ที่ไม่แจกแจง)
+    const AMBIGUOUS_KEYWORDS = [
+      "ค่าวัสดุ",
+      "ค่าอุปกรณ์",
+      "วัสดุอุปกรณ์",
+      "ค่าวัสดุอุปกรณ์",
+      "ค่าสิ่งของ",
+      "ค่าของ",
+      "ค่าใช้จ่ายเบ็ดเตล็ด",
+      "ของใช้",
+    ];
+
+    parsedData.items.forEach((item: any) => {
+      const name = (item.receiptData?.itemName || "").trim();
+      const isAmbiguous = AMBIGUOUS_KEYWORDS.some(
+        (kw) => name === kw || name.startsWith(kw + " ") || name.endsWith(" " + kw)
+      );
+
+      if (isAmbiguous) {
+        item.status = "FAIL";
+        item.errorFlags = item.errorFlags || [];
+        if (!item.errorFlags.includes("[รายการคลุมเครือ: ต้องแนบใบแจกแจงรายการย่อย]")) {
+          item.errorFlags.push("[รายการคลุมเครือ: ต้องแนบใบแจกแจงรายการย่อย]");
+        }
+        if (!item.message || !item.message.includes("รายการคลุมเครือ")) {
+          item.message = item.message
+            ? `${item.message} - [รายการคลุมเครือ: ต้องแนบใบแจกแจงรายการย่อย]`
+            : "รายการมีลักษณะคลุมเครือ ไม่แจกแจงชนิดสิ่งของ ต้องแนบใบแจกแจงรายการย่อยตามระเบียบ";
+        }
+      }
+    });
+
+    // Double-check: ตรวจสอบบิลเขียนมือที่ขาดลายเซ็น
+    if (parsedData.merchant?.isHandwritten && !parsedData.merchant?.hasReceiptSign) {
+      if (!parsedData.warnings.includes("[เอกสารไม่สมบูรณ์: ขาดลายเซ็นผู้รับเงิน]")) {
+        parsedData.warnings.push("[เอกสารไม่สมบูรณ์: ขาดลายเซ็นผู้รับเงิน]");
+      }
+    }
+
+    // สรุป Overall Status ให้แม่นยำ
+    if (parsedData.items.some((i: any) => i.status === "FAIL")) {
+      parsedData.overallStatus = "FAIL";
+    } else if (parsedData.items.some((i: any) => i.status === "NOT_FOUND")) {
+      parsedData.overallStatus = "NOT_FOUND";
+    } else {
+      parsedData.overallStatus = "PASS";
     }
 
     return NextResponse.json(parsedData);

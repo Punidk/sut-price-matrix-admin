@@ -56,12 +56,30 @@ export interface AuditScanItem {
   unit?: string;
 }
 
+export interface MerchantInfo {
+  name: string;
+  date: string;
+  hasReceiptSign: boolean;
+  isHandwritten: boolean;
+}
+
+export interface FinancialSummaryData {
+  subtotal: number;
+  discount: number;
+  vat: number;
+  total: number;
+}
+
 export interface AuditLogEntry {
   id: string;
   createdAt: number;
   itemsAnalyzed: number;
   failCount: number;
   scanResults: AuditScanItem[];
+  merchant?: MerchantInfo | null;
+  financialSummary?: FinancialSummaryData | null;
+  warnings?: string[];
+  overallStatus?: string | null;
 }
 
 export default function AdminAuditHistoryPage() {
@@ -151,6 +169,10 @@ export default function AdminAuditHistoryPage() {
               itemsAnalyzed: Number(data.itemsAnalyzed) || (Array.isArray(data.scanResults) ? data.scanResults.length : 0),
               failCount: Number(data.failCount) || 0,
               scanResults: Array.isArray(data.scanResults) ? data.scanResults : [],
+              merchant: data.merchant || null,
+              financialSummary: data.financialSummary || null,
+              warnings: Array.isArray(data.warnings) ? data.warnings : [],
+              overallStatus: data.overallStatus || null,
             };
           });
 
@@ -217,7 +239,12 @@ export default function AdminAuditHistoryPage() {
       const queryLower = searchQuery.toLowerCase().trim();
       const dateStr = formatThaiDateTime(log.createdAt).toLowerCase();
 
-      if (dateStr.includes(queryLower) || log.id.toLowerCase().includes(queryLower)) {
+      if (
+        dateStr.includes(queryLower) ||
+        log.id.toLowerCase().includes(queryLower) ||
+        (log.merchant?.name && log.merchant.name.toLowerCase().includes(queryLower)) ||
+        (log.warnings && log.warnings.some((w) => w.toLowerCase().includes(queryLower)))
+      ) {
         return true;
       }
 
@@ -496,6 +523,73 @@ export default function AdminAuditHistoryPage() {
                                 </div>
                               </div>
 
+                              {/* Document Warnings Banner */}
+                              {log.warnings && log.warnings.length > 0 && (
+                                <div className="bg-amber-950/40 border border-amber-600/80 p-3.5 space-y-2 font-mono">
+                                  <div className="flex items-center space-x-2 text-amber-300 text-xs font-bold">
+                                    <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                                    <span>การแจ้งเตือนความสมบูรณ์ของเอกสาร (Document Integrity Warnings):</span>
+                                  </div>
+                                  <ul className="space-y-1 text-xs text-amber-200">
+                                    {log.warnings.map((w, wIdx) => (
+                                      <li key={wIdx} className="flex items-start space-x-1.5 font-semibold">
+                                        <span className="text-amber-400">•</span>
+                                        <span>{w}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+
+                              {/* Merchant & Financial Summary Box */}
+                              {(log.merchant || log.financialSummary) && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-neutral-900 border border-neutral-800 p-3.5 font-mono text-xs">
+                                  {log.merchant && (
+                                    <div className="space-y-1.5 text-neutral-300">
+                                      <span className="text-[10px] text-neutral-500 uppercase tracking-wider block font-bold">ข้อมูลหัวบิล / ร้านค้า</span>
+                                      <div className="font-bold text-white text-sm">{log.merchant.name || "ไม่ระบุ"}</div>
+                                      <div className="text-[11px] text-neutral-400">วันที่ในเอกสาร: <span className="text-neutral-200">{log.merchant.date || "ไม่ระบุ"}</span></div>
+                                      <div className="flex flex-wrap gap-2 text-[11px] pt-1">
+                                        <span className={`px-2 py-0.5 border text-[10px] ${log.merchant.hasReceiptSign ? "bg-emerald-950/60 border-emerald-700 text-emerald-300" : "bg-rose-950/60 border-rose-700 text-rose-300"}`}>
+                                          {log.merchant.hasReceiptSign ? "✓ พบลายเซ็น/ตรายาง" : "✗ ขาดลายเซ็นผู้รับเงิน"}
+                                        </span>
+                                        <span className="px-2 py-0.5 border border-neutral-700 bg-neutral-950 text-neutral-300 text-[10px]">
+                                          {log.merchant.isHandwritten ? "บิลเขียนมือ" : "บิลพิมพ์/คอมพิวเตอร์"}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {log.financialSummary && (
+                                    <div className="space-y-1.5 text-neutral-300 md:border-l md:border-neutral-800 md:pl-4">
+                                      <span className="text-[10px] text-neutral-500 uppercase tracking-wider block font-bold">สรุปยอดท้ายบิล (Financial Summary)</span>
+                                      <div className="space-y-1 text-[11px]">
+                                        <div className="flex justify-between">
+                                          <span className="text-neutral-400">ยอดรวมก่อนภาษี/ส่วนลด:</span>
+                                          <span className="text-white">฿{Number(log.financialSummary.subtotal || 0).toLocaleString("th-TH", { minimumFractionDigits: 2 })}</span>
+                                        </div>
+                                        {Number(log.financialSummary.discount || 0) > 0 && (
+                                          <div className="flex justify-between text-emerald-400">
+                                            <span>ส่วนลดท้ายบิล:</span>
+                                            <span>-฿{Number(log.financialSummary.discount).toLocaleString("th-TH", { minimumFractionDigits: 2 })}</span>
+                                          </div>
+                                        )}
+                                        {Number(log.financialSummary.vat || 0) > 0 && (
+                                          <div className="flex justify-between text-neutral-300">
+                                            <span className="text-neutral-400">ภาษีมูลค่าเพิ่ม (VAT 7%):</span>
+                                            <span>+฿{Number(log.financialSummary.vat).toLocaleString("th-TH", { minimumFractionDigits: 2 })}</span>
+                                          </div>
+                                        )}
+                                        <div className="flex justify-between border-t border-neutral-800 pt-1 text-xs font-bold text-white">
+                                          <span>ยอดสุทธิท้ายบิล (Grand Total):</span>
+                                          <span className="text-orange-400">฿{Number(log.financialSummary.total || 0).toLocaleString("th-TH", { minimumFractionDigits: 2 })}</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
                               {/* Items List Inside Log */}
                               <div className="grid grid-cols-1 gap-3">
                                 {log.scanResults && log.scanResults.length > 0 ? (
@@ -568,14 +662,17 @@ export default function AdminAuditHistoryPage() {
 
                                           <div className="flex flex-wrap items-center gap-1.5 self-start sm:self-auto justify-end">
                                             {/* Specific Error Flags */}
-                                            {isFail && errorFlags.map((flag, fIdx) => (
-                                              <span
-                                                key={fIdx}
-                                                className="text-[10px] font-mono font-bold px-2 py-0.5 bg-rose-600 text-white"
-                                              >
-                                                [{flag}]
-                                              </span>
-                                            ))}
+                                            {isFail && errorFlags.map((flag, fIdx) => {
+                                              const formattedFlag = flag.startsWith("[") && flag.endsWith("]") ? flag : `[${flag}]`;
+                                              return (
+                                                <span
+                                                  key={fIdx}
+                                                  className="text-[10px] font-mono font-bold px-2 py-0.5 bg-rose-600 text-white"
+                                                >
+                                                  {formattedFlag}
+                                                </span>
+                                              );
+                                            })}
                                             <span
                                               className={`text-xs font-mono font-bold px-2.5 py-0.5 border ${
                                                 isPass
