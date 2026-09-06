@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import * as XLSX from "xlsx";
+import imageCompression from "browser-image-compression";
 import { db, isFirebaseConfigured } from "@/lib/firebase";
 import { collection, onSnapshot, addDoc, serverTimestamp } from "firebase/firestore";
 import { PriceMatrixItem } from "@/lib/types";
@@ -273,10 +274,10 @@ export default function UserFrontendPage() {
 
   // Multiple Files Analysis Handler
   const handleStartAudit = async () => {
-    if (selectedFiles.length === 0) return;
+    if (selectedFiles.length === 0 || isProcessing) return;
 
     setIsProcessing(true);
-    setProcessingStep(1); // 1. กำลังประมวลผลไฟล์ (แปลงภาพ/PDF เป็น Base64 และอ่าน Excel)...
+    setProcessingStep(1); // 1. กำลังบีบอัดรูปภาพและเตรียมข้อมูลไฟล์ (Client-side Compression & Base64)...
     setUploadError(null);
     setAnalysisResults(null);
 
@@ -285,7 +286,27 @@ export default function UserFrontendPage() {
       let combinedExcelText = "";
 
       for (const item of selectedFiles) {
-        if (item.type === "image" || item.type === "pdf") {
+        if (item.type === "image") {
+          // Client-side Image Compression via browser-image-compression
+          let fileToProcess = item.file;
+          try {
+            const compressionOptions = {
+              maxSizeMB: 1.2,
+              maxWidthOrHeight: 1920,
+              useWebWorker: true,
+            };
+            fileToProcess = await imageCompression(item.file, compressionOptions);
+          } catch (compressionErr) {
+            console.warn(`Image compression failed for ${item.name}, using original:`, compressionErr);
+            fileToProcess = item.file;
+          }
+
+          const base64 = await fileToBase64(fileToProcess);
+          payloadFiles.push({
+            mimeType: fileToProcess.type || item.mimeType,
+            base64Data: base64,
+          });
+        } else if (item.type === "pdf") {
           const base64 = await fileToBase64(item.file);
           payloadFiles.push({
             mimeType: item.mimeType,
@@ -702,7 +723,7 @@ export default function UserFrontendPage() {
                 <div className="flex items-center space-x-2 text-amber-400 font-bold">
                   <RefreshCw className="w-4 h-4 animate-spin shrink-0" />
                   <span>
-                    {processingStep === 1 && "กำลังเตรียมข้อมูลไฟล์ (แปลงรูปภาพ/PDF เป็น Base64 & อ่าน Excel)..."}
+                    {processingStep === 1 && "กำลังบีบอัดรูปภาพและเตรียมข้อมูลไฟล์ (Client-side Compression & Base64)..."}
                     {processingStep === 2 && "กำลังให้ Gemini AI อ่านและเปรียบเทียบกับฐานข้อมูลราคากลาง..."}
                     {processingStep === 3 && "กำลังประมวลผลและจัดทำรายงานสรุป..."}
                   </span>
@@ -729,7 +750,7 @@ export default function UserFrontendPage() {
                 {isProcessing ? (
                   <>
                     <RefreshCw className="w-5 h-5 animate-spin" />
-                    <span>กำลังวิเคราะห์เอกสาร...</span>
+                    <span>กำลังบีบอัดและวิเคราะห์เอกสาร...</span>
                   </>
                 ) : (
                   <>
