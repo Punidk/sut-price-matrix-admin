@@ -442,7 +442,7 @@ export default function UserFrontendPage() {
           </div>
 
           <Link
-            href="/login"
+            href="/admin/login"
             className="bg-white/10 hover:bg-white/20 border border-white/30 text-white text-xs font-mono py-2 px-3.5 rounded-lg transition flex items-center space-x-1.5 backdrop-blur-xs"
           >
             <Lock className="w-3.5 h-3.5" />
@@ -1314,7 +1314,7 @@ export default function UserFrontendPage() {
           <div className="flex items-center space-x-4 font-mono text-[11px] text-slate-500">
             <span>Pre-Audit System v2.0 (Multi-File & Excel)</span>
             <span>•</span>
-            <Link href="/login" className="hover:text-amber-400 transition">
+            <Link href="/admin/login" className="hover:text-amber-400 transition">
               Admin Login
             </Link>
           </div>

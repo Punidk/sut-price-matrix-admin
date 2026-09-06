@@ -5,6 +5,8 @@ import { useRouter, usePathname } from "next/navigation";
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider,
   signOut as firebaseSignOut,
   User,
 } from "firebase/auth";
@@ -12,6 +14,7 @@ import { auth, isFirebaseConfigured } from "@/lib/firebase";
 
 export interface DemoUser {
   email: string | null;
+  displayName?: string | null;
   uid: string;
   isDemo?: boolean;
 }
@@ -21,6 +24,7 @@ interface AuthContextType {
   loading: boolean;
   isDemoMode: boolean;
   login: (email: string, pass: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -29,6 +33,7 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   isDemoMode: false,
   login: async () => {},
+  loginWithGoogle: async () => {},
   logout: async () => {},
 });
 
@@ -37,12 +42,8 @@ const DEMO_USER_KEY = "sut_admin_demo_session";
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | DemoUser | null>(null);
   const [loading, setLoading] = useState(true);
-  const router = Router();
+  const router = useRouter();
   const pathname = usePathname();
-
-  function Router() {
-    return useRouter();
-  }
 
   useEffect(() => {
     if (isFirebaseConfigured && auth) {
@@ -71,10 +72,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (loading) return;
 
-    if (!user && pathname.startsWith("/admin")) {
-      router.push("/login");
-    } else if (user && pathname === "/login") {
-      router.push("/admin");
+    if (!user && pathname.startsWith("/admin") && pathname !== "/admin/login") {
+      router.push("/admin/login");
+    } else if (user && (pathname === "/login" || pathname === "/admin/login")) {
+      router.push("/admin/history");
     }
   }, [user, loading, pathname, router]);
 
@@ -97,6 +98,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const loginWithGoogle = async () => {
+    if (isFirebaseConfigured && auth) {
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: "select_account" });
+      await signInWithPopup(auth, provider);
+    } else {
+      const demoUser: DemoUser = {
+        email: "admin.google@sut.ac.th",
+        displayName: "SUT Admin (Google)",
+        uid: "demo-google-admin-01",
+        isDemo: true,
+      };
+      localStorage.setItem(DEMO_USER_KEY, JSON.stringify(demoUser));
+      setUser(demoUser);
+    }
+  };
+
   const logout = async () => {
     if (isFirebaseConfigured && auth) {
       await firebaseSignOut(auth);
@@ -104,7 +122,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.removeItem(DEMO_USER_KEY);
       setUser(null);
     }
-    router.push("/login");
+    router.push("/admin/login");
   };
 
   return (
@@ -114,6 +132,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loading,
         isDemoMode: !isFirebaseConfigured,
         login,
+        loginWithGoogle,
         logout,
       }}
     >

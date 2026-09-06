@@ -78,7 +78,7 @@ export default function AdminAuditHistoryPage() {
   // 1. Authentication Check
   useEffect(() => {
     if (!authLoading && !user) {
-      router.replace("/login");
+      router.replace("/admin/login");
     }
   }, [user, authLoading, router]);
 
@@ -237,84 +237,8 @@ export default function AdminAuditHistoryPage() {
   const totalIssuesCount = logs.filter((l) => l.failCount > 0).length;
   const totalPassedCount = logs.filter((l) => l.failCount === 0).length;
 
-  if (authLoading || (!user && authLoading)) {
-    return (
-      <div className="min-h-screen bg-neutral-950 text-neutral-400 flex items-center justify-center font-mono text-sm">
-        <RefreshCw className="w-5 h-5 animate-spin mr-2 text-white" />
-        LOADING SYSTEM...
-      </div>
-    );
-  }
-
-  if (!user) return null;
-
   return (
-    <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col font-sans selection:bg-white selection:text-black">
-      {/* Navbar Header (Monochrome) */}
-      <header className="bg-neutral-900 border-b border-neutral-800 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-9 h-9 bg-white text-black font-bold flex items-center justify-center text-lg rounded-none">
-              <ShieldCheck className="w-5 h-5 stroke-[2.2]" />
-            </div>
-            <div>
-              <div className="flex items-center space-x-2">
-                <h1 className="text-sm sm:text-base font-bold font-mono tracking-tight text-white uppercase">
-                  SUT CENTRAL PRICE MATRIX
-                </h1>
-                {isDemoMode && (
-                  <span className="bg-neutral-800 border border-neutral-700 text-neutral-300 text-[10px] font-mono px-2 py-0.5 uppercase">
-                    DEMO MODE
-                  </span>
-                )}
-              </div>
-              <p className="text-[11px] text-neutral-400 font-mono hidden sm:block">
-                Firestore Collection: <code className="text-white">audit_history</code>
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center space-x-4">
-            {/* Navigation Tabs */}
-            <nav className="hidden sm:flex items-center space-x-1">
-              <Link
-                href="/admin"
-                className="px-3 py-1.5 text-xs font-mono font-medium transition flex items-center space-x-1.5 border bg-neutral-950 text-neutral-400 border-neutral-800 hover:text-white hover:border-neutral-700"
-              >
-                <Database className="w-3.5 h-3.5" />
-                <span>จัดการราคากลาง</span>
-              </Link>
-              <Link
-                href="/admin/history"
-                className="px-3 py-1.5 text-xs font-mono font-medium transition flex items-center space-x-1.5 border bg-white text-black border-white"
-              >
-                <History className="w-3.5 h-3.5" />
-                <span>ประวัติการตรวจสอบ</span>
-              </Link>
-            </nav>
-
-            <div className="h-6 w-px bg-neutral-800 hidden sm:block"></div>
-
-            <div className="hidden md:flex flex-col items-end text-xs font-mono">
-              <span className="text-neutral-500">ADMIN USER</span>
-              <span className="text-white font-semibold truncate max-w-[200px]">
-                {user.email || "Admin User"}
-              </span>
-            </div>
-            <div className="h-6 w-px bg-neutral-800 hidden md:block"></div>
-            <button
-              onClick={logout}
-              className="bg-neutral-950 hover:bg-neutral-800 text-neutral-300 hover:text-white text-xs font-mono py-2 px-3 border border-neutral-800 hover:border-neutral-700 transition flex items-center space-x-2 rounded-none group"
-            >
-              <LogOut className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" />
-              <span>LOGOUT</span>
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+    <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         
         {/* Title Header */}
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
@@ -813,24 +737,5 @@ export default function AdminAuditHistoryPage() {
           </div>
         </div>
       </main>
-
-      {/* Minimalist Footer */}
-      <footer className="bg-neutral-900 border-t border-neutral-800 text-neutral-500 text-xs py-6 font-mono mt-auto">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div>
-            © {new Date().getFullYear()} SUT STUDENT COUNCIL — AUDIT LOG SYSTEM
-          </div>
-          <div className="flex items-center space-x-4 text-[11px]">
-            <Link href="/" className="hover:text-white transition">
-              หน้าสแกน User
-            </Link>
-            <span>•</span>
-            <Link href="/admin" className="hover:text-white transition">
-              จัดการราคากลาง
-            </Link>
-          </div>
-        </div>
-      </footer>
-    </div>
   );
 }

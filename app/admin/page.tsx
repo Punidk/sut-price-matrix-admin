@@ -87,7 +87,7 @@ export default function AdminDashboardPage() {
 
   useEffect(() => {
     if (!authLoading && !user) {
-      router.replace("/login");
+      router.replace("/admin/login");
     }
   }, [user, authLoading, router]);
 
@@ -487,83 +487,8 @@ export default function AdminDashboardPage() {
     }
   };
 
-  if (authLoading || !user) {
-    return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center font-mono text-xs">
-        <div className="flex items-center space-x-3">
-          <div className="w-4 h-4 border-2 border-white border-t-transparent animate-spin rounded-full"></div>
-          <span>AUTHENTICATING SECURITY ACCESS...</span>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col font-sans selection:bg-white selection:text-black">
-      {/* Navbar Header */}
-      <header className="bg-neutral-900 border-b border-neutral-800 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-9 h-9 bg-white text-black font-bold flex items-center justify-center text-lg rounded-none">
-              <ShieldCheck className="w-5 h-5 stroke-[2.2]" />
-            </div>
-            <div>
-              <div className="flex items-center space-x-2">
-                <h1 className="text-sm sm:text-base font-bold font-mono tracking-tight text-white uppercase">
-                  SUT CENTRAL PRICE MATRIX
-                </h1>
-                {isDemoMode && (
-                  <span className="bg-neutral-800 border border-neutral-700 text-neutral-300 text-[10px] font-mono px-2 py-0.5 uppercase">
-                    DEMO MODE
-                  </span>
-                )}
-              </div>
-              <p className="text-[11px] text-neutral-400 font-mono hidden sm:block">
-                Firestore Collection: <code className="text-white">price_matrix</code>
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center space-x-4">
-            {/* Admin Nav Tabs */}
-            <nav className="hidden sm:flex items-center space-x-1">
-              <Link
-                href="/admin"
-                className="px-3 py-1.5 text-xs font-mono font-medium transition flex items-center space-x-1.5 border bg-white text-black border-white"
-              >
-                <Database className="w-3.5 h-3.5" />
-                <span>จัดการราคากลาง</span>
-              </Link>
-              <Link
-                href="/admin/history"
-                className="px-3 py-1.5 text-xs font-mono font-medium transition flex items-center space-x-1.5 border bg-neutral-950 text-neutral-400 border-neutral-800 hover:text-white hover:border-neutral-700"
-              >
-                <History className="w-3.5 h-3.5" />
-                <span>ประวัติการตรวจสอบ</span>
-              </Link>
-            </nav>
-
-            <div className="h-6 w-px bg-neutral-800 hidden sm:block"></div>
-
-            <div className="hidden md:flex flex-col items-end text-xs font-mono">
-              <span className="text-neutral-500">ADMIN USER</span>
-              <span className="text-white font-semibold truncate max-w-[200px]">
-                {user.email || "Admin User"}
-              </span>
-            </div>
-            <div className="h-6 w-px bg-neutral-800 hidden md:block"></div>
-            <button
-              onClick={logout}
-              className="bg-neutral-950 hover:bg-neutral-800 text-neutral-300 hover:text-white text-xs font-mono py-2 px-3 border border-neutral-800 hover:border-neutral-700 transition flex items-center space-x-2 rounded-none group"
-            >
-              <LogOut className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" />
-              <span>LOGOUT</span>
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+    <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         {isDemoMode && (
           <div className="bg-neutral-900 border border-neutral-800 p-4 font-mono text-xs text-neutral-300 flex items-start space-x-3">
             <Info className="w-4 h-4 text-white shrink-0 mt-0.5" />
@@ -698,7 +623,6 @@ export default function AdminDashboardPage() {
             </table>
           </div>
         </div>
-      </main>
 
       {/* 1. Add / Edit Modal */}
       {isAddModalOpen && (
@@ -901,6 +825,6 @@ export default function AdminDashboardPage() {
           </div>
         </div>
       )}
-    </div>
+    </main>
   );
 }
