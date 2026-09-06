@@ -3,23 +3,43 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
 import { auth, isFirebaseConfigured } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
+import { isAllowedAdminEmail, UNAUTHORIZED_ADMIN_MESSAGE } from "@/lib/admin-whitelist";
 import { ShieldCheck, AlertCircle, ArrowLeft, RefreshCw } from "lucide-react";
 
 export default function AdminLoginPage() {
   const router = useRouter();
-  const { user, isDemoMode } = useAuth();
+  const { user, isDemoMode, logout } = useAuth();
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // หากล็อกอินอยู่แล้ว ให้ Redirect ไปที่ /admin/history ทันที
+  // ตรวจสอบ query string จาก URL เช่น ?error=unauthorized
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("error") === "unauthorized") {
+        setErrorMessage(UNAUTHORIZED_ADMIN_MESSAGE);
+      }
+    }
+  }, []);
+
+  // หากล็อกอินอยู่แล้ว ให้ตรวจสอบ Whitelist ก่อน Redirect
   useEffect(() => {
     if (user) {
-      router.replace("/admin/history");
+      if (isAllowedAdminEmail(user.email)) {
+        router.replace("/admin/history");
+      } else {
+        // หากบัญชีไม่อยู่ใน Whitelist ให้ signOut และแจ้งเตือนทันที
+        if (isFirebaseConfigured && auth) {
+          signOut(auth);
+        }
+        logout();
+        setErrorMessage(UNAUTHORIZED_ADMIN_MESSAGE);
+      }
     }
-  }, [user, router]);
+  }, [user, router, logout]);
 
   // ฟังก์ชันเข้าสู่ระบบด้วย Google (Sign in with Google)
   const handleGoogleSignIn = async () => {
@@ -33,16 +53,31 @@ export default function AdminLoginPage() {
         const result = await signInWithPopup(auth, provider);
 
         if (result.user) {
+          // ตรวจสอบ Whitelist อีเมลของแอดมิน
+          if (!isAllowedAdminEmail(result.user.email)) {
+            // หากไม่อยู่ใน Whitelist: สั่ง signOut ทันที เพื่อเตะออกจากระบบ
+            await signOut(auth);
+            await logout();
+            setErrorMessage(UNAUTHORIZED_ADMIN_MESSAGE);
+            return;
+          }
+
           router.replace("/admin/history");
         }
       } else {
-        // Fallback สำหรับ Demo Mode (เมื่อยังไม่ได้ผูก Firebase Keys)
+        // Fallback สำหรับ Demo Mode
         const demoUser = {
-          email: "admin.google@sut.ac.th",
-          displayName: "SUT Admin (Google)",
+          email: "advice39za@gmail.com",
+          displayName: "SUT Admin (advice39za)",
           uid: "demo-google-admin-01",
           isDemo: true,
         };
+
+        if (!isAllowedAdminEmail(demoUser.email)) {
+          setErrorMessage(UNAUTHORIZED_ADMIN_MESSAGE);
+          return;
+        }
+
         localStorage.setItem("sut_admin_demo_session", JSON.stringify(demoUser));
         router.replace("/admin/history");
       }

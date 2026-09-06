@@ -6,6 +6,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { onAuthStateChanged, signOut, User } from "firebase/auth";
 import { auth, isFirebaseConfigured } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
+import { isAllowedAdminEmail } from "@/lib/admin-whitelist";
 import {
   ShieldCheck,
   LogOut,
@@ -25,20 +26,41 @@ export default function AdminLayout({
   const [user, setUser] = useState<User | any>(contextUser);
   const [loading, setLoading] = useState(true);
 
-  // 1. ดักจับสถานะล็อกอินด้วย onAuthStateChanged(auth, (user) => ...)
+  // 1. ดักจับสถานะล็อกอินด้วย onAuthStateChanged พร้อมตรวจสอบ Whitelist Emails
   useEffect(() => {
-    if (isFirebaseConfigured && auth) {
-      const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-        setUser(currentUser);
+    const firebaseAuth = auth;
+    if (isFirebaseConfigured && firebaseAuth) {
+      const unsubscribe = onAuthStateChanged(firebaseAuth, async (currentUser) => {
+        if (currentUser) {
+          if (!isAllowedAdminEmail(currentUser.email)) {
+            // หากอีเมลไม่อยู่ใน Whitelist: สั่ง signOut และ Redirect กลับไปหน้า /admin/login ทันที
+            await signOut(firebaseAuth);
+            await contextLogout();
+            setUser(null);
+            setLoading(false);
+            router.replace("/admin/login?error=unauthorized");
+            return;
+          }
+          setUser(currentUser);
+        } else {
+          setUser(null);
+        }
         setLoading(false);
       });
       return () => unsubscribe();
     } else {
       // Demo mode fallback จาก AuthContext
+      if (contextUser && !isAllowedAdminEmail(contextUser.email)) {
+        contextLogout();
+        setUser(null);
+        setLoading(false);
+        router.replace("/admin/login?error=unauthorized");
+        return;
+      }
       setUser(contextUser);
       setLoading(contextLoading);
     }
-  }, [contextUser, contextLoading]);
+  }, [contextUser, contextLoading, router, contextLogout]);
 
   // 2. หากผู้ใช้ยังไม่ได้ล็อกอิน (!user) และไม่ได้อยู่ที่หน้า /admin/login ให้ Redirect กลับไปหน้า /admin/login ทันที
   useEffect(() => {
@@ -47,7 +69,9 @@ export default function AdminLayout({
     if (!user && pathname !== "/admin/login") {
       router.replace("/admin/login");
     } else if (user && pathname === "/admin/login") {
-      router.replace("/admin/history");
+      if (isAllowedAdminEmail(user.email)) {
+        router.replace("/admin/history");
+      }
     }
   }, [user, loading, pathname, router]);
 

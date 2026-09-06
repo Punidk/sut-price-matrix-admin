@@ -11,6 +11,7 @@ import {
   User,
 } from "firebase/auth";
 import { auth, isFirebaseConfigured } from "@/lib/firebase";
+import { isAllowedAdminEmail, UNAUTHORIZED_ADMIN_MESSAGE } from "@/lib/admin-whitelist";
 
 export interface DemoUser {
   email: string | null;
@@ -46,8 +47,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   useEffect(() => {
-    if (isFirebaseConfigured && auth) {
-      const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const firebaseAuth = auth;
+    if (isFirebaseConfigured && firebaseAuth) {
+      const unsubscribe = onAuthStateChanged(firebaseAuth, async (currentUser) => {
+        if (currentUser && !isAllowedAdminEmail(currentUser.email)) {
+          await firebaseSignOut(firebaseAuth);
+          setUser(null);
+          setLoading(false);
+          return;
+        }
         setUser(currentUser);
         setLoading(false);
       });
@@ -58,7 +66,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const stored = localStorage.getItem(DEMO_USER_KEY);
         if (stored) {
           try {
-            setUser(JSON.parse(stored));
+            const parsed = JSON.parse(stored);
+            if (isAllowedAdminEmail(parsed.email)) {
+              setUser(parsed);
+            } else {
+              localStorage.removeItem(DEMO_USER_KEY);
+              setUser(null);
+            }
           } catch {
             setUser(null);
           }
@@ -74,14 +88,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (!user && pathname.startsWith("/admin") && pathname !== "/admin/login") {
       router.push("/admin/login");
-    } else if (user && (pathname === "/login" || pathname === "/admin/login")) {
+    } else if (user && isAllowedAdminEmail(user.email) && (pathname === "/login" || pathname === "/admin/login")) {
       router.push("/admin/history");
     }
   }, [user, loading, pathname, router]);
 
   const login = async (email: string, pass: string) => {
+    if (!isAllowedAdminEmail(email)) {
+      throw new Error(UNAUTHORIZED_ADMIN_MESSAGE);
+    }
+
     if (isFirebaseConfigured && auth) {
-      await signInWithEmailAndPassword(auth, email, pass);
+      const cred = await signInWithEmailAndPassword(auth, email, pass);
+      if (!isAllowedAdminEmail(cred.user.email)) {
+        await firebaseSignOut(auth);
+        setUser(null);
+        throw new Error(UNAUTHORIZED_ADMIN_MESSAGE);
+      }
     } else {
       // Demo fallback login simulation
       if (email.trim() && pass.trim()) {
@@ -102,14 +125,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (isFirebaseConfigured && auth) {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: "select_account" });
-      await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(auth, provider);
+      if (result.user && !isAllowedAdminEmail(result.user.email)) {
+        await firebaseSignOut(auth);
+        setUser(null);
+        throw new Error(UNAUTHORIZED_ADMIN_MESSAGE);
+      }
     } else {
       const demoUser: DemoUser = {
-        email: "admin.google@sut.ac.th",
-        displayName: "SUT Admin (Google)",
+        email: "advice39za@gmail.com",
+        displayName: "SUT Admin (advice39za)",
         uid: "demo-google-admin-01",
         isDemo: true,
       };
+      if (!isAllowedAdminEmail(demoUser.email)) {
+        throw new Error(UNAUTHORIZED_ADMIN_MESSAGE);
+      }
       localStorage.setItem(DEMO_USER_KEY, JSON.stringify(demoUser));
       setUser(demoUser);
     }
