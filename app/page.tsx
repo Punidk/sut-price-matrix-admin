@@ -376,7 +376,7 @@ export default function UserFrontendPage() {
                 </span>
               </div>
               <p className="text-[11px] text-orange-100 hidden sm:block">
-                ระบบตรวจสอบราคากลางงบประมาณสโมสรนักศึกษา มทส.
+                ระบบตรวจสอบเอกสารสภานักศึกษา มทส.
               </p>
             </div>
           </div>
@@ -407,7 +407,7 @@ export default function UserFrontendPage() {
             </h2>
             <p className="text-sm text-slate-600 leading-relaxed max-w-2xl">
               รองรับการอัปโหลดหลายไฟล์พร้อมกัน ทั้งภาพใบเสร็จ (JPG, PNG), เอกสาร PDF และตารางงบประมาณ Excel (.xlsx, .csv) เพื่อเปรียบเทียบกับฐานข้อมูลราคากลาง (<code className="text-orange-700 font-semibold font-mono">price_matrix</code>) 
-              ของสโมสรนักศึกษา มหาวิทยาลัยเทคโนโลยีสุรนารี
+              ของสภานักศึกษา มหาวิทยาลัยเทคโนโลยีสุรนารี
             </p>
           </div>
         </section>
@@ -1021,7 +1021,7 @@ export default function UserFrontendPage() {
       <footer className="bg-slate-900 text-slate-400 text-xs py-6 border-t border-slate-800 mt-auto">
         <div className="max-w-5xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
           <div>
-            © {new Date().getFullYear()} สโมสรนักศึกษา มหาวิทยาลัยเทคโนโลยีสุรนารี (SUT Student Council)
+            © {new Date().getFullYear()} สภานักศึกษา มหาวิทยาลัยเทคโนโลยีสุรนารี (SUT Student Council)
           </div>
           <div className="flex items-center space-x-4 font-mono text-[11px] text-slate-500">
             <span>Pre-Audit System v2.0 (Multi-File & Excel)</span>
