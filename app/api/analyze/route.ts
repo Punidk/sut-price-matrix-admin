@@ -1,5 +1,49 @@
 import { NextRequest, NextResponse } from "next/server";
 
+/**
+ * Helper function สำหรับเรียก Gemini API พร้อมระบบ Auto-Retry และ Exponential Backoff + Jitter
+ * รองรับการลองซ้ำเมื่อเจอ Error 429 (Rate Limit) หรือ 503 (High Demand / Service Unavailable)
+ */
+async function fetchGeminiWithRetry(url: string, options: RequestInit, maxRetries = 3): Promise<Response> {
+  let attempt = 0;
+
+  while (attempt < maxRetries) {
+    try {
+      const response = await fetch(url, options);
+
+      // หากผ่านฉลุย คืนค่า response ทันที
+      if (response.ok) {
+        return response;
+      }
+
+      // หากเจอ Rate Limit หรือ High Demand ให้เข้าเงื่อนไข Retry
+      if (response.status === 429 || response.status === 503) {
+        attempt++;
+        if (attempt >= maxRetries) {
+          return response; // หมดโควต้าลองซ้ำ ให้ส่ง response เดิมออกไปจัดการ error
+        }
+
+        // คำนวณเวลาถอยหน่วง: 2^attempt * 1000ms + สุ่ม Jitter (0 - 500ms)
+        const delay = Math.pow(2, attempt) * 1000 + (Math.random() * 500);
+        console.warn(`[Gemini API] Encountered status ${response.status}. Retrying attempt ${attempt}/${maxRetries} in ${Math.round(delay)}ms...`);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        continue;
+      }
+
+      // หากเป็น Error อื่นๆ เช่น 400 Bad Request ไม่ต้อง Retry
+      return response;
+    } catch (error) {
+      attempt++;
+      if (attempt >= maxRetries) throw error;
+      const delay = Math.pow(2, attempt) * 1000 + (Math.random() * 500);
+      console.warn(`[Gemini API] Network error. Retrying attempt ${attempt}/${maxRetries} in ${Math.round(delay)}ms...`);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+
+  throw new Error("Exceeded maximum retry attempts for Gemini API");
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -103,8 +147,8 @@ ${matrixContext}
       }
     }
 
-    // 5. ยิง Native Fetch ตรงไปที่ Google Generative Language API
-    const response = await fetch(
+    // 5. ยิง Native Fetch ตรงไปที่ Google Generative Language API พร้อมระบบ Auto-Retry
+    const response = await fetchGeminiWithRetry(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: "POST",
