@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { db, isFirebaseConfigured } from "@/lib/firebase";
-import { collection, onSnapshot, query, orderBy, deleteDoc, doc } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, updateDoc, doc, serverTimestamp } from "firebase/firestore";
 import {
   ShieldCheck,
   LogOut,
@@ -80,6 +80,8 @@ export interface AuditLogEntry {
   financialSummary?: FinancialSummaryData | null;
   warnings?: string[];
   overallStatus?: string | null;
+  isDeleted?: boolean;
+  deletedAt?: any;
 }
 
 export default function AdminAuditHistoryPage() {
@@ -100,7 +102,7 @@ export default function AdminAuditHistoryPage() {
     }
   }, [user, authLoading, router]);
 
-  // ฟังก์ชันลบประวัติการตรวจสอบ (Delete Log) พร้อม Confirmation & Optimistic UI
+  // ฟังก์ชันลบประวัติการตรวจสอบ (Soft Delete Log) พร้อม Confirmation & Optimistic UI
   const handleDeleteLog = async (log: AuditLogEntry) => {
     const confirmDelete = window.confirm(
       `คุณแน่ใจหรือไม่ว่าต้องการลบประวัติการตรวจสอบนี้?\n(Doc ID: ${log.id} | ตรวจพบ ${log.itemsAnalyzed} รายการ)`
@@ -126,12 +128,16 @@ export default function AdminAuditHistoryPage() {
       setNotification(null);
     }, 4000);
 
-    // 2. ส่งคำสั่งลบข้อมูลออกจาก Firestore
+    // 2. ส่งคำสั่ง Soft Delete ไปยัง Firestore (updateDoc isDeleted: true)
     if (isFirebaseConfigured && db) {
       try {
-        await deleteDoc(doc(db, "audit_history", targetId));
+        const docRef = doc(db, "audit_history", targetId);
+        await updateDoc(docRef, {
+          isDeleted: true,
+          deletedAt: serverTimestamp(),
+        });
       } catch (err: any) {
-        console.error("Error deleting audit log:", err);
+        console.error("Error soft deleting audit log:", err);
         setNotification({
           message: `เกิดข้อผิดพลาดในการลบข้อมูล: ${err.message || err}`,
           type: "error",
@@ -140,7 +146,7 @@ export default function AdminAuditHistoryPage() {
     }
   };
 
-  // 2. Real-time fetch audit_history from Firestore
+  // 2. Real-time fetch audit_history from Firestore (คัดกรองเฉพาะรายการที่ไม่ได้ถูก Soft Delete)
   useEffect(() => {
     if (!user) return;
 
@@ -151,30 +157,37 @@ export default function AdminAuditHistoryPage() {
       const unsubscribe = onSnapshot(
         q,
         (snapshot) => {
-          const list: AuditLogEntry[] = snapshot.docs.map((docSnap) => {
-            const data = docSnap.data();
-            let timestamp = Date.now();
+          const list: AuditLogEntry[] = snapshot.docs
+            .filter((docSnap) => {
+              const data = docSnap.data();
+              return data.isDeleted !== true;
+            })
+            .map((docSnap) => {
+              const data = docSnap.data();
+              let timestamp = Date.now();
 
-            if (data.createdAt?.toMillis) {
-              timestamp = data.createdAt.toMillis();
-            } else if (data.createdAt instanceof Date) {
-              timestamp = data.createdAt.getTime();
-            } else if (typeof data.createdAt === "number") {
-              timestamp = data.createdAt;
-            }
+              if (data.createdAt?.toMillis) {
+                timestamp = data.createdAt.toMillis();
+              } else if (data.createdAt instanceof Date) {
+                timestamp = data.createdAt.getTime();
+              } else if (typeof data.createdAt === "number") {
+                timestamp = data.createdAt;
+              }
 
-            return {
-              id: docSnap.id,
-              createdAt: timestamp,
-              itemsAnalyzed: Number(data.itemsAnalyzed) || (Array.isArray(data.scanResults) ? data.scanResults.length : 0),
-              failCount: Number(data.failCount) || 0,
-              scanResults: Array.isArray(data.scanResults) ? data.scanResults : [],
-              merchant: data.merchant || null,
-              financialSummary: data.financialSummary || null,
-              warnings: Array.isArray(data.warnings) ? data.warnings : [],
-              overallStatus: data.overallStatus || null,
-            };
-          });
+              return {
+                id: docSnap.id,
+                createdAt: timestamp,
+                itemsAnalyzed: Number(data.itemsAnalyzed) || (Array.isArray(data.scanResults) ? data.scanResults.length : 0),
+                failCount: Number(data.failCount) || 0,
+                scanResults: Array.isArray(data.scanResults) ? data.scanResults : [],
+                merchant: data.merchant || null,
+                financialSummary: data.financialSummary || null,
+                warnings: Array.isArray(data.warnings) ? data.warnings : [],
+                overallStatus: data.overallStatus || null,
+                isDeleted: data.isDeleted || false,
+                deletedAt: data.deletedAt || null,
+              };
+            });
 
           setLogs(list);
           setDataLoading(false);
