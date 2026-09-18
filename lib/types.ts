@@ -166,3 +166,22 @@ export interface PriceMatrixItem {
 
 export type PriceMatrixFormData = Omit<PriceMatrixItem, "id" | "updatedAt">;
 
+export type DocumentMode = "PROPOSAL" | "QUOTATION";
+
+export interface CategorySubtotalCheck {
+  category: SutExpenseCategory;
+  detectedSubtotal: number;
+  calculatedSubtotal: number;
+  isMatch: boolean;
+  itemCount: number;
+}
+
+export interface ProposalAuditData {
+  projectName?: string;
+  requestedBudgetTotal?: number;
+  calculatedGrandTotal?: number;
+  isGrandTotalMatch?: boolean;
+  isHorizontalMathCorrect?: boolean;
+  categoryChecks?: CategorySubtotalCheck[];
+}
+

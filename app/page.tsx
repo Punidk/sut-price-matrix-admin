@@ -6,7 +6,15 @@ import * as XLSX from "xlsx";
 import imageCompression from "browser-image-compression";
 import { db, isFirebaseConfigured } from "@/lib/firebase";
 import { collection, onSnapshot, addDoc, serverTimestamp, getDocs } from "firebase/firestore";
-import { PriceMatrixItem, SUT_EXPENSE_CATEGORIES, SutExpenseCategory, normalizeExpenseCategory } from "@/lib/types";
+import {
+  PriceMatrixItem,
+  SUT_EXPENSE_CATEGORIES,
+  SutExpenseCategory,
+  normalizeExpenseCategory,
+  DocumentMode,
+  ProposalAuditData,
+  CategorySubtotalCheck,
+} from "@/lib/types";
 import { initialPriceMatrixData } from "@/lib/mockData";
 import {
   UploadCloud,
@@ -133,6 +141,8 @@ export default function UserFrontendPage() {
   const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null);
   const [quotationTerms, setQuotationTerms] = useState<QuotationTermsData | null>(null);
   const [documentType, setDocumentType] = useState<string | null>(null);
+  const [documentMode, setDocumentMode] = useState<DocumentMode>("PROPOSAL");
+  const [proposalAudit, setProposalAudit] = useState<ProposalAuditData | null>(null);
   const [isQuotationCheck, setIsQuotationCheck] = useState<boolean>(false);
   const [financialSummary, setFinancialSummary] = useState<FinancialSummaryData | null>(null);
   const [documentWarnings, setDocumentWarnings] = useState<string[]>([]);
@@ -288,107 +298,237 @@ export default function UserFrontendPage() {
     setSelectedFiles((prev) => prev.filter((item) => item.id !== id));
   };
 
-  // Sample file preview simulation - สร้างใบเสนอราคาตามระเบียบ มทส. 8 ข้อ
+  // Sample file preview simulation - สร้างเอกสารตัวอย่างตาม documentMode
   const handleSelectSample = () => {
     const canvas = document.createElement("canvas");
     canvas.width = 750;
-    canvas.height = 580;
+    canvas.height = 620;
     const ctx = canvas.getContext("2d");
-    if (ctx) {
+    if (!ctx) return;
+
+    if (documentMode === "PROPOSAL") {
       ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, 750, 580);
+      ctx.fillRect(0, 0, 750, 620);
 
       // Header Bar
       ctx.fillStyle = "#ea580c";
-      ctx.fillRect(0, 0, 750, 42);
+      ctx.fillRect(0, 0, 750, 44);
       ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 18px sans-serif";
-      ctx.fillText("ใบเสนอราคา (QUOTATION)", 25, 28);
+      ctx.font = "bold 16px sans-serif";
+      ctx.fillText("แบบเสนอโครงการและประมาณการค่าใช้จ่าย ประจำปีการศึกษา 2569", 25, 28);
 
-      // Vendor Info
+      // Project Info
       ctx.fillStyle = "#0f172a";
-      ctx.font = "bold 14px sans-serif";
-      ctx.fillText("ผู้เสนอราคา: บริษัท สุรนารี ออฟฟิศ ซัพพลาย แอนด์ เซอร์วิส จำกัด", 25, 70);
+      ctx.font = "bold 13px sans-serif";
+      ctx.fillText("ชื่อโครงการ: ค่ายพัฒนาทักษะวิศวกรรมและเทคโนโลยีเพื่อชุมชน", 25, 72);
       ctx.font = "12px sans-serif";
-      ctx.fillText("เลขผู้เสียภาษีผู้ขาย: 0105559012345 | โทร. 044-112233 | วันที่: 15 มกราคม 2568", 25, 90);
+      ctx.fillText("หน่วยงาน/ชมรม: ชมรมวิชาการ สภานักศึกษา มทส. | วันที่จัดกิจกรรม: 15-16 พฤศจิกายน 2569", 25, 94);
 
-      // Customer Info Box (ตามระเบียบ มทส.)
-      ctx.fillStyle = "#f8fafc";
-      ctx.fillRect(25, 105, 700, 95);
-      ctx.strokeStyle = "#cbd5e1";
-      ctx.strokeRect(25, 105, 700, 95);
-
-      ctx.fillStyle = "#0f172a";
-      ctx.font = "bold 12px sans-serif";
-      ctx.fillText("ลูกค้า / ผู้รับการเสนอราคา (Customer):", 35, 125);
-      ctx.font = "12px sans-serif";
-      ctx.fillText("ชื่อลูกค้า: มหาวิทยาลัยเทคโนโลยีสุรนารี", 35, 145);
-      ctx.fillText("ที่อยู่: 111 ถนนมหาวิทยาลัย ตำบล สุรนารี อำเภอเมือง จังหวัดนครราชสีมา 30000", 35, 165);
-      ctx.fillText("เลขประจำตัวผู้เสียภาษี: 0994000288654   |   เบอร์โทรศัพท์: 04-422-0000", 35, 185);
-
-      // Items Table
-      ctx.fillStyle = "#ea580c";
-      ctx.fillRect(25, 215, 700, 26);
+      // Category 1: หมวดโภชนาการ
+      ctx.fillStyle = "#f97316";
+      ctx.fillRect(25, 115, 700, 24);
       ctx.fillStyle = "#ffffff";
       ctx.font = "bold 12px sans-serif";
-      ctx.fillText("ลำดับ", 35, 233);
-      ctx.fillText("รายการพัสดุ / บริการ", 90, 233);
-      ctx.fillText("จำนวน", 400, 233);
-      ctx.fillText("ราคา/หน่วย", 490, 233);
-      ctx.fillText("จำนวนเงิน (บาท)", 600, 233);
+      ctx.fillText("หมวดโภชนาการ", 35, 132);
+
+      // Table Header
+      ctx.fillStyle = "#334155";
+      ctx.fillRect(25, 140, 700, 24);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 11px sans-serif";
+      ctx.fillText("ลำดับ", 35, 156);
+      ctx.fillText("รายการ", 90, 156);
+      ctx.fillText("จำนวน", 400, 156);
+      ctx.fillText("ราคา/หน่วย", 490, 156);
+      ctx.fillText("รวมเป็นเงิน (บาท)", 600, 156);
 
       ctx.fillStyle = "#1e293b";
-      ctx.font = "12px sans-serif";
-      ctx.fillText("1", 45, 260);
-      ctx.fillText("ข้าวกล่อง (กระเพราไก่ไข่ดาว)", 90, 260);
-      ctx.fillText("100 กล่อง", 400, 260);
-      ctx.fillText("45.00", 500, 260);
-      ctx.fillText("4,500.00", 620, 260);
+      ctx.font = "11px sans-serif";
+      ctx.fillText("1", 45, 182);
+      ctx.fillText("ข้าวกล่อง (กระเพราไก่ไข่ดาว)", 90, 182);
+      ctx.fillText("100 กล่อง", 400, 182);
+      ctx.fillText("45.00", 500, 182);
+      ctx.fillText("4,500.00", 620, 182);
 
-      ctx.fillText("2", 45, 285);
-      ctx.fillText("น้ำดื่มขวด 600ml", 90, 285);
-      ctx.fillText("100 ขวด", 400, 285);
-      ctx.fillText("7.00", 500, 285);
-      ctx.fillText("700.00", 620, 285);
+      ctx.fillText("2", 45, 206);
+      ctx.fillText("น้ำดื่มขวด 600ml", 90, 206);
+      ctx.fillText("100 ขวด", 400, 206);
+      ctx.fillText("7.00", 500, 206);
+      ctx.fillText("700.00", 620, 206);
 
-      ctx.fillText("3", 45, 310);
-      ctx.fillText("ป้ายไวนิลโครงการ 1x3m", 90, 310);
-      ctx.fillText("1 ผืน", 400, 310);
-      ctx.fillText("350.00", 500, 310);
-      ctx.fillText("350.00", 620, 310);
+      // Subtotal Cat 1
+      ctx.fillStyle = "#fff7ed";
+      ctx.fillRect(25, 218, 700, 24);
+      ctx.fillStyle = "#c2410c";
+      ctx.font = "bold 11px sans-serif";
+      ctx.fillText("รวมเงินหมวดโภชนาการ จำนวน 5,200.00 บาท", 420, 234);
 
-      // Total Line
-      ctx.strokeStyle = "#94a3b8";
-      ctx.beginPath();
-      ctx.moveTo(25, 330);
-      ctx.lineTo(725, 330);
-      ctx.stroke();
-
-      ctx.font = "bold 13px sans-serif";
-      ctx.fillText("ยอดรวมสุทธิทั้งสิ้น (Grand Total): ฿5,550.00", 430, 355);
-      ctx.fillStyle = "#ea580c";
+      // Category 2: หมวดอุปกรณ์สำนักงาน
+      ctx.fillStyle = "#f97316";
+      ctx.fillRect(25, 252, 700, 24);
+      ctx.fillStyle = "#ffffff";
       ctx.font = "bold 12px sans-serif";
-      ctx.fillText("(จำนวนเงินตัวหนังสือ: ห้าพันห้าร้อยห้าสิบบาทถ้วน)", 300, 375);
+      ctx.fillText("หมวดอุปกรณ์สำนักงาน", 35, 269);
 
-      // Terms Box
+      // Table Header Cat 2
+      ctx.fillStyle = "#334155";
+      ctx.fillRect(25, 277, 700, 24);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 11px sans-serif";
+      ctx.fillText("ลำดับ", 35, 293);
+      ctx.fillText("รายการ", 90, 293);
+      ctx.fillText("จำนวน", 400, 293);
+      ctx.fillText("ราคา/หน่วย", 490, 293);
+      ctx.fillText("รวมเป็นเงิน (บาท)", 600, 293);
+
+      ctx.fillStyle = "#1e293b";
+      ctx.font = "11px sans-serif";
+      ctx.fillText("3", 45, 319);
+      ctx.fillText("กระดาษถ่ายเอกสาร A4 80 แกรม", 90, 319);
+      ctx.fillText("5 รีม", 400, 319);
+      ctx.fillText("115.00", 500, 319);
+      ctx.fillText("575.00", 620, 319);
+
+      ctx.fillText("4", 45, 343);
+      ctx.fillText("ป้ายไวนิลโครงการ 1x3m", 90, 343);
+      ctx.fillText("1 ผืน", 400, 343);
+      ctx.fillText("350.00", 500, 343);
+      ctx.fillText("350.00", 620, 343);
+
+      // Subtotal Cat 2
+      ctx.fillStyle = "#fff7ed";
+      ctx.fillRect(25, 355, 700, 24);
+      ctx.fillStyle = "#c2410c";
+      ctx.font = "bold 11px sans-serif";
+      ctx.fillText("รวมเงินหมวดอุปกรณ์สำนักงาน จำนวน 925.00 บาท", 390, 371);
+
+      // Grand Total Box
       ctx.fillStyle = "#f8fafc";
-      ctx.fillRect(25, 395, 700, 160);
+      ctx.fillRect(25, 395, 700, 100);
       ctx.strokeStyle = "#cbd5e1";
-      ctx.strokeRect(25, 395, 700, 160);
+      ctx.strokeRect(25, 395, 700, 100);
 
       ctx.fillStyle = "#0f172a";
+      ctx.font = "bold 14px sans-serif";
+      ctx.fillText("งบประมาณที่ขอรับการสนับสนุนทั้งสิ้น: 6,125.00 บาท", 45, 432);
+      ctx.fillStyle = "#ea580c";
       ctx.font = "bold 12px sans-serif";
-      ctx.fillText("เงื่อนไขและข้อตกลงทางการค้า (Terms & Conditions):", 35, 418);
-      ctx.font = "12px sans-serif";
-      ctx.fillText("1. กำหนดยืนราคา: 30 วัน นับจากวันที่ออกใบเสนอราคา", 35, 440);
-      ctx.fillText("2. กำหนดเวลาส่งมอบพัสดุ: ภายใน 7 วัน นับถัดจากวันได้รับใบสั่งจ้าง", 35, 462);
+      ctx.fillText("(จำนวนเงินตัวหนังสือ: หกพันหนึ่งร้อยยี่สิบห้าบาทถ้วน)", 45, 458);
+      ctx.font = "11px sans-serif";
+      ctx.fillStyle = "#64748b";
+      ctx.fillText("หมายเหตุ: สรุปผลรวมหมวดโภชนาการ (5,200.00) + หมวดอุปกรณ์สำนักงาน (925.00) = 6,125.00 บาท", 45, 480);
 
-      ctx.fillText("ลงชื่อผู้เสนอราคา: .....................................................", 420, 495);
-      ctx.font = "bold 12px sans-serif";
-      ctx.fillText("(นายสมชาย สุรนารี)", 495, 520);
-      ctx.font = "italic 11px sans-serif";
-      ctx.fillText("ผู้จัดการฝ่ายขาย / ประทับตรา", 480, 538);
+      // Signatures
+      ctx.fillStyle = "#334155";
+      ctx.font = "11px sans-serif";
+      ctx.fillText("ลงชื่อ ...................................................... ผู้รับผิดชอบโครงการ", 45, 545);
+      ctx.fillText("ลงชื่อ ...................................................... อาจารย์ที่ปรึกษา", 420, 545);
+      ctx.fillText("(นายสมชาย มุ่งมั่น)", 75, 570);
+      ctx.fillText("(ผศ.ดร.ใจดี มีสุข)", 450, 570);
+
+      canvas.toBlob((blob) => {
+        if (blob) {
+          const sampleFile = new File([blob], "ตารางของบประมาณโครงการ_ตัวอย่าง_2569.jpg", { type: "image/jpeg" });
+          addFiles([sampleFile]);
+        }
+      }, "image/jpeg");
+      return;
     }
+
+    // โหมดใบเสนอราคา / ใบเสร็จร้านค้า (QUOTATION MODE)
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, 750, 580);
+
+    // Header Bar
+    ctx.fillStyle = "#ea580c";
+    ctx.fillRect(0, 0, 750, 42);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 18px sans-serif";
+    ctx.fillText("ใบเสนอราคา (QUOTATION)", 25, 28);
+
+    // Vendor Info
+    ctx.fillStyle = "#0f172a";
+    ctx.font = "bold 14px sans-serif";
+    ctx.fillText("ผู้เสนอราคา: บริษัท สุรนารี ออฟฟิศ ซัพพลาย แอนด์ เซอร์วิส จำกัด", 25, 70);
+    ctx.font = "12px sans-serif";
+    ctx.fillText("เลขผู้เสียภาษีผู้ขาย: 0105559012345 | โทร. 044-112233 | วันที่: 15 มกราคม 2568", 25, 90);
+
+    // Customer Info Box (ตามระเบียบ มทส.)
+    ctx.fillStyle = "#f8fafc";
+    ctx.fillRect(25, 105, 700, 95);
+    ctx.strokeStyle = "#cbd5e1";
+    ctx.strokeRect(25, 105, 700, 95);
+
+    ctx.fillStyle = "#0f172a";
+    ctx.font = "bold 12px sans-serif";
+    ctx.fillText("ลูกค้า / ผู้รับการเสนอราคา (Customer):", 35, 125);
+    ctx.font = "12px sans-serif";
+    ctx.fillText("ชื่อลูกค้า: มหาวิทยาลัยเทคโนโลยีสุรนารี", 35, 145);
+    ctx.fillText("ที่อยู่: 111 ถนนมหาวิทยาลัย ตำบล สุรนารี อำเภอเมือง จังหวัดนครราชสีมา 30000", 35, 165);
+    ctx.fillText("เลขประจำตัวผู้เสียภาษี: 0994000288654   |   เบอร์โทรศัพท์: 04-422-0000", 35, 185);
+
+    // Items Table
+    ctx.fillStyle = "#ea580c";
+    ctx.fillRect(25, 215, 700, 26);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 12px sans-serif";
+    ctx.fillText("ลำดับ", 35, 233);
+    ctx.fillText("รายการพัสดุ / บริการ", 90, 233);
+    ctx.fillText("จำนวน", 400, 233);
+    ctx.fillText("ราคา/หน่วย", 490, 233);
+    ctx.fillText("จำนวนเงิน (บาท)", 600, 233);
+
+    ctx.fillStyle = "#1e293b";
+    ctx.font = "12px sans-serif";
+    ctx.fillText("1", 45, 260);
+    ctx.fillText("ข้าวกล่อง (กระเพราไก่ไข่ดาว)", 90, 260);
+    ctx.fillText("100 กล่อง", 400, 260);
+    ctx.fillText("45.00", 500, 260);
+    ctx.fillText("4,500.00", 620, 260);
+
+    ctx.fillText("2", 45, 285);
+    ctx.fillText("น้ำดื่มขวด 600ml", 90, 285);
+    ctx.fillText("100 ขวด", 400, 285);
+    ctx.fillText("7.00", 500, 285);
+    ctx.fillText("700.00", 620, 285);
+
+    ctx.fillText("3", 45, 310);
+    ctx.fillText("ป้ายไวนิลโครงการ 1x3m", 90, 310);
+    ctx.fillText("1 ผืน", 400, 310);
+    ctx.fillText("350.00", 500, 310);
+    ctx.fillText("350.00", 620, 310);
+
+    // Total Line
+    ctx.strokeStyle = "#94a3b8";
+    ctx.beginPath();
+    ctx.moveTo(25, 330);
+    ctx.lineTo(725, 330);
+    ctx.stroke();
+
+    ctx.font = "bold 13px sans-serif";
+    ctx.fillText("ยอดรวมสุทธิทั้งสิ้น (Grand Total): ฿5,550.00", 430, 355);
+    ctx.fillStyle = "#ea580c";
+    ctx.font = "bold 12px sans-serif";
+    ctx.fillText("(จำนวนเงินตัวหนังสือ: ห้าพันห้าร้อยห้าสิบบาทถ้วน)", 300, 375);
+
+    // Terms Box
+    ctx.fillStyle = "#f8fafc";
+    ctx.fillRect(25, 395, 700, 160);
+    ctx.strokeStyle = "#cbd5e1";
+    ctx.strokeRect(25, 395, 700, 160);
+
+    ctx.fillStyle = "#0f172a";
+    ctx.font = "bold 12px sans-serif";
+    ctx.fillText("เงื่อนไขและข้อตกลงทางการค้า (Terms & Conditions):", 35, 418);
+    ctx.font = "12px sans-serif";
+    ctx.fillText("1. กำหนดยืนราคา: 30 วัน นับจากวันที่ออกใบเสนอราคา", 35, 440);
+    ctx.fillText("2. กำหนดเวลาส่งมอบพัสดุ: ภายใน 7 วัน นับถัดจากวันได้รับใบสั่งจ้าง", 35, 462);
+
+    ctx.fillText("ลงชื่อผู้เสนอราคา: .....................................................", 420, 495);
+    ctx.font = "bold 12px sans-serif";
+    ctx.fillText("(นายสมชาย สุรนารี)", 495, 520);
+    ctx.font = "italic 11px sans-serif";
+    ctx.fillText("ผู้จัดการฝ่ายขาย / ประทับตรา", 480, 538);
 
     canvas.toBlob((blob) => {
       if (blob) {
@@ -406,6 +546,7 @@ export default function UserFrontendPage() {
     setMerchantInfo(null);
     setCustomerInfo(null);
     setQuotationTerms(null);
+    setProposalAudit(null);
     setDocumentType(null);
     setFinancialSummary(null);
     setDocumentWarnings([]);
@@ -427,6 +568,9 @@ export default function UserFrontendPage() {
     setUploadError(null);
     setAnalysisResults(null);
     setMerchantInfo(null);
+    setCustomerInfo(null);
+    setQuotationTerms(null);
+    setProposalAudit(null);
     setFinancialSummary(null);
     setDocumentWarnings([]);
     setOverallStatus(null);
@@ -482,7 +626,8 @@ export default function UserFrontendPage() {
           files: payloadFiles,
           excelText: combinedExcelText.trim(),
           priceMatrix: priceMatrix,
-          isQuotationCheck: isQuotationCheck,
+          documentMode: documentMode,
+          isQuotationCheck: documentMode === "QUOTATION",
         }),
       });
 
@@ -496,6 +641,7 @@ export default function UserFrontendPage() {
       let merchant: MerchantInfo | null = null;
       let customer: CustomerInfo | null = null;
       let qTerms: QuotationTermsData | null = null;
+      let propAudit: ProposalAuditData | null = null;
       let docTypeStr: string | null = null;
       let finSummary: FinancialSummaryData | null = null;
       let warningsList: string[] = [];
@@ -506,6 +652,7 @@ export default function UserFrontendPage() {
         merchant = data.merchant || null;
         customer = data.customer || null;
         qTerms = data.quotationTerms || null;
+        propAudit = data.proposalAudit || null;
         docTypeStr = data.documentType || null;
         finSummary = data.financialSummary || null;
         warningsList = Array.isArray(data.warnings) ? data.warnings : [];
@@ -513,6 +660,7 @@ export default function UserFrontendPage() {
       } else if (Array.isArray(data)) {
         results = data;
       }
+      setProposalAudit(propAudit);
 
       // เงื่อนไข Math Error (!isMathCorrect) ให้ทำงานเฉพาะเมื่อเอกสารเป็นใบเสร็จที่ถูกต้อง (overallStatus !== 'INVALID_DOCUMENT' และมี items.length > 0) เท่านั้น
       if (
@@ -684,10 +832,18 @@ export default function UserFrontendPage() {
     (documentWarnings?.some((w) => typeof w === "string" && w.includes("อัตราค่าตอบแทนไม่ถูกต้อง")) ?? false);
 
   const isQuotationDoc =
-    documentType === "QUOTATION" ||
-    Boolean(quotationTerms?.isQuotation) ||
-    isQuotationCheck ||
-    hasSutQuotationViolation;
+    documentMode === "QUOTATION" &&
+    (documentType === "QUOTATION" ||
+      Boolean(quotationTerms?.isQuotation) ||
+      isQuotationCheck ||
+      hasSutQuotationViolation);
+
+  const hasProposalViolation =
+    documentMode === "PROPOSAL" &&
+    !isInvalidDocument &&
+    (proposalAudit?.isHorizontalMathCorrect === false ||
+      proposalAudit?.isGrandTotalMatch === false ||
+      (proposalAudit?.categoryChecks?.some((c) => !c.isMatch) ?? false));
 
   const isOverallPass =
     !isInvalidDocument &&
@@ -696,19 +852,29 @@ export default function UserFrontendPage() {
     !hasDuplicate &&
     !hasSutQuotationViolation &&
     !hasCompensationViolation &&
+    !hasProposalViolation &&
     totalItemsCount > 0 &&
     hasApprovedItems &&
     hasValidAmount &&
     failItemsCount === 0 &&
     notFoundItemsCount === 0;
 
-  const isOverallHasFail = !isInvalidDocument && (failItemsCount > 0 || isMathError || hasTampering || hasSutQuotationViolation || hasCompensationViolation);
+  const isOverallHasFail =
+    !isInvalidDocument &&
+    (failItemsCount > 0 ||
+      isMathError ||
+      hasTampering ||
+      hasSutQuotationViolation ||
+      hasCompensationViolation ||
+      hasProposalViolation);
+
   const isOverallPendingReview =
     !isInvalidDocument &&
     !isMathError &&
     !hasTampering &&
     !hasSutQuotationViolation &&
     !hasCompensationViolation &&
+    !hasProposalViolation &&
     (hasDuplicate || (totalItemsCount > 0 && failItemsCount === 0 && (notFoundItemsCount > 0 || !hasApprovedItems || !hasValidAmount)));
 
   const totalPassAmount = analysisResults
@@ -1138,27 +1304,97 @@ export default function UserFrontendPage() {
               </div>
             )}
 
-            {/* SUT Quotation Rules Toggle */}
-            <div className="bg-orange-50/70 border border-orange-200 rounded-xl p-3 flex items-center justify-between">
-              <label className="flex items-center space-x-2.5 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={isQuotationCheck}
-                  onChange={(e) => setIsQuotationCheck(e.target.checked)}
-                  className="w-4 h-4 text-orange-600 rounded border-slate-300 focus:ring-orange-500 cursor-pointer"
-                />
-                <div>
-                  <span className="text-xs font-bold text-slate-800 block">
-                    ตรวจสอบตามระเบียบใบเสนอราคา มทส. (Quotation Validation Rule)
-                  </span>
-                  <span className="text-[11px] text-slate-500 block">
-                    ตรวจข้อมูลลูกค้า (มหาวิทยาลัย, ที่อยู่, เลขผู้เสียภาษี 0994000288654, โทร 04-422-0000) และเงื่อนไขยืนราคา/ส่งมอบ/ตัวหนังสือ/ลายเซ็น
-                  </span>
-                </div>
-              </label>
-              <span className="text-[10px] bg-orange-100 text-orange-800 font-bold px-2 py-0.5 rounded-full border border-orange-200 hidden sm:inline-block">
-                8 ข้อกำหนด
-              </span>
+            {/* Document Mode Selector: Segmented Control */}
+            <div className="bg-slate-100/90 p-2 rounded-2xl border border-slate-200 space-y-2">
+              <div className="flex items-center justify-between px-1.5 pt-0.5">
+                <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5 text-orange-600" />
+                  เลือกประเภทเอกสารก่อนสแกน (Document Mode)
+                </span>
+                <span className="text-[11px] font-semibold text-orange-800 bg-orange-100/80 px-2 py-0.5 rounded-full border border-orange-200">
+                  {documentMode === "PROPOSAL" ? "ตารางของบประมาณโครงการ" : "ใบเสนอราคา / ใบเสร็จร้านค้า"}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {/* Mode 1: Project Proposal Mode */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDocumentMode("PROPOSAL");
+                    setIsQuotationCheck(false);
+                  }}
+                  className={`relative flex items-start gap-3 p-3 rounded-xl border text-left transition-all ${
+                    documentMode === "PROPOSAL"
+                      ? "bg-white border-orange-500 shadow-sm ring-2 ring-orange-400/20"
+                      : "bg-white/60 border-slate-200 hover:bg-white hover:border-slate-300 text-slate-600"
+                  }`}
+                >
+                  <div
+                    className={`p-2 rounded-lg shrink-0 ${
+                      documentMode === "PROPOSAL" ? "bg-orange-500 text-white shadow-sm" : "bg-slate-100 text-slate-500"
+                    }`}
+                  >
+                    <FileSpreadsheet className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <span
+                        className={`text-xs font-bold block ${
+                          documentMode === "PROPOSAL" ? "text-orange-950" : "text-slate-700"
+                        }`}
+                      >
+                        ตารางของบประมาณโครงการ
+                      </span>
+                      {documentMode === "PROPOSAL" && (
+                        <span className="w-2 h-2 rounded-full bg-orange-500 shrink-0"></span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+                      ตรวจสูตรแนวนอน (จำนวน × ราคา), ผลรวม 6 หมวด และยอดงบที่ขอ เทียบราคากลางปี 2569 (ไม่ตรวจ Tax ID)
+                    </p>
+                  </div>
+                </button>
+
+                {/* Mode 2: Quotation / Receipt Mode */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDocumentMode("QUOTATION");
+                    setIsQuotationCheck(true);
+                  }}
+                  className={`relative flex items-start gap-3 p-3 rounded-xl border text-left transition-all ${
+                    documentMode === "QUOTATION"
+                      ? "bg-white border-orange-500 shadow-sm ring-2 ring-orange-400/20"
+                      : "bg-white/60 border-slate-200 hover:bg-white hover:border-slate-300 text-slate-600"
+                  }`}
+                >
+                  <div
+                    className={`p-2 rounded-lg shrink-0 ${
+                      documentMode === "QUOTATION" ? "bg-orange-500 text-white shadow-sm" : "bg-slate-100 text-slate-500"
+                    }`}
+                  >
+                    <ShieldCheck className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <span
+                        className={`text-xs font-bold block ${
+                          documentMode === "QUOTATION" ? "text-orange-950" : "text-slate-700"
+                        }`}
+                      >
+                        ใบเสนอราคา / ใบเสร็จร้านค้า
+                      </span>
+                      {documentMode === "QUOTATION" && (
+                        <span className="w-2 h-2 rounded-full bg-orange-500 shrink-0"></span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+                      ตรวจระเบียบจัดซื้อจัดจ้าง มทส. 8 ข้อ (ชื่อ มทส., Tax ID 0994000288654, ยืนราคา, ลายเซ็น)
+                    </p>
+                  </div>
+                </button>
+              </div>
             </div>
 
             {/* Audit Action Button */}
@@ -1177,7 +1413,9 @@ export default function UserFrontendPage() {
                 ) : (
                   <>
                     <Sparkles className="w-5 h-5 text-amber-200 group-hover:rotate-12 transition-transform" />
-                    <span>เริ่มตรวจสอบราคากลางด้วย Gemini AI ({selectedFiles.length} ไฟล์)</span>
+                    <span>
+                      เริ่มตรวจสอบ{documentMode === "PROPOSAL" ? "ตารางของบประมาณ" : "ใบเสนอราคา/ใบเสร็จ"}ด้วย Gemini AI ({selectedFiles.length} ไฟล์)
+                    </span>
                     <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                   </>
                 )}
@@ -1363,20 +1601,35 @@ export default function UserFrontendPage() {
               </div>
             )}
 
-            {/* Merchant & Financial Breakdown Card */}
-            {(merchantInfo || financialSummary) && (
+            {/* Merchant / Project & Financial Breakdown Card */}
+            {(merchantInfo || financialSummary || proposalAudit) && (
               <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm grid grid-cols-1 md:grid-cols-2 gap-5 text-xs">
-                {/* Merchant Information */}
+                {/* Document Information */}
                 <div className="space-y-3">
                   <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 border-b border-slate-100 pb-1.5 flex items-center space-x-1.5">
-                    <Building2 className="w-4 h-4 text-orange-600" />
-                    <span>ข้อมูลร้านค้า / ผู้จำหน่าย (Merchant Details)</span>
+                    {documentMode === "PROPOSAL" ? (
+                      <>
+                        <FileSpreadsheet className="w-4 h-4 text-orange-600" />
+                        <span>ข้อมูลเอกสารโครงการ (Project Proposal Details)</span>
+                      </>
+                    ) : (
+                      <>
+                        <Building2 className="w-4 h-4 text-orange-600" />
+                        <span>ข้อมูลร้านค้า / ผู้จำหน่าย (Merchant Details)</span>
+                      </>
+                    )}
                   </div>
                   <div className="grid grid-cols-2 gap-3 text-xs">
                     <div>
-                      <span className="text-slate-500 block text-[11px]">ร้านค้า / ผู้ให้บริการ:</span>
+                      <span className="text-slate-500 block text-[11px]">
+                        {documentMode === "PROPOSAL" ? "ชื่อโครงการ / เอกสาร:" : "ร้านค้า / ผู้ให้บริการ:"}
+                      </span>
                       <span className="font-bold text-slate-900 text-sm">
-                        {isInvalidDocument ? "-" : (merchantInfo?.name || "ไม่ระบุ")}
+                        {isInvalidDocument
+                          ? "-"
+                          : documentMode === "PROPOSAL"
+                          ? proposalAudit?.projectName || merchantInfo?.name || "โครงการกิจกรรมนักศึกษา"
+                          : merchantInfo?.name || "ไม่ระบุ"}
                       </span>
                     </div>
                     <div>
@@ -1390,6 +1643,8 @@ export default function UserFrontendPage() {
                       <span className="text-slate-800 font-medium">
                         {isInvalidDocument
                           ? "-"
+                          : documentMode === "PROPOSAL"
+                          ? "ตารางของบประมาณโครงการ"
                           : isQuotationDoc
                           ? "ใบเสนอราคา (Quotation)"
                           : merchantInfo?.isHandwritten
@@ -1398,16 +1653,28 @@ export default function UserFrontendPage() {
                       </span>
                     </div>
                     <div>
-                      <span className="text-slate-500 block text-[11px]">ลายเซ็นผู้รับเงิน:</span>
-                      <span className={`font-semibold inline-flex items-center space-x-1 ${
-                        isInvalidDocument
-                          ? "text-slate-500 font-medium"
-                          : merchantInfo?.hasReceiptSign
-                          ? "text-emerald-700"
-                          : "text-rose-600 font-bold"
-                      }`}>
+                      <span className="text-slate-500 block text-[11px]">
+                        {documentMode === "PROPOSAL" ? "สถานะการตรวจสอบ:" : "ลายเซ็นผู้รับเงิน:"}
+                      </span>
+                      <span
+                        className={`font-semibold inline-flex items-center space-x-1 ${
+                          isInvalidDocument
+                            ? "text-slate-500 font-medium"
+                            : documentMode === "PROPOSAL"
+                            ? isOverallPass
+                              ? "text-emerald-700"
+                              : "text-rose-600 font-bold"
+                            : merchantInfo?.hasReceiptSign
+                            ? "text-emerald-700"
+                            : "text-rose-600 font-bold"
+                        }`}
+                      >
                         {isInvalidDocument
                           ? "-"
+                          : documentMode === "PROPOSAL"
+                          ? isOverallPass
+                            ? "✓ พร้อมเสนอขออนุมัติ"
+                            : "✕ พบข้อผิดพลาด"
                           : merchantInfo?.hasReceiptSign
                           ? "✓ พบลายเซ็น/ตรายาง"
                           : "✕ ไม่พบลายเซ็น"}
@@ -1416,56 +1683,296 @@ export default function UserFrontendPage() {
                   </div>
                 </div>
 
-                {/* Financial Breakdown (Subtotal, Discount, VAT 7%, Total) */}
+                {/* Financial Breakdown */}
                 <div className="space-y-3">
                   <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 border-b border-slate-100 pb-1.5 flex items-center space-x-1.5">
                     <FileText className="w-4 h-4 text-orange-600" />
-                    <span>สรุปยอดภาษีและส่วนลด (VAT & Discount Summary)</span>
+                    <span>
+                      {documentMode === "PROPOSAL"
+                        ? "สรุปยอดงบประมาณโครงการ (Budget Summary)"
+                        : "สรุปยอดภาษีและส่วนลด (VAT & Discount Summary)"}
+                    </span>
                   </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                    <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                      <span className="text-slate-500 block text-[10px]">ยอดรวมก่อนลด:</span>
-                      <span className="font-mono font-bold text-slate-800 text-xs">
-                        {isInvalidDocument
-                          ? "-"
-                          : `฿${(financialSummary?.subtotal || calculatedItemsTotal).toLocaleString("th-TH", { minimumFractionDigits: 2 })}`}
-                      </span>
+                  {documentMode === "PROPOSAL" ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                      <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                        <span className="text-slate-500 block text-[10px]">ผลรวมคำนวณจริง:</span>
+                        <span className="font-mono font-bold text-slate-800 text-xs">
+                          {isInvalidDocument
+                            ? "-"
+                            : `฿${(proposalAudit?.calculatedGrandTotal || calculatedItemsTotal).toLocaleString("th-TH", { minimumFractionDigits: 2 })}`}
+                        </span>
+                      </div>
+                      <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                        <span className="text-slate-500 block text-[10px]">งบประมาณที่ขอ:</span>
+                        <span className="font-mono font-bold text-slate-800 text-xs">
+                          {isInvalidDocument
+                            ? "-"
+                            : `฿${(proposalAudit?.requestedBudgetTotal || totalBillAmount).toLocaleString("th-TH", { minimumFractionDigits: 2 })}`}
+                        </span>
+                      </div>
+                      <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                        <span className="text-slate-500 block text-[10px]">ผลต่าง (Diff):</span>
+                        <span
+                          className={`font-mono font-bold text-xs ${
+                            proposalAudit?.isGrandTotalMatch ? "text-emerald-600" : "text-rose-600"
+                          }`}
+                        >
+                          {isInvalidDocument
+                            ? "-"
+                            : `฿${Math.abs((proposalAudit?.requestedBudgetTotal || 0) - (proposalAudit?.calculatedGrandTotal || 0)).toLocaleString("th-TH", { minimumFractionDigits: 2 })}`}
+                        </span>
+                      </div>
+                      <div className="bg-orange-50/60 p-2.5 rounded-xl border border-orange-200">
+                        <span className="text-orange-900 block text-[10px] font-semibold">ยอดสุทธิรวม:</span>
+                        <span className="font-mono font-bold text-orange-800 text-xs">
+                          {isInvalidDocument
+                            ? "-"
+                            : `฿${totalBillAmount.toLocaleString("th-TH", { minimumFractionDigits: 2 })}`}
+                        </span>
+                      </div>
                     </div>
-                    <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                      <span className="text-slate-500 block text-[10px]">ส่วนลด (Discount):</span>
-                      <span className={`font-mono font-bold text-xs ${!isInvalidDocument && (financialSummary?.discount || 0) > 0 ? "text-emerald-600" : "text-slate-400"}`}>
-                        {isInvalidDocument
-                          ? "-"
-                          : (financialSummary?.discount || 0) > 0
-                          ? `-฿${financialSummary?.discount?.toLocaleString("th-TH", { minimumFractionDigits: 2 })}`
-                          : "฿0.00"}
-                      </span>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                      <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                        <span className="text-slate-500 block text-[10px]">ยอดรวมก่อนลด:</span>
+                        <span className="font-mono font-bold text-slate-800 text-xs">
+                          {isInvalidDocument
+                            ? "-"
+                            : `฿${(financialSummary?.subtotal || calculatedItemsTotal).toLocaleString("th-TH", { minimumFractionDigits: 2 })}`}
+                        </span>
+                      </div>
+                      <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                        <span className="text-slate-500 block text-[10px]">ส่วนลด (Discount):</span>
+                        <span
+                          className={`font-mono font-bold text-xs ${
+                            !isInvalidDocument && (financialSummary?.discount || 0) > 0
+                              ? "text-emerald-600"
+                              : "text-slate-400"
+                          }`}
+                        >
+                          {isInvalidDocument
+                            ? "-"
+                            : (financialSummary?.discount || 0) > 0
+                            ? `-฿${financialSummary?.discount?.toLocaleString("th-TH", { minimumFractionDigits: 2 })}`
+                            : "฿0.00"}
+                        </span>
+                      </div>
+                      <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                        <span className="text-slate-500 block text-[10px]">ภาษีมูลค่าเพิ่ม (VAT):</span>
+                        <span
+                          className={`font-mono font-bold text-xs ${
+                            !isInvalidDocument && (financialSummary?.vat || 0) > 0 ? "text-blue-600" : "text-slate-400"
+                          }`}
+                        >
+                          {isInvalidDocument
+                            ? "-"
+                            : (financialSummary?.vat || 0) > 0
+                            ? `+฿${financialSummary?.vat?.toLocaleString("th-TH", { minimumFractionDigits: 2 })}`
+                            : "฿0.00"}
+                        </span>
+                      </div>
+                      <div className="bg-orange-50/60 p-2.5 rounded-xl border border-orange-200">
+                        <span className="text-orange-900 block text-[10px] font-semibold">ยอดสุทธิรวม:</span>
+                        <span className="font-mono font-bold text-orange-800 text-xs">
+                          {isInvalidDocument
+                            ? "-"
+                            : `฿${totalBillAmount.toLocaleString("th-TH", { minimumFractionDigits: 2 })}`}
+                        </span>
+                      </div>
                     </div>
-                    <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                      <span className="text-slate-500 block text-[10px]">ภาษีมูลค่าเพิ่ม (VAT):</span>
-                      <span className={`font-mono font-bold text-xs ${!isInvalidDocument && (financialSummary?.vat || 0) > 0 ? "text-blue-600" : "text-slate-400"}`}>
-                        {isInvalidDocument
-                          ? "-"
-                          : (financialSummary?.vat || 0) > 0
-                          ? `+฿${financialSummary?.vat?.toLocaleString("th-TH", { minimumFractionDigits: 2 })}`
-                          : "฿0.00"}
-                      </span>
-                    </div>
-                    <div className="bg-orange-50/60 p-2.5 rounded-xl border border-orange-200">
-                      <span className="text-orange-900 block text-[10px] font-semibold">ยอดสุทธิรวม:</span>
-                      <span className="font-mono font-bold text-orange-800 text-xs">
-                        {isInvalidDocument
-                          ? "-"
-                          : `฿${totalBillAmount.toLocaleString("th-TH", { minimumFractionDigits: 2 })}`}
-                      </span>
-                    </div>
-                  </div>
+                  )}
                 </div>
               </div>
             )}
 
-            {/* SUT Quotation Compliance Audit Card (8 ข้อกำหนดระเบียบ มทส.) */}
-            {!isInvalidDocument && (isQuotationDoc || quotationTerms || customerInfo) && (
+            {/* Project Proposal Budget Audit Card (โหมด: ตารางของบประมาณโครงการ) */}
+            {!isInvalidDocument && documentMode === "PROPOSAL" && (
+              <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+                  <div className="flex items-center space-x-2.5">
+                    <div className="p-2 bg-amber-100 text-amber-700 rounded-xl">
+                      <FileSpreadsheet className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-900 flex items-center space-x-2">
+                        <span>ผลการตรวจสอบตารางของบประมาณโครงการ</span>
+                        <span className="text-[10px] bg-amber-100 text-amber-800 font-mono px-2 py-0.5 rounded-full border border-amber-200">
+                          Project Proposal Audit
+                        </span>
+                      </h4>
+                      <p className="text-[11px] text-slate-500">
+                        {proposalAudit?.projectName
+                          ? `ชื่อโครงการ: ${proposalAudit.projectName}`
+                          : "ตรวจสอบความถูกต้องของโครงสร้างตารางงบประมาณ 6 หมวด และสูตรคณิตศาสตร์"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span
+                      className={`text-xs font-bold font-mono px-3 py-1 rounded-full border ${
+                        proposalAudit?.isGrandTotalMatch &&
+                        proposalAudit?.isHorizontalMathCorrect &&
+                        (!proposalAudit?.categoryChecks || proposalAudit.categoryChecks.every((c) => c.isMatch))
+                          ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                          : "bg-rose-100 text-rose-800 border-rose-300"
+                      }`}
+                    >
+                      {proposalAudit?.isGrandTotalMatch &&
+                      proposalAudit?.isHorizontalMathCorrect &&
+                      (!proposalAudit?.categoryChecks || proposalAudit.categoryChecks.every((c) => c.isMatch))
+                        ? "✓ ตารางงบประมาณถูกต้องครบถ้วน"
+                        : "✕ พบข้อผิดพลาดในตารางงบประมาณ"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 3 Metrics Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                  {/* Metric 1: Horizontal Math */}
+                  <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                        1. สูตรแนวนอน
+                      </span>
+                      {proposalAudit?.isHorizontalMathCorrect ? (
+                        <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded border border-emerald-200">
+                          ✓ ผ่านทุกรายการ
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold bg-rose-100 text-rose-800 px-2 py-0.5 rounded border border-rose-200">
+                          ✕ คำนวณเลขผิด
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs">
+                      <p className="font-semibold text-slate-800">
+                        จำนวน × ราคา/หน่วย == รวมเงิน
+                      </p>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        {proposalAudit?.isHorizontalMathCorrect
+                          ? "คำนวณถูกต้องครบทุกแถวรายการ"
+                          : "พบแถวรายการที่คำนวณตัวเลขผิด"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Metric 2: Category Subtotals */}
+                  <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                        2. ยอดรวมแต่ละหมวด
+                      </span>
+                      {(!proposalAudit?.categoryChecks || proposalAudit.categoryChecks.every((c) => c.isMatch)) ? (
+                        <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded border border-emerald-200">
+                          ✓ ตรงกันทุกหมวด
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold bg-rose-100 text-rose-800 px-2 py-0.5 rounded border border-rose-200">
+                          ✕ มียอดหมวดไม่ตรง
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs">
+                      <p className="font-semibold text-slate-800">
+                        ผลรวมรายการ == ยอดรวมหมวด
+                      </p>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        {proposalAudit?.categoryChecks?.length || 0} หมวดงบประมาณที่ตรวจพบ
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Metric 3: Grand Total Match */}
+                  <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                        3. งบประมาณทั้งสิ้น
+                      </span>
+                      {proposalAudit?.isGrandTotalMatch ? (
+                        <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded border border-emerald-200">
+                          ✓ ยอดตรงกัน
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold bg-rose-100 text-rose-800 px-2 py-0.5 rounded border border-rose-200">
+                          ✕ ยอดไม่ตรง
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs">
+                      <p className="font-semibold text-slate-800">
+                        งบที่ขอ: ฿{(proposalAudit?.requestedBudgetTotal || 0).toLocaleString()}
+                      </p>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        คำนวณจริง: ฿{(proposalAudit?.calculatedGrandTotal || 0).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Category Subtotals Detailed Table */}
+                {proposalAudit?.categoryChecks && proposalAudit.categoryChecks.length > 0 && (
+                  <div className="border border-slate-200/80 rounded-xl overflow-hidden">
+                    <div className="bg-slate-100/70 px-3.5 py-2 border-b border-slate-200/80 flex items-center justify-between text-xs font-bold text-slate-700">
+                      <span className="flex items-center gap-1.5">
+                        <Layers className="w-3.5 h-3.5 text-orange-600" />
+                        ตารางสรุปผลรวมรายหมวดงบประมาณ (Category Subtotals)
+                      </span>
+                      <span className="text-[11px] font-normal text-slate-500">
+                        ผลรวมรายการย่อยเทียบกับข้อความ &ldquo;รวมเงินหมวด...&rdquo;
+                      </span>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-slate-50 text-[11px] text-slate-500 border-b border-slate-200/60 uppercase font-semibold">
+                            <th className="py-2.5 px-3">หมวดงบประมาณ</th>
+                            <th className="py-2.5 px-3 text-center">จำนวนรายการ</th>
+                            <th className="py-2.5 px-3 text-right">ยอดที่ระบุในตาราง (บาท)</th>
+                            <th className="py-2.5 px-3 text-right">ผลรวมคำนวณจริง (บาท)</th>
+                            <th className="py-2.5 px-3 text-center">สถานะ</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {proposalAudit.categoryChecks.map((catCheck, cIdx) => (
+                            <tr key={cIdx} className="hover:bg-slate-50/50">
+                              <td className="py-2.5 px-3 font-semibold text-slate-800">
+                                {catCheck.category}
+                              </td>
+                              <td className="py-2.5 px-3 text-center text-slate-600">
+                                {catCheck.itemCount} รายการ
+                              </td>
+                              <td className="py-2.5 px-3 text-right font-mono text-slate-700">
+                                ฿{catCheck.detectedSubtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </td>
+                              <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
+                                ฿{catCheck.calculatedSubtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </td>
+                              <td className="py-2.5 px-3 text-center">
+                                {catCheck.isMatch ? (
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                    ตรงกัน
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                                    <XCircle className="w-3 h-3 text-rose-600" />
+                                    ไม่ตรงกัน
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* SUT Quotation Compliance Audit Card (8 ข้อกำหนดระเบียบ มทส. - เฉพาะโหมดใบเสนอราคา) */}
+            {!isInvalidDocument && documentMode === "QUOTATION" && (isQuotationDoc || quotationTerms || customerInfo) && (
               <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
                   <div className="flex items-center space-x-2.5">
@@ -2146,29 +2653,60 @@ export default function UserFrontendPage() {
                 </div>
               </div>
 
-              {/* Merchant Details in Print */}
+              {/* Merchant / Project Details in Print */}
               {merchantInfo && (
                 <div className="mt-2 pt-2 border-t border-neutral-300 grid grid-cols-3 gap-2 text-[10px]">
                   <div>
-                    <span className="text-neutral-500">ร้านค้า/ผู้ให้บริการ:</span>{" "}
-                    <span className="font-bold">{merchantInfo.name || "ไม่ระบุ"}</span>
+                    <span className="text-neutral-500">
+                      {documentMode === "PROPOSAL" ? "โครงการ / เอกสาร:" : "ร้านค้า/ผู้ให้บริการ:"}
+                    </span>{" "}
+                    <span className="font-bold">
+                      {documentMode === "PROPOSAL"
+                        ? proposalAudit?.projectName || merchantInfo.name || "โครงการกิจกรรมนักศึกษา"
+                        : merchantInfo.name || "ไม่ระบุ"}
+                    </span>
                   </div>
                   <div>
                     <span className="text-neutral-500">วันที่ในเอกสาร:</span>{" "}
                     <span>{merchantInfo.date || "ไม่ระบุ"}</span>
                   </div>
                   <div>
-                    <span className="text-neutral-500">ประเภท / การลงนาม:</span>{" "}
-                    <span className={merchantInfo.hasReceiptSign ? "text-black" : "text-black font-bold"}>
-                      {isQuotationDoc ? "ใบเสนอราคา" : merchantInfo.isHandwritten ? "บิลเขียนมือ" : "บิลพิมพ์/POS"} -{" "}
-                      {merchantInfo.hasReceiptSign ? "✓ มีลายเซ็น" : "✕ ขาดลายเซ็น"}
+                    <span className="text-neutral-500">ประเภทเอกสาร:</span>{" "}
+                    <span className="text-black font-bold">
+                      {documentMode === "PROPOSAL"
+                        ? "ตารางของบประมาณโครงการ"
+                        : isQuotationDoc
+                        ? "ใบเสนอราคา"
+                        : merchantInfo.isHandwritten
+                        ? "บิลเขียนมือ"
+                        : "บิลพิมพ์/POS"}
                     </span>
                   </div>
                 </div>
               )}
 
+              {/* Project Proposal Audit Summary in Print */}
+              {documentMode === "PROPOSAL" && proposalAudit && (
+                <div className="mt-2 p-2 border border-black bg-neutral-50 text-[10px] space-y-1">
+                  <div className="flex justify-between items-center font-bold border-b border-neutral-300 pb-0.5">
+                    <span>ผลการตรวจสอบตารางของบประมาณโครงการ (Project Proposal Audit):</span>
+                    <span className="font-bold text-black">
+                      {proposalAudit.isGrandTotalMatch && proposalAudit.isHorizontalMathCorrect
+                        ? "✓ ยอดรวมและสูตรแนวนอนถูกต้อง"
+                        : "✕ พบข้อผิดพลาดในการคำนวณงบประมาณ"}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[9px] leading-tight">
+                    <div>1. สูตรแนวนอน (จำนวน × ราคา): {proposalAudit.isHorizontalMathCorrect ? "✓ ถูกต้องทุกรายการ" : "✕ มีรายการคำนวณผิด"}</div>
+                    <div>3. งบประมาณที่ขอรับการสนับสนุน: ฿{(proposalAudit.requestedBudgetTotal || 0).toLocaleString()}</div>
+                    <div>2. ผลรวม 6 หมวดงบประมาณ: {(!proposalAudit.categoryChecks || proposalAudit.categoryChecks.every((c) => c.isMatch)) ? "✓ ตรงกันทุกหมวด" : "✕ มียอดหมวดไม่ตรง"}</div>
+                    <div>4. ผลรวมคำนวณจริง: ฿{(proposalAudit.calculatedGrandTotal || 0).toLocaleString()} ({proposalAudit.isGrandTotalMatch ? "✓ ตรงกับงบที่ขอ" : "✕ ไม่ตรงกับงบที่ขอ"})</div>
+                  </div>
+                </div>
+              )}
+
               {/* SUT Quotation Compliance Summary in Print */}
-              {isQuotationDoc && (
+              {documentMode === "QUOTATION" && isQuotationDoc && (
                 <div className="mt-2 p-2 border border-black bg-neutral-50 text-[10px] space-y-1">
                   <div className="flex justify-between items-center font-bold border-b border-neutral-300 pb-0.5">
                     <span>ผลตรวจสอบตามระเบียบใบเสนอราคา มทส. (8 ข้อกำหนด):</span>
