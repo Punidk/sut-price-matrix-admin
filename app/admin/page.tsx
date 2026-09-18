@@ -15,6 +15,7 @@ import {
   updateDoc,
   deleteDoc,
   doc,
+  writeBatch,
   serverTimestamp,
 } from "firebase/firestore";
 import {
@@ -37,7 +38,13 @@ import {
   FileText,
   CheckCircle2,
   History,
+  Zap,
 } from "lucide-react";
+import {
+  MASTER_PRICE_MATRIX_2569,
+  getMasterDocId,
+  seedMasterPriceMatrix2569,
+} from "@/lib/masterData2569";
 
 export interface PriceMatrixItem {
   id: string;
@@ -84,6 +91,20 @@ export default function AdminDashboardPage() {
   const [aiScanStep, setAiScanStep] = useState(0); // 0: idle, 1: extract Gemini, 2: saving Firestore
   const [aiScanStatusText, setAiScanStatusText] = useState("");
   const [aiScanError, setAiScanError] = useState<string | null>(null);
+
+  // ควบคุมหน้าต่าง Master Sync 2569 & Toast แจ้งเตือน
+  const [isMasterSyncModalOpen, setIsMasterSyncModalOpen] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [toast, setToast] = useState<{ title: string; message?: string } | null>(null);
+  const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const showToast = (title: string, message?: string) => {
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    setToast({ title, message });
+    toastTimeoutRef.current = setTimeout(() => {
+      setToast(null);
+    }, 4500);
+  };
 
   const aiFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -496,6 +517,46 @@ export default function AdminDashboardPage() {
     }
   };
 
+  // Master Sync ราคากลางปี 2569 ทั้ง 6 หมวด
+  const handleExecuteMasterSync = async () => {
+    setIsSyncing(true);
+    try {
+      if (isFirebaseConfigured && db) {
+        await seedMasterPriceMatrix2569(db);
+      }
+
+      // ปรับปรุง State ท้องถิ่นทันที (Local State Immediate Refresh) เพื่อให้ตารางรีเฟรชทันที
+      const formattedMasterItems: PriceMatrixItem[] = MASTER_PRICE_MATRIX_2569.map((m) => ({
+        id: getMasterDocId(m.category, m.itemName, m.unit),
+        itemName: m.itemName,
+        category: m.category,
+        maxPrice: m.maxPrice,
+        unit: m.unit,
+        condition: m.condition,
+        note: m.note,
+        updatedAt: Date.now(),
+      }));
+
+      setItems((prev) => {
+        const itemMap = new Map<string, PriceMatrixItem>();
+        prev.forEach((it) => itemMap.set(it.id, it));
+        formattedMasterItems.forEach((it) => itemMap.set(it.id, it));
+        return Array.from(itemMap.values());
+      });
+
+      setIsMasterSyncModalOpen(false);
+      showToast(
+        "อัปเดตราคากลางปี 2569 สำเร็จทั้งหมด",
+        `บันทึกข้อมูลราคากลางปี 2569 ครบทั้ง 6 หมวด (${MASTER_PRICE_MATRIX_2569.length} รายการ) ลงฐานข้อมูล price_matrix สำเร็จเรียบร้อย`
+      );
+    } catch (err: any) {
+      console.error("Master sync error:", err);
+      showToast("เกิดข้อผิดพลาดในการซิงค์ข้อมูล", err.message || "ไม่สามารถซิงค์ราคากลางได้");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const filteredItems = useMemo(() => {
     return items
       .filter((item) => {
@@ -551,7 +612,22 @@ export default function AdminDashboardPage() {
             </h2>
           </div>
 
-          <div className="flex items-center space-x-3">
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Master Sync 2569 Button */}
+            <button
+              onClick={() => setIsMasterSyncModalOpen(true)}
+              disabled={isSyncing}
+              className="bg-emerald-500 hover:bg-emerald-400 text-black font-bold font-mono text-xs py-2.5 px-4 transition border border-emerald-400 flex items-center justify-center space-x-2 rounded-none shadow-sm cursor-pointer disabled:opacity-50"
+              title="ซิงค์ฐานข้อมูลราคากลางปี 2569 ทั้ง 6 หมวดเข้าสู่ระบบ"
+            >
+              {isSyncing ? (
+                <RefreshCw className="w-4 h-4 animate-spin stroke-[2.5]" />
+              ) : (
+                <Zap className="w-4 h-4 fill-current stroke-1" />
+              )}
+              <span>⚡ ซิงค์ราคากลางปี 2569 ทั้งหมด (Master Sync)</span>
+            </button>
+
             {/* AI Matrix Scan Button */}
             <button
               onClick={handleOpenAIScanModal}
@@ -871,6 +947,126 @@ export default function AdminDashboardPage() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* 4. Master Sync 2569 Confirmation Modal */}
+      {isMasterSyncModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs font-sans">
+          <div className="bg-neutral-900 border border-neutral-700 w-full max-w-lg shadow-2xl rounded-none overflow-hidden space-y-0">
+            <div className="bg-neutral-950 px-6 py-4 border-b border-neutral-800 flex items-center justify-between">
+              <div className="flex items-center space-x-2.5">
+                <div className="p-1 bg-emerald-950 border border-emerald-500/50">
+                  <Zap className="w-4 h-4 text-emerald-400 fill-current" />
+                </div>
+                <h3 className="text-base font-bold font-mono uppercase tracking-tight text-white">
+                  ซิงค์ราคากลางปี 2569 ทั้งหมด (Master Sync)
+                </h3>
+              </div>
+              <button
+                onClick={() => !isSyncing && setIsMasterSyncModalOpen(false)}
+                disabled={isSyncing}
+                className="text-neutral-400 hover:text-white p-1 transition disabled:opacity-30 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <p className="text-xs text-neutral-300 leading-relaxed font-sans">
+                ระบบจะทำการเขียนชุดข้อมูลราคากลางมาตรฐานปี 2569 ของสภานักศึกษา มทส. ทั้งหมด{" "}
+                <span className="text-white font-bold font-mono">{MASTER_PRICE_MATRIX_2569.length} รายการ</span>{" "}
+                (ครอบคลุมครบ 6 หมวด) ลงใน Firestore คอลเลกชัน{" "}
+                <code className="bg-neutral-950 px-1.5 py-0.5 border border-neutral-800 text-emerald-400 font-mono">price_matrix</code>
+              </p>
+
+              <div className="bg-neutral-950 border border-neutral-800 p-4 space-y-2 text-xs font-mono text-neutral-400">
+                <div className="text-[11px] font-bold uppercase text-white flex items-center space-x-1.5">
+                  <Database className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>รูปแบบ Document ID มาตรฐาน:</span>
+                </div>
+                <div className="text-neutral-300 bg-neutral-900 px-2.5 py-1.5 border border-neutral-800 text-[11px]">
+                  <code>[หมวดหมู่]_[ชื่อรายการ]_[หน่วยนับ]</code>
+                </div>
+                <p className="text-[11px] text-neutral-400 font-sans leading-normal">
+                  ✓ ป้องกันข้อมูลทับซ้อนและรองรับสินค้าชื่อเดียวกันแต่คนละหน่วยนับได้อย่างสมบูรณ์
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
+                <div className="bg-neutral-950/60 border border-neutral-800 p-2 text-neutral-300">
+                  <span className="text-neutral-500 block text-[10px]">หมวดค่าตอบแทน:</span> 10 รายการ
+                </div>
+                <div className="bg-neutral-950/60 border border-neutral-800 p-2 text-neutral-300">
+                  <span className="text-neutral-500 block text-[10px]">หมวดโภชนาการ:</span> 10 รายการ
+                </div>
+                <div className="bg-neutral-950/60 border border-neutral-800 p-2 text-neutral-300">
+                  <span className="text-neutral-500 block text-[10px]">หมวดยานพาหนะ:</span> 8 รายการ
+                </div>
+                <div className="bg-neutral-950/60 border border-neutral-800 p-2 text-neutral-300">
+                  <span className="text-neutral-500 block text-[10px]">หมวดอุปกรณ์ก่อสร้าง:</span> 14 รายการ
+                </div>
+                <div className="bg-neutral-950/60 border border-neutral-800 p-2 text-neutral-300">
+                  <span className="text-neutral-500 block text-[10px]">หมวดอุปกรณ์สำนักงาน:</span> 15 รายการ
+                </div>
+                <div className="bg-neutral-950/60 border border-neutral-800 p-2 text-neutral-300">
+                  <span className="text-neutral-500 block text-[10px]">หมวดอุปกรณ์อิเล็กทรอนิกส์:</span> 15 รายการ
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-neutral-800 flex items-center justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setIsMasterSyncModalOpen(false)}
+                  disabled={isSyncing}
+                  className="bg-neutral-950 hover:bg-neutral-800 text-neutral-400 border border-neutral-800 px-4 py-2 text-xs font-mono transition rounded-none disabled:opacity-30 cursor-pointer"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExecuteMasterSync}
+                  disabled={isSyncing}
+                  className="bg-emerald-500 hover:bg-emerald-400 text-black font-bold border border-emerald-500 px-5 py-2 text-xs font-mono transition disabled:opacity-40 rounded-none flex items-center space-x-2 cursor-pointer shadow-sm"
+                >
+                  {isSyncing ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>กำลังซิงค์ราคากลางปี 2569...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="w-3.5 h-3.5 fill-current" />
+                      <span>ยืนยันซิงค์ข้อมูล ({MASTER_PRICE_MATRIX_2569.length} รายการ)</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. Floating Toast Notification */}
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-start space-x-3 bg-emerald-950 border border-emerald-500/80 text-white px-5 py-3.5 shadow-2xl rounded-none animate-in slide-in-from-bottom-5 duration-300 max-w-md">
+          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+          <div className="flex-1 space-y-1">
+            <div className="text-xs font-bold font-mono tracking-tight text-white uppercase">
+              {toast.title}
+            </div>
+            {toast.message && (
+              <div className="text-xs text-emerald-200/90 font-sans leading-relaxed">
+                {toast.message}
+              </div>
+            )}
+          </div>
+          <button
+            onClick={() => setToast(null)}
+            className="text-neutral-400 hover:text-white p-0.5 transition cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
     </main>
