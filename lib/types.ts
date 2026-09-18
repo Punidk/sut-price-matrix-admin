@@ -184,4 +184,11 @@ export interface ProposalAuditData {
   isHorizontalMathCorrect?: boolean;
   categoryChecks?: CategorySubtotalCheck[];
 }
-
+export interface ReceiptItemData {
+  itemName: string;
+  personCount?: number;
+  qty: number;
+  unit: string;
+  unitPrice: number;
+  totalPrice: number;
+}

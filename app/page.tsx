@@ -52,6 +52,7 @@ import {
 
 export interface ReceiptItemData {
   itemName: string;
+  personCount?: number;
   qty: number;
   unit: string;
   unitPrice: number;
@@ -2357,6 +2358,7 @@ export default function UserFrontendPage() {
 
                           const itemName = item.receiptData?.itemName || item.itemInReceipt || "รายการที่ตรวจพบ";
                           const qty = item.receiptData?.qty != null ? item.receiptData.qty : 1;
+                          const personCount = item.receiptData?.personCount;
                           const receiptUnit = item.receiptData?.unit || item.unit || "หน่วย";
                           const unitPrice = item.receiptData?.unitPrice != null ? item.receiptData.unitPrice : (item.detectedPrice || 0);
                           const totalPrice = item.receiptData?.totalPrice != null ? item.receiptData.totalPrice : (qty * unitPrice);
@@ -2366,8 +2368,15 @@ export default function UserFrontendPage() {
                           const matrixUnit = item.matrixData?.unit || null;
 
                           const errorFlags = Array.isArray(item.errorFlags) ? item.errorFlags : [];
-                          const isUnitMismatch = !!(matrixUnit && receiptUnit && matrixUnit.trim().toLowerCase() !== receiptUnit.trim().toLowerCase());
-                          const isMathError = Math.abs(qty * unitPrice - totalPrice) > 0.01;
+                          const isUnitMismatch = errorFlags.includes("หน่วยไม่ตรง") || !!(matrixUnit && receiptUnit && matrixUnit.trim().toLowerCase() !== receiptUnit.trim().toLowerCase() && !(personCount && personCount > 1 && matrixUnit.toLowerCase().includes(receiptUnit.toLowerCase())));
+
+                          const hasBackendMathError = errorFlags.includes("คำนวณเลขผิด");
+                          const expectedStandard = qty * unitPrice;
+                          const expectedMultidim = (personCount || 1) * qty * unitPrice;
+                          const isClientMathError =
+                            Math.abs(expectedStandard - totalPrice) > 0.05 &&
+                            Math.abs(expectedMultidim - totalPrice) > 0.05;
+                          const isMathError = hasBackendMathError || isClientMathError;
 
                           const hasMatrixMax = matrixMaxPrice != null && matrixMaxPrice > 0;
                           const priceDiff = hasMatrixMax ? unitPrice - matrixMaxPrice : 0;
@@ -2456,8 +2465,16 @@ export default function UserFrontendPage() {
                               {/* Receipt Math & Qty Calculation Breakdown Box */}
                               <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 space-y-1.5 text-xs">
                                 <div className="flex flex-wrap items-center justify-between gap-2">
-                                  <div className="flex items-center space-x-2 text-slate-700">
+                                  <div className="flex items-center space-x-2 text-slate-700 flex-wrap">
                                     <span className="font-semibold text-slate-900">จำนวน & ราคาในบิล:</span>
+                                    {personCount && personCount > 1 && (
+                                      <>
+                                        <span className="font-mono bg-blue-50 text-blue-800 px-2 py-0.5 border border-blue-200 rounded font-bold">
+                                          {personCount} คน
+                                        </span>
+                                        <span>×</span>
+                                      </>
+                                    )}
                                     <span className="font-mono bg-white px-2 py-0.5 border border-slate-200 rounded text-slate-900">
                                       {qty}{" "}
                                       {isUnitMismatch ? (
@@ -2485,7 +2502,11 @@ export default function UserFrontendPage() {
                                 {isMathError && (
                                   <div className="text-[11px] text-rose-600 font-medium flex items-center space-x-1 pt-1">
                                     <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                                    <span>คูณเลขไม่ตรง: {qty} × {unitPrice} = {(qty * unitPrice).toFixed(2)} แต่ในบิลระบุ {Number(totalPrice).toFixed(2)}</span>
+                                    <span>
+                                      คูณเลขไม่ตรง:{" "}
+                                      {personCount && personCount > 1 ? `${personCount} คน × ` : ""}
+                                      {qty} × {unitPrice} = {((personCount && personCount > 1 ? personCount : 1) * qty * unitPrice).toFixed(2)} แต่ในบิลระบุ {Number(totalPrice).toFixed(2)}
+                                    </span>
                                   </div>
                                 )}
                               </div>
@@ -2814,6 +2835,7 @@ export default function UserFrontendPage() {
                                 )}
                               </td>
                               <td className="py-2 px-2 text-right font-mono whitespace-nowrap">
+                                {item.receiptData?.personCount && item.receiptData.personCount > 1 ? `${item.receiptData.personCount} คน × ` : ""}
                                 {qty} {receiptUnit} × ฿{Number(unitPrice).toFixed(2)}
                                 {isUnitMismatch && (
                                   <div className="text-[9px] text-neutral-600 font-sans">

@@ -29,6 +29,7 @@ import {
 
 export interface ReceiptItemData {
   itemName: string;
+  personCount?: number;
   qty: number;
   unit: string;
   unitPrice: number;
@@ -877,9 +878,17 @@ export default function AdminAuditHistoryPage() {
                                     const matrixMaxPrice = item.matrixData?.maxPrice != null ? item.matrixData.maxPrice : (item.matrixMaxPrice != null ? item.matrixMaxPrice : null);
                                     const matrixUnit = item.matrixData?.unit || null;
 
-                                    const errorFlags = Array.isArray(item.errorFlags) ? item.errorFlags : [];
-                                    const isUnitMismatch = !!(matrixUnit && receiptUnit && matrixUnit.trim().toLowerCase() !== receiptUnit.trim().toLowerCase());
-                                    const isMathError = Math.abs(qty * unitPrice - totalPrice) > 0.01;
+                                     const personCount = item.receiptData?.personCount;
+                                     const errorFlags = Array.isArray(item.errorFlags) ? item.errorFlags : [];
+                                     const isUnitMismatch = errorFlags.includes("หน่วยไม่ตรง") || !!(matrixUnit && receiptUnit && matrixUnit.trim().toLowerCase() !== receiptUnit.trim().toLowerCase() && !(personCount && personCount > 1 && matrixUnit.toLowerCase().includes(receiptUnit.toLowerCase())));
+
+                                     const hasBackendMathError = errorFlags.includes("คำนวณเลขผิด");
+                                     const expectedStandard = qty * unitPrice;
+                                     const expectedMultidim = (personCount || 1) * qty * unitPrice;
+                                     const isClientMathError =
+                                       Math.abs(expectedStandard - totalPrice) > 0.05 &&
+                                       Math.abs(expectedMultidim - totalPrice) > 0.05;
+                                     const isMathError = hasBackendMathError || isClientMathError;
 
                                     const hasMax = matrixMaxPrice != null && matrixMaxPrice > 0;
                                     const diff = hasMax ? unitPrice - matrixMaxPrice : 0;
@@ -969,9 +978,14 @@ export default function AdminAuditHistoryPage() {
                                         {/* Breakdown calculation box */}
                                         <div className="bg-neutral-950 border border-neutral-800 p-3 space-y-1.5 text-xs font-mono">
                                           <div className="flex flex-wrap items-center justify-between gap-2 text-neutral-300">
-                                            <div className="flex items-center space-x-2">
+                                            <div className="flex items-center space-x-2 flex-wrap">
                                               <span className="text-neutral-500">จำนวน & ราคาในบิล:</span>
                                               <span className="text-white bg-neutral-900 border border-neutral-700 px-2 py-0.5">
+                                                {personCount && personCount > 1 && (
+                                                  <span className="text-blue-400 font-bold mr-1">
+                                                    {personCount} คน ×
+                                                  </span>
+                                                )}
                                                 {qty}{" "}
                                                 {isUnitMismatch ? (
                                                   <span className="bg-rose-950 text-rose-300 border border-rose-600 px-1 py-0.2 font-bold underline decoration-rose-500">
@@ -994,7 +1008,7 @@ export default function AdminAuditHistoryPage() {
                                               <AlertTriangle className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />
                                               <div>
                                                 <span className="font-bold text-rose-100">[คำนวณเลขผิด]: </span>
-                                                คำนวณจริง ({qty} × ฿{Number(unitPrice).toFixed(2)} = ฿{(qty * unitPrice).toFixed(2)}) แต่ระบุในบิลเป็น ฿{Number(totalPrice).toFixed(2)}
+                                                คำนวณจริง ({personCount && personCount > 1 ? `${personCount} คน × ` : ""}{qty} × ฿{Number(unitPrice).toFixed(2)} = ฿{((personCount && personCount > 1 ? personCount : 1) * qty * unitPrice).toFixed(2)}) แต่ระบุในบิลเป็น ฿{Number(totalPrice).toFixed(2)}
                                               </div>
                                             </div>
                                           )}

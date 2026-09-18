@@ -28,6 +28,101 @@ function getBaseItemName(name: string): string {
     .toLowerCase();
 }
 
+// Helper: ตรวจจับและสกัดจำนวนคน/ผู้เข้าร่วม จากชื่อรายการ หรือฟิลด์ที่ AI สกัดมา
+function extractPersonCount(itemName: string, aiPersonCount?: any): number {
+  if (typeof aiPersonCount === "number" && !isNaN(aiPersonCount) && aiPersonCount > 0) {
+    return Math.round(aiPersonCount);
+  }
+  if (typeof aiPersonCount === "string") {
+    const parsed = parseInt(aiPersonCount.replace(/[^\d]/g, ""), 10);
+    if (!isNaN(parsed) && parsed > 0) return parsed;
+  }
+
+  if (!itemName) return 1;
+
+  // แปลงเลขไทยเป็นเลขอารบิก
+  const thaiDigits = ["๐", "๑", "๒", "๓", "๔", "๕", "๖", "๗", "๘", "๙"];
+  let cleanName = itemName;
+  thaiDigits.forEach((td, idx) => {
+    cleanName = cleanName.replaceAll(td, String(idx));
+  });
+
+  // 1. ตรวจจับในวงเล็บ เช่น "(40 คน)", "(นักศึกษา 40 คน)", "(ผู้เข้าร่วม 40 คน)", "(40 ท่าน)", "[3 ราย]"
+  const parenMatch = cleanName.match(/[\(\[\{][^\)\]\}]*?(\d+)\s*(?:คน|ท่าน|ราย)[^\)\]\}]*?[\)\]\}]/);
+  if (parenMatch && parenMatch[1]) {
+    const num = parseInt(parenMatch[1], 10);
+    if (!isNaN(num) && num > 0) return num;
+  }
+
+  // 2. ตรวจจับนอกวงเล็บ เช่น "40 คน", "40 ท่าน", "40 ราย", "วิทยากร 2 คน", "จำนวน 40 คน"
+  const generalMatch = cleanName.match(/(?:จำนวน\s*)?(\d+)\s*(?:คน|ท่าน|ราย)/);
+  if (generalMatch && generalMatch[1]) {
+    const num = parseInt(generalMatch[1], 10);
+    if (!isNaN(num) && num > 0) return num;
+  }
+
+  return 1;
+}
+
+// Helper: ตรวจสอบว่าหน่วยนับ หรือบริบทรายการ มีมิติของตัวคูณ "คน" หรือไม่
+function isPerPersonUnit(unit: string, itemName: string, personCount: number): boolean {
+  const cleanU = (unit || "").trim().toLowerCase();
+  const cleanN = (itemName || "").toLowerCase();
+
+  // 1. หากหน่วยมีคำว่า คน, ท่าน, ราย เช่น "คน/มื้อ", "คน/วัน", "คน/ชม.", "บาท/คน/มื้อ", "คน"
+  if (/คน|ท่าน|ราย/i.test(cleanU)) {
+    return true;
+  }
+
+  // 2. หากระบุจำนวนคน (personCount > 1) และหน่วยเป็นหน่วยเวลาหรือรอบ เช่น มื้อ, วัน, ชม., ชั่วโมง, คืน, ครั้ง, แมตช์, เเมต
+  if (personCount > 1 && /มื้อ|วัน|ชม|ชั่วโมง|คืน|ครั้ง|เเมต|แมต/i.test(cleanU)) {
+    return true;
+  }
+
+  // 3. หากชื่อรายการระบุคำว่า ต่อคน, ต่อท่าน, /คน
+  if (/ต่อคน|ต่อท่าน|\/คน/i.test(cleanN)) {
+    return true;
+  }
+
+  return false;
+}
+
+// Helper: ตรวจสอบความเข้ากันได้ของหน่วยนับในเอกสารกับหน่วยในราคากลาง (โดยเฉพาะหน่วยที่มีมิติคน)
+function isUnitCompatible(docUnit: string, matrixUnit: string, personCount: number): boolean {
+  const d = cleanText(docUnit);
+  const m = cleanText(matrixUnit);
+  if (!d || !m) return true;
+  if (d === m) return true;
+
+  const dClean = d.replace(/\./g, "").trim();
+  const mClean = m.replace(/\./g, "").trim();
+  if (dClean === mClean) return true;
+
+  // กรณีมิติคน เช่น ในราคากลางระบุ "คน/มื้อ" แต่ในตารางงบเขียน "มื้อ" (เพราะมีจำนวนคนระบุในชื่อหรือ personCount แล้ว)
+  if (personCount > 1 || /คน|ท่าน|ราย/i.test(dClean) || /คน|ท่าน|ราย/i.test(mClean)) {
+    if (
+      (mClean.includes("มื้อ") && dClean.includes("มื้อ")) ||
+      (mClean.includes("วัน") && dClean.includes("วัน")) ||
+      (mClean.includes("ชม") && dClean.includes("ชม")) ||
+      (mClean.includes("ชั่วโมง") && dClean.includes("ชั่วโมง")) ||
+      (mClean.includes("เเมต") && (dClean.includes("เเมต") || dClean.includes("แมต"))) ||
+      (mClean.includes("คน") && dClean.includes("คน"))
+    ) {
+      return true;
+    }
+  }
+
+  // กรณีเอกสารระบุ "บาท/คน/มื้อ" หรือ "บาท/มื้อ" หรือ "บาท/หน่วย"
+  if (dClean.startsWith("บาท/")) {
+    const stripped = dClean.replace(/^บาท\//, "");
+    if (stripped === mClean || (personCount > 1 && mClean.endsWith(stripped))) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 // Helper: แปลงสตริงวันที่เป็น Date object รองรับรูปแบบไทยและสากล
 function parseThaiOrIsoDate(dateStr: string): Date | null {
   if (!dateStr || typeof dateStr !== "string") return null;
@@ -280,9 +375,10 @@ export async function POST(req: NextRequest) {
 4. ยอดรวมแต่ละหมวดตามที่ระบุในเอกสาร (detectedCategorySubtotals): ค้นหาแถวสรุปยอดรวมของแต่ละหมวด เช่น "รวมเงินหมวดค่าตอบแทน ... บาท" สกัดเป็น array: [{ "category": "ชื่อหมวด", "subtotal": ตัวเลข }]
 5. ดึงรายการค่าใช้จ่ายทุกแถวในตารางออกมาใน items:
    - category: จัดกลุ่มเข้า 1 ใน 6 หมวดหลัก ได้แก่ 'หมวดค่าตอบแทน', 'หมวดโภชนาการ', 'หมวดยานพาหนะ', 'หมวดวัสดุก่อสร้าง', 'หมวดอุปกรณ์สำนักงาน', 'หมวดอุปกรณ์อิเล็กทรอนิกส์' (หรือ 'หมวดอื่นๆ')
-   - itemName: ชื่อรายการตามตาราง
-   - qty: จำนวน (number)
-   - unit: หน่วยนับ (string เช่น คน/วัน, ชม., กล่อง, แพ็ก, ชิ้น, ม้วน, มื้อ, คัน)
+   - itemName: ชื่อรายการตามตาราง (เช่น "ค่าอาหารและเครื่องดื่ม (40 คน)")
+   - personCount: ตรวจจับตัวเลข "จำนวนคน/ผู้เข้าร่วม" ที่อยู่ในชื่อรายการ หรือในวงเล็บ เช่น "(40 คน)", "(1 คน)", "(3 คน)" หรือ "วิทยากร 2 คน" ให้สกัดตัวเลขออกมาเป็น number เช่น 40, 1, 3 (หากไม่ระบุจำนวนคนให้ใส่ null หรือ 1)
+   - qty: จำนวน (number) เช่น 1, 2, 4
+   - unit: หน่วยนับ (string เช่น คน/วัน, ชม., กล่อง, แพ็ก, ชิ้น, ม้วน, มื้อ, วัน, คัน)
    - unitPrice: ราคาต่อหน่วยตามที่เขียนในเอกสาร (number)
    - totalPrice: ยอดรวมเป็นเงินตามที่เขียนในช่องรวมเงินของแถวนั้น (number)
 
@@ -301,12 +397,13 @@ export async function POST(req: NextRequest) {
   ],
   "items": [
     {
-      "category": "หมวดค่าตอบแทน",
-      "itemName": "ชื่อรายการในตาราง",
+      "category": "หมวดโภชนาการ",
+      "itemName": "ค่าอาหารและเครื่องดื่ม (40 คน)",
+      "personCount": 40,
       "qty": 1,
-      "unit": "คน/วัน",
-      "unitPrice": 0.00,
-      "totalPrice": 0.00
+      "unit": "มื้อ",
+      "unitPrice": 40.00,
+      "totalPrice": 1600.00
     }
   ]
 }`;
@@ -684,6 +781,9 @@ ${matrixContext}
         const cleanDisplayItemName = cleanProposalItemName(rawName);
         const baseItemName = getBaseItemName(rawName);
 
+        const aiPersonCount = rawItem.personCount ?? rawItem.receiptData?.personCount;
+        const personCount = extractPersonCount(rawName, aiPersonCount);
+
         const qty = Number(rawItem.qty ?? rawItem.receiptData?.qty) || 1;
         const rawUnit = (rawItem.unit || rawItem.receiptData?.unit || "").trim();
         const cleanUnit = cleanText(rawUnit);
@@ -700,13 +800,54 @@ ${matrixContext}
         let itemStatus: "PASS" | "FAIL" | "NOT_FOUND" = "PASS";
         let message = "";
 
-        // 1. ตรวจสูตรคณิตศาสตร์แนวนอน: จำนวน * ราคาต่อหน่วย == รวมเป็นเงิน
-        const expectedTotal = qty * unitPrice;
-        const hasHorizontalError = Math.abs(expectedTotal - totalPrice) > 0.1 && totalPrice > 0 && unitPrice > 0;
+        // 1. ตรวจสูตรคณิตศาสตร์แนวนอน:
+        // - หากหน่วยเป็นหน่วยคูณคน เช่น บาท/คน/มื้อ, คน/มื้อ, คน/วัน, คน/ชั่วโมง หรือชื่อรายการระบุจำนวนคนไว้:
+        //   ยอดรวม = (personCount || 1) * จำนวน * ราคาต่อหน่วย
+        // - หากเป็นหน่วยปกติ (ลัง, แพ็ก, ม้วน, แกลลอน, รีม ฯลฯ):
+        //   ยอดรวม = จำนวน * ราคาต่อหน่วย
+        const isPersonUnit = isPerPersonUnit(rawUnit, rawName, personCount);
+        const standardTotal = qty * unitPrice;
+        const multidimTotal = (personCount > 1 ? personCount : 1) * qty * unitPrice;
+
+        let expectedTotal = standardTotal;
+        let isMathCorrect = false;
+
+        if (isPersonUnit && personCount > 1) {
+          // มีตัวคูณคนในชื่อรายการหรือหน่วยนับ
+          if (Math.abs(multidimTotal - totalPrice) <= 0.1) {
+            expectedTotal = multidimTotal;
+            isMathCorrect = true;
+          } else if (Math.abs(standardTotal - totalPrice) <= 0.1) {
+            // เผื่อกรณีในเอกสารคูณคนรวมเข้าไปในช่องจำนวนแล้ว (เช่น จำนวน 40 มื้อ x 40 บาท = 1,600)
+            expectedTotal = standardTotal;
+            isMathCorrect = true;
+          } else {
+            expectedTotal = multidimTotal;
+            isMathCorrect = false;
+          }
+        } else {
+          // รายการหน่วยปกติ
+          if (Math.abs(standardTotal - totalPrice) <= 0.1) {
+            expectedTotal = standardTotal;
+            isMathCorrect = true;
+          } else if (personCount > 1 && Math.abs(multidimTotal - totalPrice) <= 0.1) {
+            expectedTotal = multidimTotal;
+            isMathCorrect = true;
+          } else {
+            expectedTotal = standardTotal;
+            isMathCorrect = false;
+          }
+        }
+
+        const hasHorizontalError = !isMathCorrect && totalPrice > 0 && unitPrice > 0;
         if (hasHorizontalError) {
           itemStatus = "FAIL";
           errorFlags.push("คำนวณเลขผิด");
-          const mathWarn = `[ข้อผิดพลาดทางคณิตศาสตร์: รายการ "${cleanDisplayItemName}" จำนวน ${qty} × ฿${unitPrice.toLocaleString()} = ฿${expectedTotal.toLocaleString()} แต่ระบุรวมเป็นเงิน ฿${totalPrice.toLocaleString()}]`;
+          const calcFormulaStr =
+            personCount > 1 && expectedTotal === multidimTotal
+              ? `${personCount} คน × ${qty} ${rawUnit || "หน่วย"} × ฿${unitPrice.toLocaleString()} = ฿${expectedTotal.toLocaleString()}`
+              : `${qty} ${rawUnit || "หน่วย"} × ฿${unitPrice.toLocaleString()} = ฿${expectedTotal.toLocaleString()}`;
+          const mathWarn = `[ข้อผิดพลาดทางคณิตศาสตร์: รายการ "${cleanDisplayItemName}" คำนวณจริง (${calcFormulaStr}) แต่ระบุรวมเป็นเงิน ฿${totalPrice.toLocaleString()}]`;
           proposalWarnings.push(mathWarn);
         }
 
@@ -778,19 +919,27 @@ ${matrixContext}
         }
 
         if (!matchedMatrixData && candidates.length > 0) {
-          // หากมีรายการที่หน่วยนับตรงเป๊ะ
-          const exactUnitMatch = candidates.find(
-            (c: any) => cleanText(c.unit) === cleanUnit
+          // 1. ค้นหารายการที่หน่วยนับเข้ากันได้ (Compatible Unit Match)
+          const compatibleCandidates = candidates.filter((c: any) =>
+            isUnitCompatible(rawUnit, c.unit, personCount)
           );
-          if (exactUnitMatch) {
-            matchedMatrixData = exactUnitMatch;
-          } else {
-            matchedMatrixData = candidates[0];
-            if (cleanUnit && cleanText(candidates[0].unit) !== cleanUnit) {
-              itemStatus = "FAIL";
-              if (!errorFlags.includes("หน่วยไม่ตรง")) errorFlags.push("หน่วยไม่ตรง");
-              message = `หน่วยนับ '${rawUnit}' ไม่ตรงกับหน่วยในราคากลาง ('${candidates.map((c: any) => c.unit).join(", ")}')`;
-            }
+
+          const candidatePool = compatibleCandidates.length > 0 ? compatibleCandidates : candidates;
+
+          // 2. ค้นหารายการที่ราคาต่อหน่วยตรงกัน หรืออยู่ในเกณฑ์ (ไม่เกิน maxPrice)
+          const exactPriceMatch = candidatePool.find(
+            (c: any) => Number(c.maxPrice) === unitPrice
+          );
+          const withinBudgetMatch = candidatePool.find(
+            (c: any) => Number(c.maxPrice) >= unitPrice
+          );
+
+          matchedMatrixData = exactPriceMatch || withinBudgetMatch || candidatePool[0];
+
+          if (compatibleCandidates.length === 0 && cleanUnit && cleanText(matchedMatrixData.unit) !== cleanUnit) {
+            itemStatus = "FAIL";
+            if (!errorFlags.includes("หน่วยไม่ตรง")) errorFlags.push("หน่วยไม่ตรง");
+            message = `หน่วยนับ '${rawUnit}' ไม่ตรงกับหน่วยในราคากลาง ('${candidates.map((c: any) => c.unit).join(", ")}')`;
           }
         }
 
@@ -816,6 +965,7 @@ ${matrixContext}
           message: message,
           receiptData: {
             itemName: cleanDisplayItemName,
+            personCount: personCount > 1 ? personCount : undefined,
             qty: qty,
             unit: rawUnit,
             unitPrice: unitPrice,
