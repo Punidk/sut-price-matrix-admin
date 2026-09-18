@@ -45,6 +45,8 @@ export interface PriceMatrixItem {
   category: string;
   maxPrice: number;
   unit: string;
+  condition?: string;
+  note?: string;
   updatedAt?: number;
 }
 
@@ -405,6 +407,7 @@ export default function AdminDashboardPage() {
         unit?: string;
         id?: number | string;
         note?: string;
+        condition?: string;
       }> = await resExtract.json();
 
       if (!Array.isArray(extractedItems) || extractedItems.length === 0) {
@@ -426,6 +429,8 @@ export default function AdminDashboardPage() {
           category: normalizeExpenseCategory(itemData.category, itemName),
           maxPrice,
           unit: (itemData.unit || "รายการ").trim(),
+          note: itemData.note || "",
+          condition: itemData.condition || "",
         };
 
         const normalizedKey = normalizeItemKey(formattedItem.itemName, formattedItem.unit) || `pm-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;

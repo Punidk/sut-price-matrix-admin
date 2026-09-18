@@ -253,7 +253,22 @@ ${isQuotationCheck ? "- [คำสั่งพิเศษ]: ผู้ใช้�
 - 'หมวดอุปกรณ์อิเล็กทรอนิกส์': เช่น บอร์ดไมโครคอนโทรลเลอร์ (Arduino, ESP32), เซนเซอร์, ตัวต้านทาน, สายไฟ, มัลติมิเตอร์, แบตเตอรี่, อุปกรณ์คอมพิวเตอร์, Flash Drive
 
 ========================================
-6. รูปแบบ Response Schema (JSON Object เท่านั้น):
+6. กฎการตรวจสอบอัตราค่าตอบแทนตามวันทำงาน (Weekday vs Weekend Rates Audit):
+========================================
+เมื่อตรวจสอบรายการใน 'หมวดค่าตอบแทน' (เช่น ค่าจ้างเหมาบริการรายวัน, ค่าปฏิบัติงาน, ค่าตอบแทนเจ้าหน้าที่/ผู้ปฏิบัติงาน, ค่าตอบแทนวิทยากร):
+1. ให้นำ "วันที่ในเอกสาร" (merchant.date) หรือวันที่จัดกิจกรรม/วันที่ปฏิบัติงานที่ระบุในเอกสาร มาตรวจสอบหาวันในสัปดาห์ (Day of the Week):
+   - วันเสาร์ หรือ วันอาทิตย์: ให้เทียบกับราคากลางที่เป็นอัตราวันหยุด/เสาร์-อาทิตย์ (WEEKEND)
+   - วันจันทร์ ถึง วันศุกร์: ให้เทียบกับราคากลางที่เป็นอัตราวันธรรมดา/จันทร์-ศุกร์ (WEEKDAY)
+2. หากพบว่าวันที่จัดกิจกรรมหรือวันที่ในเอกสารตรงกับ "วันธรรมดา (จันทร์ - ศุกร์)" แต่ในเอกสารเบิกในอัตราวันหยุด (เช่น คิด 420 บาท แทนที่จะเป็นอัตราวันธรรมดา 240 บาท):
+   - กำหนด status ของรายการเป็น FAIL
+   - เพิ่ม "ราคาเกินเกณฑ์" ลงใน errorFlags ของรายการ
+   - และต้องเพิ่มคำเตือนลงใน warnings ของผลวิเคราะห์ด้วยเสมอ ในรูปแบบ:
+     "[อัตราค่าตอบแทนไม่ถูกต้อง: วันที่จัดกิจกรรมตรงกับวันธรรมดา ต้องใช้อัตรา [อัตราวันธรรมดา] บาท/[หน่วย] แทนอัตราวันหยุด]"
+     (ตัวอย่าง: "[อัตราค่าตอบแทนไม่ถูกต้อง: วันที่จัดกิจกรรมตรงกับวันธรรมดา ต้องใช้อัตรา 240 บาท/คน/วัน แทนอัตราวันหยุด]")
+   - กำหนด overallStatus = "FAIL"
+
+========================================
+7. รูปแบบ Response Schema (JSON Object เท่านั้น):
 ========================================
 จงส่งคำตอบกลับมาเป็น JSON Object ตามโครงสร้างนี้เท่านั้น (ห้ามครอบ markdown หรือมีข้อความอื่นนอก JSON):
 {
@@ -291,7 +306,7 @@ ${isQuotationCheck ? "- [คำสั่งพิเศษ]: ผู้ใช้�
   "overallStatus": "PASS" | "FAIL" | "NOT_FOUND" | "INVALID_DOCUMENT",
   "warnings": [
     "[ระเบียบ มทส.] ขาดเลขประจำตัวผู้เสียภาษีของมหาวิทยาลัย (0994000288654)",
-    "[ระเบียบ มทส.] ไม่พบข้อความระบุระยะเวลายืนราคา"
+    "[อัตราค่าตอบแทนไม่ถูกต้อง: วันที่จัดกิจกรรมตรงกับวันธรรมดา ต้องใช้อัตรา 240 บาท/คน/วัน แทนอัตราวันหยุด]"
   ],
   "items": [
     {
@@ -459,6 +474,76 @@ ${isQuotationCheck ? "- [คำสั่งพิเศษ]: ผู้ใช้�
       }
     }
 
+    // Helper function สำหรับแปลงสตริงวันที่จากเอกสารภาษาไทย / สากล เป็น Date object
+    // รองรับ พ.ศ. (แปลงเป็น ค.ศ. อัตโนมัติ), ชื่อเดือนภาษาไทยแบบเต็ม/ย่อ, รูปแบบ DD/MM/YYYY, YYYY-MM-DD
+    function parseThaiOrIsoDate(dateStr: string): Date | null {
+      if (!dateStr || typeof dateStr !== "string") return null;
+      const thaiDigits = ["๐", "๑", "๒", "๓", "๔", "๕", "๖", "๗", "๘", "๙"];
+      let cleanStr = dateStr.trim();
+      thaiDigits.forEach((td, idx) => {
+        cleanStr = cleanStr.replaceAll(td, String(idx));
+      });
+      if (!cleanStr || cleanStr === "-" || cleanStr === "ไม่ระบุ") return null;
+
+      const thaiMonths: Record<string, number> = {
+        "มกราคม": 0, "ม.ค.": 0, "ม.ค": 0,
+        "กุมภาพันธ์": 1, "ก.พ.": 1, "ก.พ": 1,
+        "มีนาคม": 2, "มี.ค.": 2, "มี.ค": 2,
+        "เมษายน": 3, "เม.ย.": 3, "เม.ย": 3,
+        "พฤษภาคม": 4, "พ.ค.": 4, "พ.ค": 4,
+        "มิถุนายน": 5, "มิ.ย.": 5, "มิ.ย": 5,
+        "กรกฎาคม": 6, "ก.ค.": 6, "ก.ค": 6,
+        "สิงหาคม": 7, "ส.ค.": 7, "ส.ค": 7,
+        "กันยายน": 8, "ก.ย.": 8, "ก.ย": 8,
+        "ตุลาคม": 9, "ต.ค.": 9, "ต.ค": 9,
+        "พฤศจิกายน": 10, "พ.ย.": 10, "พ.ย": 10,
+        "ธันวาคม": 11, "ธ.ค.": 11, "ธ.ค": 11,
+      };
+
+      // ตรวจหาเดือนภาษาไทย เช่น "15 กันยายน 2569" หรือ "15 ก.ย. 2567"
+      for (const [mName, mIdx] of Object.entries(thaiMonths)) {
+        if (cleanStr.includes(mName)) {
+          const parts = cleanStr.split(mName);
+          const dayMatch = parts[0].match(/(\d{1,2})\s*$/);
+          const yearMatch = parts[1].match(/^\s*\.?\s*(\d{4})/);
+          if (dayMatch && yearMatch) {
+            const day = parseInt(dayMatch[1], 10);
+            let year = parseInt(yearMatch[1], 10);
+            if (year > 2400) year -= 543;
+            return new Date(year, mIdx, day);
+          }
+        }
+      }
+
+      // รูปแบบ DD/MM/YYYY หรือ DD-MM-YYYY
+      const dmyMatch = cleanStr.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})/);
+      if (dmyMatch) {
+        const day = parseInt(dmyMatch[1], 10);
+        const month = parseInt(dmyMatch[2], 10) - 1;
+        let year = parseInt(dmyMatch[3], 10);
+        if (year > 2400) year -= 543;
+        return new Date(year, month, day);
+      }
+
+      // รูปแบบ YYYY-MM-DD
+      const ymdMatch = cleanStr.match(/(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})/);
+      if (ymdMatch) {
+        let year = parseInt(ymdMatch[1], 10);
+        if (year > 2400) year -= 543;
+        const month = parseInt(ymdMatch[2], 10) - 1;
+        const day = parseInt(ymdMatch[3], 10);
+        return new Date(year, month, day);
+      }
+
+      const timestamp = Date.parse(cleanStr);
+      if (!isNaN(timestamp)) {
+        const d = new Date(timestamp);
+        if (d.getFullYear() > 2400) d.setFullYear(d.getFullYear() - 543);
+        return d;
+      }
+      return null;
+    }
+
     // Double-check: ดักจับรายการคลุมเครือเพิ่มเติม (เช่น ค่าวัสดุ, ค่าอุปกรณ์ ที่ไม่แจกแจง)
     const AMBIGUOUS_KEYWORDS = [
       "ค่าวัสดุ",
@@ -532,6 +617,105 @@ ${isQuotationCheck ? "- [คำสั่งพิเศษ]: ผู้ใช้�
                 item.message = `ราคาต่อหน่วย (฿${unitPrice.toFixed(2)}) ผ่านเกณฑ์ราคากลางหน่วย '${exactUnitMatch.unit}' (เพดาน ฿${maxPrice.toFixed(2)}/${exactUnitMatch.unit})`;
               }
             }
+          }
+        }
+      }
+
+      // Programmatic Guardrail: ตรวจสอบอัตราค่าตอบแทนตามวันทำงาน (Weekday vs Weekend Rates Guardrail)
+      const parsedDocDate = parseThaiOrIsoDate(parsedData.merchant?.date || "");
+      const parsedItemDate = parseThaiOrIsoDate(name);
+      const effectiveDate = parsedItemDate || parsedDocDate;
+
+      if (item.category === "หมวดค่าตอบแทน" && effectiveDate && Array.isArray(priceMatrix) && priceMatrix.length > 0) {
+        const dayOfWeek = effectiveDate.getDay(); // 0 = Sunday, 1..5 = Mon..Fri, 6 = Saturday
+        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+        const isWeekday = dayOfWeek >= 1 && dayOfWeek <= 5;
+
+        const cleanBaseName = (s: string) =>
+          (s || "")
+            .replace(/\(.*?\)/g, "")
+            .replace(/\[.*?\]/g, "")
+            .trim()
+            .toLowerCase();
+
+        const baseItemName = cleanBaseName(name);
+        const baseMatrixName = cleanBaseName(item.matrixData?.itemName || item.matchedMatrixItem || "");
+
+        const candidates = priceMatrix.filter((pm: any) => {
+          const pmCat = normalizeExpenseCategory(pm.category, pm.itemName);
+          if (pmCat !== "หมวดค่าตอบแทน") return false;
+          const pmBase = cleanBaseName(pm.itemName);
+          return (
+            pmBase === baseItemName ||
+            pmBase === baseMatrixName ||
+            (baseItemName.length > 5 && (pmBase.includes(baseItemName) || baseItemName.includes(pmBase))) ||
+            (baseMatrixName.length > 5 && (pmBase.includes(baseMatrixName) || baseMatrixName.includes(pmBase)))
+          );
+        });
+
+        const isWeekdayPm = (pm: any) =>
+          pm.condition === "WEEKDAY" ||
+          /จันทร์|วันธรรมดา|เวลาราชการ/i.test((pm.itemName || "") + " " + (pm.note || ""));
+
+        const isWeekendPm = (pm: any) =>
+          pm.condition === "WEEKEND" ||
+          /เสาร์|อาทิตย์|วันหยุด/i.test((pm.itemName || "") + " " + (pm.note || ""));
+
+        const weekdayPm = candidates.find(isWeekdayPm);
+        const weekendPm = candidates.find(isWeekendPm);
+        const unitPrice = Number(item.receiptData?.unitPrice) || 0;
+
+        if (isWeekday && weekdayPm) {
+          const weekdayRate = Number(weekdayPm.maxPrice) || 0;
+          const weekendRate = weekendPm ? Number(weekendPm.maxPrice) || 0 : 0;
+          const targetUnit = weekdayPm.unit || item.receiptData?.unit || "คน/วัน";
+
+          const isClaimingWeekend =
+            (weekendRate > weekdayRate && unitPrice >= weekendRate) ||
+            unitPrice > weekdayRate ||
+            (item.matrixData && isWeekendPm(item.matrixData)) ||
+            /เสาร์|อาทิตย์|วันหยุด/i.test(name);
+
+          if (isClaimingWeekend) {
+            item.matrixData = {
+              itemName: weekdayPm.itemName,
+              category: "หมวดค่าตอบแทน",
+              maxPrice: weekdayRate,
+              unit: weekdayPm.unit,
+            };
+            item.matchedMatrixItem = weekdayPm.itemName;
+            item.matrixMaxPrice = weekdayRate;
+            item.status = "FAIL";
+
+            if (!item.errorFlags) item.errorFlags = [];
+            if (!item.errorFlags.includes("ราคาเกินเกณฑ์")) {
+              item.errorFlags.push("ราคาเกินเกณฑ์");
+            }
+
+            const warningMsg = `[อัตราค่าตอบแทนไม่ถูกต้อง: วันที่จัดกิจกรรมตรงกับวันธรรมดา ต้องใช้อัตรา ${weekdayRate} บาท/${targetUnit} แทนอัตราวันหยุด]`;
+            if (!parsedData.warnings.some((w: string) => typeof w === "string" && w.includes("อัตราค่าตอบแทนไม่ถูกต้อง"))) {
+              parsedData.warnings.push(warningMsg);
+            }
+
+            item.message = `วันที่จัดกิจกรรมหรือวันที่ในเอกสารตรงกับวันธรรมดา ต้องใช้อัตราค่าตอบแทนวันธรรมดา (${weekdayRate} บาท/${targetUnit}) แต่ในเอกสารเบิกในอัตราวันหยุด`;
+            parsedData.overallStatus = "FAIL";
+          }
+        } else if (isWeekend && weekendPm) {
+          const weekendRate = Number(weekendPm.maxPrice) || 0;
+          const targetUnit = weekendPm.unit || item.receiptData?.unit || "คน/วัน";
+
+          if (unitPrice <= weekendRate && weekendRate > 0) {
+            item.matrixData = {
+              itemName: weekendPm.itemName,
+              category: "หมวดค่าตอบแทน",
+              maxPrice: weekendRate,
+              unit: weekendPm.unit,
+            };
+            item.matchedMatrixItem = weekendPm.itemName;
+            item.matrixMaxPrice = weekendRate;
+            item.status = "PASS";
+            item.errorFlags = (item.errorFlags || []).filter((f: string) => f !== "ราคาเกินเกณฑ์");
+            item.message = `ราคาต่อหน่วย (฿${unitPrice.toFixed(2)}) ผ่านเกณฑ์ราคากลางอัตราวันหยุด '${weekendPm.itemName}' (เพดาน ฿${weekendRate.toFixed(2)}/${targetUnit})`;
           }
         }
       }
@@ -726,10 +910,17 @@ ${isQuotationCheck ? "- [คำสั่งพิเศษ]: ผู้ใช้�
         (w: string) => typeof w === "string" && w.includes("[ระเบียบ มทส.]")
       );
 
+    const hasCompensationViolation =
+      Array.isArray(parsedData.warnings) &&
+      parsedData.warnings.some(
+        (w: string) => typeof w === "string" && w.includes("อัตราค่าตอบแทนไม่ถูกต้อง")
+      );
+
     if (
       parsedData.financialSummary?.isMathCorrect === false ||
       hasTampering ||
       hasSutViolation ||
+      hasCompensationViolation ||
       parsedData.items.some((i: any) => i.status === "FAIL")
     ) {
       parsedData.overallStatus = "FAIL";

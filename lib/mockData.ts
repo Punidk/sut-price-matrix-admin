@@ -4,7 +4,7 @@ export const initialPriceMatrixData: PriceMatrixItem[] = [
   {
     id: "sut-001",
     itemName: "ข้าวกล่อง (สำหรับผู้เข้าร่วมกิจกรรม/สตาฟ)",
-    category: "อาหาร",
+    category: "หมวดโภชนาการ",
     maxPrice: 50,
     unit: "บาท/มื้อ",
     unitPrice: 50,
@@ -14,7 +14,7 @@ export const initialPriceMatrixData: PriceMatrixItem[] = [
   {
     id: "sut-002",
     itemName: "อาหารว่างและเครื่องดื่ม (Snack Box)",
-    category: "อาหาร",
+    category: "หมวดโภชนาการ",
     maxPrice: 35,
     unit: "บาท/ชุด",
     unitPrice: 35,
@@ -24,7 +24,7 @@ export const initialPriceMatrixData: PriceMatrixItem[] = [
   {
     id: "sut-003",
     itemName: "น้ำดื่มบรรจุขวด SUT (600 ml)",
-    category: "อาหาร",
+    category: "หมวดโภชนาการ",
     maxPrice: 60,
     unit: "บาท/แพ็ค",
     unitPrice: 60,
@@ -34,7 +34,7 @@ export const initialPriceMatrixData: PriceMatrixItem[] = [
   {
     id: "sut-004",
     itemName: "ป้ายไวนิลประชาสัมพันธ์โครงการ (พร้อมเจาะตาไก่)",
-    category: "อุปกรณ์สำนักงาน",
+    category: "หมวดอุปกรณ์สำนักงาน",
     maxPrice: 150,
     unit: "บาท/ตร.ม.",
     unitPrice: 150,
@@ -44,7 +44,7 @@ export const initialPriceMatrixData: PriceMatrixItem[] = [
   {
     id: "sut-005",
     itemName: "เข็มกอปรปัญญา/ของที่ระลึกวิทยากร",
-    category: "อุปกรณ์สำนักงาน",
+    category: "หมวดอุปกรณ์สำนักงาน",
     maxPrice: 350,
     unit: "บาท/ชิ้น",
     unitPrice: 350,
@@ -54,7 +54,7 @@ export const initialPriceMatrixData: PriceMatrixItem[] = [
   {
     id: "sut-006",
     itemName: "เกียรติบัตรพิมพ์สีพร้อมปกวุฒิบัตร",
-    category: "อุปกรณ์สำนักงาน",
+    category: "หมวดอุปกรณ์สำนักงาน",
     maxPrice: 25,
     unit: "บาท/ใบ",
     unitPrice: 25,
@@ -64,7 +64,7 @@ export const initialPriceMatrixData: PriceMatrixItem[] = [
   {
     id: "sut-007",
     itemName: "ค่าตอบแทนวิทยากรภายนอก (ระดับเชี่ยวชาญ)",
-    category: "บริการ",
+    category: "หมวดค่าตอบแทน",
     maxPrice: 1200,
     unit: "บาท/ชม.",
     unitPrice: 1200,
@@ -74,7 +74,7 @@ export const initialPriceMatrixData: PriceMatrixItem[] = [
   {
     id: "sut-008",
     itemName: "ค่าบริการเช่าเครื่องเสียงและไฟเวทีกลางแจ้ง",
-    category: "บริการ",
+    category: "หมวดอุปกรณ์อิเล็กทรอนิกส์",
     maxPrice: 5000,
     unit: "บาท/วัน",
     unitPrice: 5000,
@@ -84,7 +84,7 @@ export const initialPriceMatrixData: PriceMatrixItem[] = [
   {
     id: "sut-009",
     itemName: "ค่าบริการรถบัสรับ-ส่งกิจกรรมนอกสถานที่",
-    category: "บริการ",
+    category: "หมวดพาหนะ",
     maxPrice: 4500,
     unit: "บาท/คัน/วัน",
     unitPrice: 4500,
@@ -94,11 +94,35 @@ export const initialPriceMatrixData: PriceMatrixItem[] = [
   {
     id: "sut-010",
     itemName: "อุปกรณ์การจัดฐานกิจกรรมและสันทนาการ",
-    category: "อื่นๆ",
+    category: "หมวดอุปกรณ์ก่อสร้าง",
     maxPrice: 2000,
     unit: "บาท/ชุดโครงการ",
     unitPrice: 2000,
     unitType: "บาท/ชุดโครงการ",
     updatedAt: Date.now() - 3600000 * 2,
+  },
+  {
+    id: "sut-011",
+    itemName: "ค่าจ้างพนักงานไฟฟ้าและซ่อมบำรุง (วันจันทร์-ศุกร์ เวลาราชการ)",
+    category: "หมวดค่าตอบแทน",
+    maxPrice: 240,
+    unit: "คน/วัน",
+    unitPrice: 240,
+    unitType: "คน/วัน",
+    condition: "WEEKDAY",
+    note: "วันจันทร์-วันศุกร์ ในเวลาราชการ",
+    updatedAt: Date.now() - 3600000 * 4,
+  },
+  {
+    id: "sut-012",
+    itemName: "ค่าจ้างพนักงานไฟฟ้าและซ่อมบำรุง (วันเสาร์-อาทิตย์ และวันหยุดนักขัตฤกษ์)",
+    category: "หมวดค่าตอบแทน",
+    maxPrice: 420,
+    unit: "คน/วัน",
+    unitPrice: 420,
+    unitType: "คน/วัน",
+    condition: "WEEKEND",
+    note: "วันเสาร์-อาทิตย์ และวันหยุดนักขัตฤกษ์",
+    updatedAt: Date.now() - 3600000 * 4,
   },
 ];

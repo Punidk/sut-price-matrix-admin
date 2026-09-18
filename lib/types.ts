@@ -138,7 +138,10 @@ export interface PriceMatrixItem {
   unit: string;
   unitPrice?: number;
   unitType?: string;
+  condition?: string;
+  note?: string;
   updatedAt?: number;
 }
 
 export type PriceMatrixFormData = Omit<PriceMatrixItem, "id" | "updatedAt">;
+

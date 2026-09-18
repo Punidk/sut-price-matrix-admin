@@ -25,17 +25,38 @@ export async function POST(req: Request) {
 - หมวดหมู่ (จัดเข้า 1 ใน 6 หมวดตามเอกสาร ได้แก่ 'หมวดค่าตอบแทน', 'หมวดโภชนาการ', 'หมวดยานพาหนะ', 'หมวดอุปกรณ์ก่อสร้าง', 'หมวดอุปกรณ์สำนักงาน', 'หมวดอุปกรณ์อิเล็กทรอนิกส์')
 - ชื่อรายการ (name)
 - ราคาต่อหน่วย (price) เป็นตัวเลข
-- หน่วยนับ (unit) เช่น กล่อง, แพ็ก, ชิ้น, อัน, วัน, ชม., รีม, เล่ม, ชุด, ม้วน
+- หน่วยนับ (unit) เช่น กล่อง, แพ็ก, ชิ้น, อัน, วัน, ชม., รีม, เล่ม, ชุด, ม้วน, คน/วัน, คน/ชม.
+- เงื่อนไขวันทำงาน (condition): หากมีเงื่อนไขวันทำงานให้ระบุ 'WEEKDAY' (วันจันทร์-ศุกร์ เวลาราชการ) หรือ 'WEEKEND' (วันเสาร์-อาทิตย์ / วันหยุดนักขัตฤกษ์) หากไม่มีให้ใส่ null
 - หมายเหตุ (note) ถ้ามี
-และตอบกลับเป็น JSON array ของรายการทั้งหมด ห้ามใส่ markdown หรือข้อความอื่นนอก JSON เช่น:
+
+[กฎพิเศษสำหรับการแยกรายการค่าตอบแทนตามวันทำงาน (Weekday vs Weekend Rates)]:
+- หากพบรายการใน 'หมวดค่าตอบแทน' (หรือรายการใดๆ) ที่มีเงื่อนไขในหมายเหตุหรือในตารางระบุแยกวันทำงาน เช่น "วันจันทร์-วันศุกร์" กับ "วันเสาร์-วันอาทิตย์ / วันหยุดนักขัตฤกษ์" หรือ "เวลาราชการ" กับ "นอกเวลาราชการ":
+  * ต้องสร้างรายการแยกออกจากกันเป็นคนละรายการอย่างชัดเจน ห้ามรวมเป็นรายการเดียว
+  * ให้ระบุเงื่อนไขต่อท้ายชื่อรายการในวงเล็บเสมอ เช่น:
+    - "ค่าจ้างพนักงานไฟฟ้าและซ่อมบำรุง (วันจันทร์-ศุกร์ เวลาราชการ)"
+    - "ค่าจ้างพนักงานไฟฟ้าและซ่อมบำรุง (วันเสาร์-อาทิตย์ และวันหยุดนักขัตฤกษ์)"
+  * กำหนด condition เป็น 'WEEKDAY' หรือ 'WEEKEND' ตามเงื่อนไข
+  * บันทึกรายละเอียดใน note ให้ครบถ้วน
+
+ตอบกลับเป็น JSON array ของรายการทั้งหมด ห้ามใส่ markdown หรือข้อความอื่นนอก JSON เช่น:
 [
   {
     "id": 1,
-    "category": "หมวดอุปกรณ์สำนักงาน",
-    "name": "กระดาษถ่ายเอกสาร A4 80 แกรม",
-    "price": 125,
-    "unit": "รีม",
-    "note": ""
+    "category": "หมวดค่าตอบแทน",
+    "name": "ค่าจ้างพนักงานไฟฟ้าและซ่อมบำรุง (วันจันทร์-ศุกร์ เวลาราชการ)",
+    "price": 240,
+    "unit": "คน/วัน",
+    "condition": "WEEKDAY",
+    "note": "วันจันทร์-วันศุกร์ ในเวลาราชการ"
+  },
+  {
+    "id": 2,
+    "category": "หมวดค่าตอบแทน",
+    "name": "ค่าจ้างพนักงานไฟฟ้าและซ่อมบำรุง (วันเสาร์-อาทิตย์ และวันหยุดนักขัตฤกษ์)",
+    "price": 420,
+    "unit": "คน/วัน",
+    "condition": "WEEKEND",
+    "note": "วันเสาร์-อาทิตย์ และวันหยุดนักขัตฤกษ์"
   }
 ]`;
 
@@ -81,11 +102,41 @@ export async function POST(req: Request) {
     // แปลงเป็น JSON Object ส่งกลับไปให้หน้าเว็บ
     const parsedData = JSON.parse(text);
 
-    // Map ให้รองรับทั้ง key 'name'/'itemName' และ 'price'/'maxPrice'
+    // Map ให้รองรับทั้ง key 'name'/'itemName' และ 'price'/'maxPrice' พร้อมจัดการเงื่อนไขวันทำงาน
     const formattedData = Array.isArray(parsedData)
       ? parsedData.map((it: any, idx: number) => {
-          const itemName = (it.name || it.itemName || "รายการไม่มีชื่อ").trim();
+          let itemName = (it.name || it.itemName || "รายการไม่มีชื่อ").trim();
           const maxPrice = Number(it.price != null ? it.price : it.maxPrice) || 0;
+          let condition = it.condition || "";
+          const note = (it.note || "").trim();
+
+          const lowerCombined = (itemName + " " + note).toLowerCase();
+          const isWeekend =
+            condition === "WEEKEND" ||
+            lowerCombined.includes("วันเสาร์") ||
+            lowerCombined.includes("วันอาทิตย์") ||
+            lowerCombined.includes("เสาร์-อาทิตย์") ||
+            lowerCombined.includes("วันหยุด");
+          const isWeekday =
+            !isWeekend &&
+            (condition === "WEEKDAY" ||
+              lowerCombined.includes("วันจันทร์") ||
+              lowerCombined.includes("จันทร์-ศุกร์") ||
+              lowerCombined.includes("วันธรรมดา") ||
+              lowerCombined.includes("เวลาราชการ"));
+
+          if (isWeekend) {
+            condition = "WEEKEND";
+            if (!itemName.includes("เสาร์") && !itemName.includes("วันหยุด")) {
+              itemName = `${itemName} (วันเสาร์-อาทิตย์ และวันหยุดนักขัตฤกษ์)`;
+            }
+          } else if (isWeekday) {
+            condition = "WEEKDAY";
+            if (!itemName.includes("จันทร์") && !itemName.includes("เวลาราชการ")) {
+              itemName = `${itemName} (วันจันทร์-ศุกร์ เวลาราชการ)`;
+            }
+          }
+
           return {
             id: it.id ?? (idx + 1),
             index: it.id ?? (idx + 1),
@@ -95,7 +146,8 @@ export async function POST(req: Request) {
             price: maxPrice,
             maxPrice: maxPrice,
             unit: (it.unit || "รายการ").trim(),
-            note: it.note || "",
+            note: note,
+            condition: condition || undefined,
           };
         })
       : [];

@@ -679,6 +679,10 @@ export default function UserFrontendPage() {
     !isInvalidDocument &&
     (documentWarnings?.some((w) => typeof w === "string" && w.includes("[ระเบียบ มทส.]")) ?? false);
 
+  const hasCompensationViolation =
+    !isInvalidDocument &&
+    (documentWarnings?.some((w) => typeof w === "string" && w.includes("อัตราค่าตอบแทนไม่ถูกต้อง")) ?? false);
+
   const isQuotationDoc =
     documentType === "QUOTATION" ||
     Boolean(quotationTerms?.isQuotation) ||
@@ -691,18 +695,20 @@ export default function UserFrontendPage() {
     !hasTampering &&
     !hasDuplicate &&
     !hasSutQuotationViolation &&
+    !hasCompensationViolation &&
     totalItemsCount > 0 &&
     hasApprovedItems &&
     hasValidAmount &&
     failItemsCount === 0 &&
     notFoundItemsCount === 0;
 
-  const isOverallHasFail = !isInvalidDocument && (failItemsCount > 0 || isMathError || hasTampering || hasSutQuotationViolation);
+  const isOverallHasFail = !isInvalidDocument && (failItemsCount > 0 || isMathError || hasTampering || hasSutQuotationViolation || hasCompensationViolation);
   const isOverallPendingReview =
     !isInvalidDocument &&
     !isMathError &&
     !hasTampering &&
     !hasSutQuotationViolation &&
+    !hasCompensationViolation &&
     (hasDuplicate || (totalItemsCount > 0 && failItemsCount === 0 && (notFoundItemsCount > 0 || !hasApprovedItems || !hasValidAmount)));
 
   const totalPassAmount = analysisResults
@@ -1293,9 +1299,9 @@ export default function UserFrontendPage() {
             </div>
 
             {/* Document Integrity Warnings Alert Box */}
-            {(isMathError || hasTampering || hasDuplicate || hasSutQuotationViolation || (documentWarnings && documentWarnings.length > 0)) && (
+            {(isMathError || hasTampering || hasDuplicate || hasSutQuotationViolation || hasCompensationViolation || (documentWarnings && documentWarnings.length > 0)) && (
               <div className={`border-2 p-4 sm:p-5 rounded-2xl space-y-3 shadow-sm animate-in fade-in duration-300 ${
-                isInvalidDocument || isMathError || hasTampering || hasSutQuotationViolation
+                isInvalidDocument || isMathError || hasTampering || hasSutQuotationViolation || hasCompensationViolation
                   ? "bg-rose-50 border-rose-400 text-rose-900"
                   : "bg-amber-50 border-amber-400 text-amber-900"
               }`}>
@@ -1315,6 +1321,14 @@ export default function UserFrontendPage() {
                   </div>
                 )}
 
+                {/* Red Alert Bar for Compensation Rate Violation */}
+                {!isInvalidDocument && hasCompensationViolation && (
+                  <div className="bg-rose-600 text-white font-bold text-xs sm:text-sm py-2.5 px-4 rounded-xl flex items-center space-x-2 shadow-xs">
+                    <AlertTriangle className="w-4 h-4 shrink-0 text-white" />
+                    <span>⚠️ อัตราค่าตอบแทนไม่ถูกต้อง: วันที่จัดกิจกรรมตรงกับวันธรรมดา ต้องใช้อัตราวันธรรมดาแทนอัตราวันหยุด</span>
+                  </div>
+                )}
+
                 {/* Red Alert Bar for Math Error - ซ่อนหาก isInvalidDocument หรือมี Tampering */}
                 {!isInvalidDocument && !hasTampering && isMathError && (
                   <div className="bg-rose-600 text-white font-bold text-xs sm:text-sm py-2.5 px-4 rounded-xl flex items-center space-x-2 shadow-xs">
@@ -1331,16 +1345,16 @@ export default function UserFrontendPage() {
                   </div>
                 )}
 
-                <div className={`flex items-center space-x-2.5 font-bold text-sm ${isInvalidDocument || isMathError || hasTampering || hasSutQuotationViolation ? "text-rose-800" : "text-amber-800"}`}>
-                  <AlertTriangle className={`w-5 h-5 shrink-0 ${isInvalidDocument || isMathError || hasTampering || hasSutQuotationViolation ? "text-rose-600" : "text-amber-600"}`} />
+                <div className={`flex items-center space-x-2.5 font-bold text-sm ${isInvalidDocument || isMathError || hasTampering || hasSutQuotationViolation || hasCompensationViolation ? "text-rose-800" : "text-amber-800"}`}>
+                  <AlertTriangle className={`w-5 h-5 shrink-0 ${isInvalidDocument || isMathError || hasTampering || hasSutQuotationViolation || hasCompensationViolation ? "text-rose-600" : "text-amber-600"}`} />
                   <span>แจ้งเตือนความสมบูรณ์ของเอกสาร (Document Integrity Warnings):</span>
                 </div>
                 {documentWarnings && documentWarnings.length > 0 && (
-                  <ul className={`list-disc list-inside text-xs font-semibold space-y-1.5 pl-1.5 ${isInvalidDocument || isMathError || hasTampering || hasSutQuotationViolation ? "text-rose-900" : "text-amber-900"}`}>
+                  <ul className={`list-disc list-inside text-xs font-semibold space-y-1.5 pl-1.5 ${isInvalidDocument || isMathError || hasTampering || hasSutQuotationViolation || hasCompensationViolation ? "text-rose-900" : "text-amber-900"}`}>
                     {documentWarnings
                       .filter((warning) => (!isInvalidDocument || !warning.includes("คณิตศาสตร์")) && (!hasDuplicate || warning !== duplicateWarningText))
                       .map((warning, wIdx) => (
-                        <li key={wIdx} className={warning.includes("[ระเบียบ มทส.]") ? "text-rose-700 font-bold" : ""}>
+                        <li key={wIdx} className={warning.includes("[ระเบียบ มทส.]") || warning.includes("อัตราค่าตอบแทนไม่ถูกต้อง") ? "text-rose-700 font-bold" : ""}>
                           {warning}
                         </li>
                       ))}
