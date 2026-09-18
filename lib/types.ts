@@ -1,4 +1,134 @@
-export type CategoryType = "อาหาร" | "อุปกรณ์สำนักงาน" | "บริการ" | "อื่นๆ" | "Food" | "Material" | "Service" | "Other";
+export const SUT_EXPENSE_CATEGORIES = [
+  "หมวดค่าตอบแทน",
+  "หมวดโภชนาการ",
+  "หมวดยานพาหนะ",
+  "หมวดอุปกรณ์ก่อสร้าง",
+  "หมวดอุปกรณ์สำนักงาน",
+  "หมวดอุปกรณ์อิเล็กทรอนิกส์",
+] as const;
+
+export type SutExpenseCategory = (typeof SUT_EXPENSE_CATEGORIES)[number];
+
+export type CategoryType =
+  | SutExpenseCategory
+  | "หมวดพาหนะ"
+  | "อาหาร"
+  | "อุปกรณ์สำนักงาน"
+  | "บริการ"
+  | "อื่นๆ"
+  | "Food"
+  | "Material"
+  | "Service"
+  | "Other";
+
+export function normalizeExpenseCategory(cat?: string | null, itemName?: string | null): SutExpenseCategory {
+  const catText = (cat || "").trim();
+  if (SUT_EXPENSE_CATEGORIES.includes(catText as any)) {
+    return catText as SutExpenseCategory;
+  }
+  if (catText === "หมวดพาหนะ") {
+    return "หมวดยานพาหนะ";
+  }
+
+  const combined = `${catText} ${itemName || ""}`.toLowerCase();
+
+  // 1. หมวดค่าตอบแทน
+  if (
+    combined.includes("ตอบแทน") ||
+    combined.includes("วิทยากร") ||
+    combined.includes("ค่าจ้าง") ||
+    combined.includes("กรรมการ") ||
+    combined.includes("เบี้ยเลี้ยง")
+  ) {
+    return "หมวดค่าตอบแทน";
+  }
+
+  // 2. หมวดโภชนาการ
+  if (
+    combined.includes("โภชนาการ") ||
+    combined.includes("อาหาร") ||
+    combined.includes("ขนม") ||
+    combined.includes("เครื่องดื่ม") ||
+    combined.includes("น้ำดื่ม") ||
+    combined.includes("เบรก") ||
+    combined.includes("ข้าว") ||
+    combined.includes("food")
+  ) {
+    return "หมวดโภชนาการ";
+  }
+
+  // 3. หมวดยานพาหนะ
+  if (
+    combined.includes("พาหนะ") ||
+    combined.includes("ยานพาหนะ") ||
+    combined.includes("น้ำมัน") ||
+    combined.includes("เชื้อเพลิง") ||
+    combined.includes("เดินทาง") ||
+    combined.includes("ทางด่วน") ||
+    combined.includes("เช่ารถ") ||
+    combined.includes("ตั๋ว") ||
+    combined.includes("vehicle")
+  ) {
+    return "หมวดยานพาหนะ";
+  }
+
+  // 4. หมวดอุปกรณ์ก่อสร้าง
+  if (
+    combined.includes("ก่อสร้าง") ||
+    combined.includes("น็อต") ||
+    combined.includes("สกรู") ||
+    combined.includes("ท่อ") ||
+    combined.includes("ไม้") ||
+    combined.includes("เหล็ก") ||
+    combined.includes("ปูน") ||
+    combined.includes("สีทา") ||
+    combined.includes("ตะปู") ||
+    combined.includes("กระดาษทราย") ||
+    combined.includes("construction")
+  ) {
+    return "หมวดอุปกรณ์ก่อสร้าง";
+  }
+
+  // 5. หมวดอุปกรณ์อิเล็กทรอนิกส์
+  if (
+    combined.includes("อิเล็กทรอนิกส์") ||
+    combined.includes("อิเล็กทรอนิก") ||
+    combined.includes("ไมโครคอนโทรลเลอร์") ||
+    combined.includes("ไมโคร") ||
+    combined.includes("เซนเซอร์") ||
+    combined.includes("เซ็นเซอร์") ||
+    combined.includes("ตัวต้านทาน") ||
+    combined.includes("สายไฟ") ||
+    combined.includes("บอร์ด") ||
+    combined.includes("arduino") ||
+    combined.includes("esp32") ||
+    combined.includes("คอมพิวเตอร์") ||
+    combined.includes("flash drive") ||
+    combined.includes("electronic")
+  ) {
+    return "หมวดอุปกรณ์อิเล็กทรอนิกส์";
+  }
+
+  // 6. หมวดอุปกรณ์สำนักงาน
+  if (
+    combined.includes("สำนักงาน") ||
+    combined.includes("กระดาษ") ||
+    combined.includes("ปากกา") ||
+    combined.includes("แฟ้ม") ||
+    combined.includes("ไวนิล") ||
+    combined.includes("เทป") ||
+    combined.includes("คลิป") ||
+    combined.includes("เครื่องเขียน") ||
+    combined.includes("ซอง") ||
+    combined.includes("material") ||
+    combined.includes("office")
+  ) {
+    return "หมวดอุปกรณ์สำนักงาน";
+  }
+
+  // Default fallback
+  return "หมวดอุปกรณ์สำนักงาน";
+}
 
 export interface PriceMatrixItem {
   id: string;

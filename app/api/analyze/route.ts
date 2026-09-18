@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { normalizeExpenseCategory, SUT_EXPENSE_CATEGORIES } from "@/lib/types";
 
 // ขยายเวลา Serverless Function เพื่อป้องกันปัญหา Vercel Timeout (504 Gateway Timeout)
 export const maxDuration = 30;
@@ -230,7 +231,18 @@ ${isQuotationCheck ? "- [คำสั่งพิเศษ]: ผู้ใช้�
 - [ผ่านเกณฑ์ (PASS)]: หากไม่มีข้อผิดพลาดใดๆ กำหนด status: "PASS" และ errorFlags: []
 
 ========================================
-5. รูปแบบ Response Schema (JSON Object เท่านั้น):
+5. การจำแนกหมวดหมู่งบประมาณสภานักศึกษา (Expense Category Classification - 6 หมวดหลัก):
+========================================
+ให้วิเคราะห์และจัดกลุ่มสินค้า/บริการแต่ละรายการ (ใส่ในฟิลด์ category ของแต่ละ item) ลงใน 1 ใน 6 หมวดหมู่นี้ให้ถูกต้องตามความเป็นจริง:
+- 'หมวดค่าตอบแทน': เช่น ค่าวิทยากร, ค่าตอบแทนวิทยากร, ค่าจ้าง, ค่าตอบแทนกรรมการ, ค่าบริการบุคคล
+- 'หมวดโภชนาการ': เช่น ข้าวกล่อง, อาหาร, อาหารว่าง, ขนมเบรก, น้ำดื่ม, เครื่องดื่ม, ผลไม้, วัตถุดิบประกอบอาหาร
+- 'หมวดยานพาหนะ': เช่น ค่าน้ำมัน, ค่าเชื้อเพลิง, ค่าเดินทาง, ค่าผ่านทาง/ทางด่วน, ค่าเช่ารถตู้/รถบัส, ตั๋วรถโดยสาร
+- 'หมวดอุปกรณ์ก่อสร้าง': เช่น น็อต, สกรู, ท่อ PVC, ตะปู, กระดาษทราย, ไม้อัด, เหล็ก, ปูนซีเมนต์, สีทาบ้าน, เครื่องมือช่าง
+- 'หมวดอุปกรณ์สำนักงาน': เช่น กระดาษ A4, ปากกา, แฟ้ม, คลิปหนีบกระดาษ, ป้ายไวนิล, เทปกาว, ซองเอกสาร, เครื่องเขียน
+- 'หมวดอุปกรณ์อิเล็กทรอนิกส์': เช่น บอร์ดไมโครคอนโทรลเลอร์ (Arduino, ESP32), เซนเซอร์, ตัวต้านทาน, สายไฟ, มัลติมิเตอร์, แบตเตอรี่, อุปกรณ์คอมพิวเตอร์, Flash Drive
+
+========================================
+6. รูปแบบ Response Schema (JSON Object เท่านั้น):
 ========================================
 จงส่งคำตอบกลับมาเป็น JSON Object ตามโครงสร้างนี้เท่านั้น (ห้ามครอบ markdown หรือมีข้อความอื่นนอก JSON):
 {
@@ -273,6 +285,7 @@ ${isQuotationCheck ? "- [คำสั่งพิเศษ]: ผู้ใช้�
   "items": [
     {
       "status": "PASS" | "FAIL" | "NOT_FOUND",
+      "category": "หมวดค่าตอบแทน" | "หมวดโภชนาการ" | "หมวดยานพาหนะ" | "หมวดอุปกรณ์ก่อสร้าง" | "หมวดอุปกรณ์สำนักงาน" | "หมวดอุปกรณ์อิเล็กทรอนิกส์",
       "errorFlags": ["ราคาเกินเกณฑ์", "หน่วยไม่ตรง", "คำนวณเลขผิด", "[รายการคลุมเครือ: ต้องแนบใบแจกแจงรายการย่อย]"],
       "message": "คำอธิบายผลการตรวจสอบอย่างละเอียดภาษาไทย",
       "receiptData": {
@@ -448,7 +461,15 @@ ${isQuotationCheck ? "- [คำสั่งพิเศษ]: ผู้ใช้�
     ];
 
     parsedData.items.forEach((item: any) => {
-      const name = (item.receiptData?.itemName || "").trim();
+      const name = (item.receiptData?.itemName || item.itemInReceipt || "").trim();
+
+      // การจัดหมวดหมู่มาตรฐาน 6 หมวดตามแบบฟอร์มสภานักศึกษา มทส.
+      const rawCat = item.category || item.matrixData?.category || null;
+      item.category = normalizeExpenseCategory(rawCat, name);
+      if (item.matrixData) {
+        item.matrixData.category = item.category;
+      }
+
       const isAmbiguous = AMBIGUOUS_KEYWORDS.some(
         (kw) => name === kw || name.startsWith(kw + " ") || name.endsWith(" " + kw)
       );

@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
 import * as XLSX from "xlsx";
 import imageCompression from "browser-image-compression";
 import { db, isFirebaseConfigured } from "@/lib/firebase";
 import { collection, onSnapshot, addDoc, serverTimestamp, getDocs } from "firebase/firestore";
-import { PriceMatrixItem } from "@/lib/types";
+import { PriceMatrixItem, SUT_EXPENSE_CATEGORIES, SutExpenseCategory, normalizeExpenseCategory } from "@/lib/types";
 import { initialPriceMatrixData } from "@/lib/mockData";
 import {
   UploadCloud,
@@ -34,6 +34,12 @@ import {
   AlertTriangle,
   Printer,
   FileWarning,
+  Coins,
+  Utensils,
+  Car,
+  Hammer,
+  Paperclip,
+  Cpu,
 } from "lucide-react";
 
 export interface ReceiptItemData {
@@ -53,6 +59,7 @@ export interface MatrixItemData {
 
 export interface AnalysisItemResult {
   status: "PASS" | "FAIL" | "NOT_FOUND";
+  category?: string;
   errorFlags?: string[];
   message?: string;
   receiptData?: ReceiptItemData;
@@ -710,6 +717,91 @@ export default function UserFrontendPage() {
     : 0;
 
   const totalFailOrPendingAmount = Math.max(0, totalBillAmount - totalPassAmount);
+
+  // จัดกลุ่มรายการสินค้าตาม 6 หมวดหมู่งบประมาณสภานักศึกษา มทส.
+  const groupedExpenseCategories = useMemo(() => {
+    if (!analysisResults || analysisResults.length === 0) return [];
+
+    const categoryGroups: {
+      category: SutExpenseCategory;
+      items: { item: AnalysisItemResult; originalIndex: number }[];
+      subtotal: number;
+      passCount: number;
+      failCount: number;
+    }[] = [];
+
+    SUT_EXPENSE_CATEGORIES.forEach((cat) => {
+      const itemsInCat: { item: AnalysisItemResult; originalIndex: number }[] = [];
+
+      analysisResults.forEach((item, idx) => {
+        const itemCat = normalizeExpenseCategory(
+          item.category || item.matrixData?.category,
+          item.receiptData?.itemName || item.itemInReceipt
+        );
+        if (itemCat === cat) {
+          itemsInCat.push({ item, originalIndex: idx });
+        }
+      });
+
+      if (itemsInCat.length > 0) {
+        const subtotal = itemsInCat.reduce((sum, { item }) => {
+          const qty = item.receiptData?.qty != null ? item.receiptData.qty : 1;
+          const unitPrice = item.receiptData?.unitPrice != null ? item.receiptData.unitPrice : (item.detectedPrice || 0);
+          const totalPrice = item.receiptData?.totalPrice != null ? item.receiptData.totalPrice : (qty * unitPrice);
+          return sum + Number(totalPrice);
+        }, 0);
+
+        const passCount = itemsInCat.filter(({ item }) => item.status === "PASS").length;
+        const failCount = itemsInCat.filter(({ item }) => item.status === "FAIL" || item.status === "NOT_FOUND").length;
+
+        categoryGroups.push({
+          category: cat,
+          items: itemsInCat,
+          subtotal,
+          passCount,
+          failCount,
+        });
+      }
+    });
+
+    return categoryGroups;
+  }, [analysisResults]);
+
+  const getCategoryIcon = (category: string) => {
+    switch (category) {
+      case "หมวดค่าตอบแทน":
+        return <Coins className="w-4 h-4 text-purple-600" />;
+      case "หมวดโภชนาการ":
+        return <Utensils className="w-4 h-4 text-emerald-600" />;
+      case "หมวดยานพาหนะ":
+        return <Car className="w-4 h-4 text-blue-600" />;
+      case "หมวดอุปกรณ์ก่อสร้าง":
+        return <Hammer className="w-4 h-4 text-amber-600" />;
+      case "หมวดอุปกรณ์อิเล็กทรอนิกส์":
+        return <Cpu className="w-4 h-4 text-indigo-600" />;
+      case "หมวดอุปกรณ์สำนักงาน":
+      default:
+        return <Paperclip className="w-4 h-4 text-orange-600" />;
+    }
+  };
+
+  const getCategoryBadgeStyle = (category: string) => {
+    switch (category) {
+      case "หมวดค่าตอบแทน":
+        return "bg-purple-100 text-purple-800 border-purple-200";
+      case "หมวดโภชนาการ":
+        return "bg-emerald-100 text-emerald-800 border-emerald-200";
+      case "หมวดยานพาหนะ":
+        return "bg-blue-100 text-blue-800 border-blue-200";
+      case "หมวดอุปกรณ์ก่อสร้าง":
+        return "bg-amber-100 text-amber-800 border-amber-200";
+      case "หมวดอุปกรณ์อิเล็กทรอนิกส์":
+        return "bg-indigo-100 text-indigo-800 border-indigo-200";
+      case "หมวดอุปกรณ์สำนักงาน":
+      default:
+        return "bg-orange-100 text-orange-800 border-orange-200";
+    }
+  };
 
   const formatThaiDateTime = (timestamp: number) => {
     if (!timestamp) return "-";
@@ -1650,239 +1742,308 @@ export default function UserFrontendPage() {
                 </div>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-6">
                 <div className="flex items-center justify-between px-1">
                   <h4 className="text-base font-bold text-slate-900 flex items-center space-x-2">
                     <Layers className="w-5 h-5 text-orange-600" />
-                    <span>รายละเอียดผลการตรวจสอบแต่ละรายการ ({totalItemsCount})</span>
+                    <span>รายละเอียดผลการตรวจสอบแยกตาม 6 หมวดงบประมาณ ({totalItemsCount} รายการ)</span>
                   </h4>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4">
-                  {analysisResults.map((item, idx) => {
-                  const isPass = item.status === "PASS";
-                  const isFail = item.status === "FAIL";
-                  const isNotFound = item.status === "NOT_FOUND";
+                {/* 6 SUT Budget Categories Summary Bar */}
+                {groupedExpenseCategories.length > 0 && (
+                  <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-sm space-y-3">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                      <span className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center space-x-1.5">
+                        <FileSpreadsheet className="w-4 h-4 text-orange-600" />
+                        <span>สรุปยอดเงินแยกตามหมวดหมู่งบประมาณสภานักศึกษา มทส.</span>
+                      </span>
+                      <span className="text-[11px] font-mono text-slate-500">
+                        {groupedExpenseCategories.length} หมวดที่มีการเบิกจ่าย
+                      </span>
+                    </div>
 
-                  const itemName = item.receiptData?.itemName || item.itemInReceipt || "รายการที่ตรวจพบ";
-                  const qty = item.receiptData?.qty != null ? item.receiptData.qty : 1;
-                  const receiptUnit = item.receiptData?.unit || item.unit || "หน่วย";
-                  const unitPrice = item.receiptData?.unitPrice != null ? item.receiptData.unitPrice : (item.detectedPrice || 0);
-                  const totalPrice = item.receiptData?.totalPrice != null ? item.receiptData.totalPrice : (qty * unitPrice);
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+                      {groupedExpenseCategories.map((group) => (
+                        <div
+                          key={group.category}
+                          className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-1 hover:border-orange-300 transition"
+                        >
+                          <div className="flex items-center space-x-1.5 text-xs">
+                            {getCategoryIcon(group.category)}
+                            <span className="font-bold text-slate-800 text-[11px] truncate" title={group.category}>
+                              {group.category}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-baseline">
+                            <span className="font-mono font-extrabold text-xs sm:text-sm text-slate-900">
+                              ฿{group.subtotal.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-slate-500 block">
+                            {group.items.length} รายการ (ผ่าน {group.passCount}{group.failCount > 0 ? `, ไม่ผ่าน ${group.failCount}` : ""})
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-                  const matrixName = item.matrixData?.itemName || item.matchedMatrixItem || null;
-                  const matrixMaxPrice = item.matrixData?.maxPrice != null ? item.matrixData.maxPrice : (item.matrixMaxPrice != null ? item.matrixMaxPrice : null);
-                  const matrixUnit = item.matrixData?.unit || null;
-
-                  const errorFlags = Array.isArray(item.errorFlags) ? item.errorFlags : [];
-                  const isUnitMismatch = !!(matrixUnit && receiptUnit && matrixUnit.trim().toLowerCase() !== receiptUnit.trim().toLowerCase());
-                  const isMathError = Math.abs(qty * unitPrice - totalPrice) > 0.01;
-
-                  const hasMatrixMax = matrixMaxPrice != null && matrixMaxPrice > 0;
-                  const priceDiff = hasMatrixMax ? unitPrice - matrixMaxPrice : 0;
-
-                  return (
+                {/* Items Grouped by Category */}
+                <div className="space-y-6">
+                  {groupedExpenseCategories.map((group) => (
                     <div
-                      key={idx}
-                      className={`bg-white border-2 rounded-2xl p-5 sm:p-6 shadow-sm transition space-y-4 ${
-                        isPass
-                          ? "border-emerald-200 hover:border-emerald-400"
-                          : isFail
-                          ? "border-rose-300 hover:border-rose-500 bg-rose-50/10"
-                          : "border-amber-300 bg-amber-50/30 hover:border-amber-400"
-                      }`}
+                      key={group.category}
+                      className="bg-white border-2 border-slate-200/90 rounded-2xl p-5 sm:p-6 shadow-sm space-y-4"
                     >
-                      {/* Item Header */}
-                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 pb-3 border-b border-slate-100">
-                        <div className="flex items-start space-x-3">
-                          <div className={`p-2.5 rounded-xl shrink-0 mt-0.5 ${
-                            isPass
-                              ? "bg-emerald-100 text-emerald-700"
-                              : isFail
-                              ? "bg-rose-100 text-rose-700"
-                              : "bg-amber-100 text-amber-800"
-                          }`}>
-                            {isPass ? (
-                              <CheckCircle2 className="w-5 h-5" />
-                            ) : isFail ? (
-                              <XCircle className="w-5 h-5" />
-                            ) : (
-                              <AlertTriangle className="w-5 h-5" />
-                            )}
+                      {/* Category Header */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
+                        <div className="flex items-center space-x-3">
+                          <div className="p-2.5 bg-slate-100 rounded-xl">
+                            {getCategoryIcon(group.category)}
                           </div>
-                          <div className="space-y-1">
-                            <span className="text-[11px] font-mono text-slate-400">รายการที่ {idx + 1}</span>
-                            <h5 className="text-base font-bold text-slate-900 leading-snug">
-                              {itemName}
-                            </h5>
-                            {matrixName && (
-                              <div className="text-xs text-slate-500 font-mono flex items-center space-x-1.5">
-                                <span>จับคู่ราคากลาง:</span>
-                                <span className="bg-slate-100 text-slate-800 px-2 py-0.5 rounded font-semibold">{matrixName}</span>
-                              </div>
-                            )}
+                          <div>
+                            <div className="flex items-center space-x-2">
+                              <h5 className="text-base font-extrabold text-slate-900">
+                                {group.category}
+                              </h5>
+                              <span className="text-xs bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full font-mono font-semibold">
+                                {group.items.length} รายการ
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-slate-500">
+                              ผ่านเกณฑ์ {group.passCount} รายการ
+                              {group.failCount > 0 && `, ต้องตรวจสอบ ${group.failCount} รายการ`}
+                            </p>
                           </div>
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-1.5 self-start sm:self-auto justify-end">
-                          {/* Specific Error Flags Badges */}
-                          {isFail && errorFlags.map((flag, fIdx) => (
-                            <span
-                              key={fIdx}
-                              className="text-xs font-bold font-mono px-2.5 py-0.5 rounded-full bg-rose-600 text-white shadow-xs"
+                        <div className="flex items-center space-x-2 self-end sm:self-auto bg-slate-50 px-3.5 py-2 rounded-xl border border-slate-200">
+                          <span className="text-xs text-slate-600 font-semibold">รวมเงิน{group.category}:</span>
+                          <span className="font-mono font-extrabold text-base text-slate-900">
+                            ฿{group.subtotal.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Item Cards inside this Category */}
+                      <div className="grid grid-cols-1 gap-4">
+                        {group.items.map(({ item, originalIndex }) => {
+                          const idx = originalIndex;
+                          const isPass = item.status === "PASS";
+                          const isFail = item.status === "FAIL";
+                          const isNotFound = item.status === "NOT_FOUND";
+
+                          const itemName = item.receiptData?.itemName || item.itemInReceipt || "รายการที่ตรวจพบ";
+                          const qty = item.receiptData?.qty != null ? item.receiptData.qty : 1;
+                          const receiptUnit = item.receiptData?.unit || item.unit || "หน่วย";
+                          const unitPrice = item.receiptData?.unitPrice != null ? item.receiptData.unitPrice : (item.detectedPrice || 0);
+                          const totalPrice = item.receiptData?.totalPrice != null ? item.receiptData.totalPrice : (qty * unitPrice);
+
+                          const matrixName = item.matrixData?.itemName || item.matchedMatrixItem || null;
+                          const matrixMaxPrice = item.matrixData?.maxPrice != null ? item.matrixData.maxPrice : (item.matrixMaxPrice != null ? item.matrixMaxPrice : null);
+                          const matrixUnit = item.matrixData?.unit || null;
+
+                          const errorFlags = Array.isArray(item.errorFlags) ? item.errorFlags : [];
+                          const isUnitMismatch = !!(matrixUnit && receiptUnit && matrixUnit.trim().toLowerCase() !== receiptUnit.trim().toLowerCase());
+                          const isMathError = Math.abs(qty * unitPrice - totalPrice) > 0.01;
+
+                          const hasMatrixMax = matrixMaxPrice != null && matrixMaxPrice > 0;
+                          const priceDiff = hasMatrixMax ? unitPrice - matrixMaxPrice : 0;
+
+                          return (
+                            <div
+                              key={originalIndex}
+                              className={`bg-white border-2 rounded-xl p-4 sm:p-5 shadow-xs transition space-y-3.5 ${
+                                isPass
+                                  ? "border-emerald-200 hover:border-emerald-400"
+                                  : isFail
+                                  ? "border-rose-300 hover:border-rose-500 bg-rose-50/10"
+                                  : "border-amber-300 bg-amber-50/30 hover:border-amber-400"
+                              }`}
                             >
-                              [{flag}]
-                            </span>
-                          ))}
-                          <span
-                            className={`text-xs font-bold font-mono px-3 py-1 rounded-full ${
-                              isPass
-                                ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
-                                : isFail
-                                ? "bg-rose-100 text-rose-800 border border-rose-300"
-                                : "bg-amber-100 text-amber-900 border border-amber-300"
-                            }`}
-                          >
-                            {isNotFound ? "NOT FOUND" : item.status}
-                          </span>
-                        </div>
-                      </div>
+                              {/* Item Header */}
+                              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 pb-3 border-b border-slate-100">
+                                <div className="flex items-start space-x-3">
+                                  <div className={`p-2.5 rounded-xl shrink-0 mt-0.5 ${
+                                    isPass
+                                      ? "bg-emerald-100 text-emerald-700"
+                                      : isFail
+                                      ? "bg-rose-100 text-rose-700"
+                                      : "bg-amber-100 text-amber-800"
+                                  }`}>
+                                    {isPass ? (
+                                      <CheckCircle2 className="w-5 h-5" />
+                                    ) : isFail ? (
+                                      <XCircle className="w-5 h-5" />
+                                    ) : (
+                                      <AlertTriangle className="w-5 h-5" />
+                                    )}
+                                  </div>
+                                  <div className="space-y-1">
+                                    <div className="flex items-center space-x-2">
+                                      <span className="text-[11px] font-mono text-slate-400">ลำดับที่ {idx + 1}</span>
+                                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${getCategoryBadgeStyle(group.category)}`}>
+                                        {group.category}
+                                      </span>
+                                    </div>
+                                    <h5 className="text-base font-bold text-slate-900 leading-snug">
+                                      {itemName}
+                                    </h5>
+                                    {matrixName && (
+                                      <div className="text-xs text-slate-500 font-mono flex items-center space-x-1.5">
+                                        <span>จับคู่ราคากลาง:</span>
+                                        <span className="bg-slate-100 text-slate-800 px-2 py-0.5 rounded font-semibold">{matrixName}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
 
-                      {/* Not Found Special Alert Notice */}
-                      {isNotFound && (
-                        <div className="bg-amber-100/70 border border-amber-300 p-3 rounded-xl flex items-start space-x-2.5 text-xs text-amber-900">
-                          <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
-                          <span className="font-medium">
-                            รายการนี้ไม่อยู่ในราคากลาง ต้องตรวจสอบด้วยดุลยพินิจของคณะกรรมการ
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Receipt Math & Qty Calculation Breakdown Box */}
-                      <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 space-y-1.5 text-xs">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div className="flex items-center space-x-2 text-slate-700">
-                            <span className="font-semibold text-slate-900">จำนวน & ราคาในบิล:</span>
-                            <span className="font-mono bg-white px-2 py-0.5 border border-slate-200 rounded text-slate-900">
-                              {qty}{" "}
-                              {isUnitMismatch ? (
-                                <span className="bg-rose-100 text-rose-800 border border-rose-300 px-1 py-0.2 rounded font-bold underline decoration-rose-500">
-                                  {receiptUnit}
-                                </span>
-                              ) : (
-                                receiptUnit
-                              )}{" "}
-                              × ฿{Number(unitPrice).toFixed(2)}
-                            </span>
-                          </div>
-                          <div className="text-slate-900 font-mono font-bold text-sm">
-                            ราคารวมในบิล: ฿{Number(totalPrice).toFixed(2)}
-                          </div>
-                        </div>
-
-                        {/* Math Error Highlight */}
-                        {(isMathError || errorFlags.includes("คำนวณเลขผิด")) && (
-                          <div className="bg-rose-50 border border-rose-300 text-rose-800 p-2.5 rounded-lg flex items-start space-x-2 text-[11px] font-mono">
-                            <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-                            <div>
-                              <span className="font-bold">[ข้อผิดพลาดทางคณิตศาสตร์]: </span>
-                              คำนวณจริง ({qty} × ฿{Number(unitPrice).toFixed(2)} = ฿{(qty * unitPrice).toFixed(2)}) แต่ระบุในบิลเป็น ฿{Number(totalPrice).toFixed(2)}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Unit Mismatch Highlight Note */}
-                        {isUnitMismatch && (
-                          <div className="bg-amber-50 border border-amber-300 text-amber-900 p-2.5 rounded-lg flex items-start space-x-2 text-[11px] font-mono">
-                            <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
-                            <div>
-                              <span className="font-bold">[หน่วยนับไม่ตรง]: </span>
-                              ในบิลระบุหน่วย <span className="bg-rose-200/80 px-1 rounded font-bold text-rose-900">{receiptUnit}</span> แต่เพดานราคากลางกำหนดหน่วยเป็น <span className="bg-amber-200/80 px-1 rounded font-bold text-amber-900">{matrixUnit}</span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Pricing Comparison Grid */}
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-white p-4 rounded-xl border border-slate-200 text-xs">
-                        <div className="space-y-1">
-                          <span className="text-slate-500">ราคาต่อหน่วยในบิล:</span>
-                          <div className="text-base font-extrabold text-slate-900 font-mono">
-                            ฿{Number(unitPrice).toFixed(2)}{" "}
-                            <span className="text-xs font-normal text-slate-500">
-                              /{" "}
-                              {isUnitMismatch ? (
-                                <span className="bg-rose-100 text-rose-800 font-bold px-1 py-0.2 rounded border border-rose-300">
-                                  {receiptUnit}
-                                </span>
-                              ) : (
-                                receiptUnit
-                              )}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="space-y-1">
-                          <span className="text-slate-500">เพดานราคากลาง:</span>
-                          <div className="text-base font-extrabold font-mono text-amber-600">
-                            {hasMatrixMax ? (
-                              <>
-                                ฿{Number(matrixMaxPrice).toFixed(2)}{" "}
-                                <span className="text-xs font-normal text-slate-500">
-                                  /{" "}
-                                  {isUnitMismatch ? (
-                                    <span className="bg-amber-100 text-amber-900 font-bold px-1 py-0.2 rounded border border-amber-300">
-                                      {matrixUnit}
+                                <div className="flex flex-wrap items-center gap-1.5 self-start sm:self-auto justify-end">
+                                  {isFail && errorFlags.map((flag, fIdx) => (
+                                    <span
+                                      key={fIdx}
+                                      className="text-xs font-bold font-mono px-2.5 py-0.5 rounded-full bg-rose-600 text-white shadow-xs"
+                                    >
+                                      [{flag}]
                                     </span>
-                                  ) : (
-                                    matrixUnit || receiptUnit
-                                  )}
-                                </span>
-                              </>
-                            ) : (
-                              <span className="text-xs text-slate-400 font-sans font-normal">ไม่มีในฐานราคากลาง</span>
-                            )}
-                          </div>
-                        </div>
+                                  ))}
+                                  <span
+                                    className={`text-xs font-bold font-mono px-3 py-1 rounded-full ${
+                                      isPass
+                                        ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                                        : isFail
+                                        ? "bg-rose-100 text-rose-800 border border-rose-300"
+                                        : "bg-amber-100 text-amber-900 border border-amber-300"
+                                    }`}
+                                  >
+                                    {isNotFound ? "NOT FOUND" : item.status}
+                                  </span>
+                                </div>
+                              </div>
 
-                        <div className="space-y-1">
-                          <span className="text-slate-500">ส่วนต่างราคาต่อหน่วย:</span>
-                          {isNotFound ? (
-                            <div className="text-xs font-semibold text-amber-800 flex items-center space-x-1 mt-0.5">
-                              <AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
-                              <span>รอการพิจารณา</span>
-                            </div>
-                          ) : (
-                            <div className={`text-base font-extrabold font-mono flex items-center space-x-1 ${
-                              priceDiff <= 0 ? "text-emerald-600" : "text-rose-600"
-                            }`}>
-                              {priceDiff <= 0 ? (
-                                <>
-                                  <TrendingDown className="w-4 h-4 shrink-0" />
-                                  <span>ประหยัด ฿{Math.abs(priceDiff).toFixed(2)}</span>
-                                </>
-                              ) : (
-                                <>
-                                  <TrendingUp className="w-4 h-4 shrink-0" />
-                                  <span>เกินเกณฑ์ ฿{Math.abs(priceDiff).toFixed(2)}</span>
-                                </>
+                              {/* Not Found Special Alert Notice */}
+                              {isNotFound && (
+                                <div className="bg-amber-100/70 border border-amber-300 p-3 rounded-xl flex items-start space-x-2.5 text-xs text-amber-900">
+                                  <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                                  <span className="font-medium">
+                                    รายการนี้ไม่อยู่ในราคากลาง ต้องตรวจสอบด้วยดุลยพินิจของคณะกรรมการ
+                                  </span>
+                                </div>
                               )}
+
+                              {/* Receipt Math & Qty Calculation Breakdown Box */}
+                              <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 space-y-1.5 text-xs">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <div className="flex items-center space-x-2 text-slate-700">
+                                    <span className="font-semibold text-slate-900">จำนวน & ราคาในบิล:</span>
+                                    <span className="font-mono bg-white px-2 py-0.5 border border-slate-200 rounded text-slate-900">
+                                      {qty}{" "}
+                                      {isUnitMismatch ? (
+                                        <span className="text-amber-700 font-bold underline" title={`หน่วยในบิล '${receiptUnit}' ไม่ตรงกับหน่วยราคากลาง '${matrixUnit}'`}>
+                                          {receiptUnit} (หน่วยไม่ตรง)
+                                        </span>
+                                      ) : (
+                                        receiptUnit
+                                      )}
+                                    </span>
+                                    <span>×</span>
+                                    <span className="font-mono bg-white px-2 py-0.5 border border-slate-200 rounded font-bold text-slate-900">
+                                      ฿{Number(unitPrice).toFixed(2)}
+                                    </span>
+                                  </div>
+
+                                  <div className="text-right">
+                                    <span className="text-slate-500">ราคารวมในบิล: </span>
+                                    <span className="font-mono font-bold text-sm text-slate-900">
+                                      ฿{Number(totalPrice).toLocaleString("th-TH", { minimumFractionDigits: 2 })}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {isMathError && (
+                                  <div className="text-[11px] text-rose-600 font-medium flex items-center space-x-1 pt-1">
+                                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                    <span>คูณเลขไม่ตรง: {qty} × {unitPrice} = {(qty * unitPrice).toFixed(2)} แต่ในบิลระบุ {Number(totalPrice).toFixed(2)}</span>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Price Matrix Comparison Box */}
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50/50 p-3 rounded-xl border border-slate-100 text-xs">
+                                <div className="space-y-1">
+                                  <span className="text-slate-500">เพดานราคากลาง (Price Matrix Limit):</span>
+                                  <div className="font-mono font-bold text-slate-900 flex items-center space-x-1">
+                                    {hasMatrixMax ? (
+                                      <>
+                                        <span className="text-sm">฿{Number(matrixMaxPrice).toFixed(2)}</span>
+                                        <span className="text-slate-500 font-normal">
+                                          /{" "}
+                                          {isUnitMismatch ? (
+                                            <span className="text-amber-700 font-bold">{matrixUnit}</span>
+                                          ) : (
+                                            matrixUnit || receiptUnit
+                                          )}
+                                        </span>
+                                      </>
+                                    ) : (
+                                      <span className="text-xs text-slate-400 font-sans font-normal">ไม่มีในฐานราคากลาง</span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div className="space-y-1">
+                                  <span className="text-slate-500">ส่วนต่างราคาต่อหน่วย:</span>
+                                  {isNotFound ? (
+                                    <div className="text-xs font-semibold text-amber-800 flex items-center space-x-1 mt-0.5">
+                                      <AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
+                                      <span>รอการพิจารณา</span>
+                                    </div>
+                                  ) : (
+                                    <div className={`text-base font-extrabold font-mono flex items-center space-x-1 ${
+                                      priceDiff <= 0 ? "text-emerald-600" : "text-rose-600"
+                                    }`}>
+                                      {priceDiff <= 0 ? (
+                                        <>
+                                          <TrendingDown className="w-4 h-4 shrink-0" />
+                                          <span>ประหยัด ฿{Math.abs(priceDiff).toFixed(2)}</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <TrendingUp className="w-4 h-4 shrink-0" />
+                                          <span>เกินเกณฑ์ ฿{Math.abs(priceDiff).toFixed(2)}</span>
+                                        </>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Message Explanation */}
+                              <div className="text-xs text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-200/80 leading-relaxed">
+                                <span className="font-semibold text-slate-800 font-mono text-[11px]">ผลการวิเคราะห์: </span>
+                                {item.message}
+                              </div>
                             </div>
-                          )}
-                        </div>
+                          );
+                        })}
                       </div>
 
-                      {/* Message Explanation */}
-                      <div className="text-xs text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-200/80 leading-relaxed">
-                        <span className="font-semibold text-slate-800 font-mono text-[11px]">ผลการวิเคราะห์: </span>
-                        {item.message}
+                      {/* Category Subtotal Footer */}
+                      <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 flex justify-between items-center text-xs font-bold text-slate-800">
+                        <div className="flex items-center space-x-2">
+                          {getCategoryIcon(group.category)}
+                          <span>สรุปรวมเงิน{group.category} ({group.items.length} รายการ)</span>
+                        </div>
+                        <span className="font-mono text-sm sm:text-base text-slate-900">
+                          ฿{group.subtotal.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
+                        </span>
                       </div>
                     </div>
-                  );
-                })}
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
             {/* Bottom Actions */}
             <div className="bg-white border border-slate-200 rounded-2xl p-6 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm">
@@ -2041,86 +2202,212 @@ export default function UserFrontendPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-300">
-                  {analysisResults.map((item, idx) => {
-                    const isPass = item.status === "PASS";
-                    const isFail = item.status === "FAIL";
-                    const isNotFound = item.status === "NOT_FOUND";
-
-                    const itemName = item.receiptData?.itemName || item.itemInReceipt || "รายการที่ตรวจพบ";
-                    const qty = item.receiptData?.qty != null ? item.receiptData.qty : 1;
-                    const receiptUnit = item.receiptData?.unit || item.unit || "หน่วย";
-                    const unitPrice = item.receiptData?.unitPrice != null ? item.receiptData.unitPrice : (item.detectedPrice || 0);
-                    const totalPrice = item.receiptData?.totalPrice != null ? item.receiptData.totalPrice : (qty * unitPrice);
-
-                    const matrixName = item.matrixData?.itemName || item.matchedMatrixItem || null;
-                    const matrixMaxPrice = item.matrixData?.maxPrice != null ? item.matrixData.maxPrice : (item.matrixMaxPrice != null ? item.matrixMaxPrice : null);
-                    const matrixUnit = item.matrixData?.unit || null;
-
-                    const errorFlags = Array.isArray(item.errorFlags) ? item.errorFlags : [];
-                    const isUnitMismatch = !!(matrixUnit && receiptUnit && matrixUnit.trim().toLowerCase() !== receiptUnit.trim().toLowerCase());
-                    const hasMatrixMax = matrixMaxPrice != null && matrixMaxPrice > 0;
-
-                    return (
-                      <tr key={idx} className="align-top">
-                        <td className="py-2 px-2 text-center font-mono">{idx + 1}</td>
-                        <td className="py-2 px-2">
-                          <div className="font-bold text-black">{itemName}</div>
-                          {matrixName && (
-                            <div className="text-[10px] text-neutral-600">
-                              (เทียบราคากลาง: {matrixName})
+                  {groupedExpenseCategories.length > 0 ? (
+                    groupedExpenseCategories.map((group) => (
+                      <React.Fragment key={group.category}>
+                        {/* Category Header Row */}
+                        <tr className="bg-neutral-200 border-t-2 border-b border-black font-bold text-black">
+                          <td colSpan={6} className="py-1.5 px-2 text-xs">
+                            <div className="flex justify-between items-center">
+                              <span className="font-bold">📁 {group.category} ({group.items.length} รายการ)</span>
+                              <span className="font-mono text-[11px] font-normal">
+                                ผ่าน {group.passCount} รายการ{group.failCount > 0 ? `, ตรวจสอบ ${group.failCount} รายการ` : ""}
+                              </span>
                             </div>
-                          )}
-                          {/* Failure explanation / flags */}
-                          {isFail && (
-                            <div className="mt-1 text-[10px] text-black font-semibold">
-                              <span className="underline">หมายเหตุข้อผิดพลาด:</span>{" "}
-                              {errorFlags.map((flag) => `[${flag}]`).join(" ")}
-                              {item.message && ` - ${item.message}`}
-                            </div>
-                          )}
-                          {isNotFound && (
-                            <div className="mt-1 text-[10px] text-neutral-700 italic">
-                              * ไม่อยู่ในฐานข้อมูลราคากลาง (ต้องใช้ดุลยพินิจของคณะกรรมการ)
-                            </div>
-                          )}
-                        </td>
-                        <td className="py-2 px-2 text-right font-mono whitespace-nowrap">
-                          {qty} {receiptUnit} × ฿{Number(unitPrice).toFixed(2)}
-                          {isUnitMismatch && (
-                            <div className="text-[9px] text-neutral-600 font-sans">
-                              (หน่วยกลาง: {matrixUnit})
-                            </div>
-                          )}
-                        </td>
-                        <td className="py-2 px-2 text-right font-mono font-semibold whitespace-nowrap">
-                          ฿{Number(totalPrice).toLocaleString("th-TH", { minimumFractionDigits: 2 })}
-                        </td>
-                        <td className="py-2 px-2 text-right font-mono whitespace-nowrap">
-                          {hasMatrixMax ? (
-                            `฿${Number(matrixMaxPrice).toLocaleString("th-TH", { minimumFractionDigits: 2 })} / ${matrixUnit || receiptUnit}`
-                          ) : (
-                            <span className="text-neutral-400">-</span>
-                          )}
-                        </td>
-                        <td className="py-2 px-2 text-center font-mono">
-                          <span
-                            className={`inline-block px-1.5 py-0.5 text-[10px] font-bold border ${
-                              isPass
-                                ? "border-black bg-neutral-100 text-black"
-                                : isFail
-                                ? "border-black bg-black text-white"
-                                : "border-neutral-500 bg-neutral-200 text-black"
-                            }`}
-                          >
-                            {item.status}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                          </td>
+                        </tr>
+
+                        {/* Items in this Category */}
+                        {group.items.map(({ item, originalIndex }) => {
+                          const isPass = item.status === "PASS";
+                          const isFail = item.status === "FAIL";
+                          const isNotFound = item.status === "NOT_FOUND";
+
+                          const itemName = item.receiptData?.itemName || item.itemInReceipt || "รายการที่ตรวจพบ";
+                          const qty = item.receiptData?.qty != null ? item.receiptData.qty : 1;
+                          const receiptUnit = item.receiptData?.unit || item.unit || "หน่วย";
+                          const unitPrice = item.receiptData?.unitPrice != null ? item.receiptData.unitPrice : (item.detectedPrice || 0);
+                          const totalPrice = item.receiptData?.totalPrice != null ? item.receiptData.totalPrice : (qty * unitPrice);
+
+                          const matrixName = item.matrixData?.itemName || item.matchedMatrixItem || null;
+                          const matrixMaxPrice = item.matrixData?.maxPrice != null ? item.matrixData.maxPrice : (item.matrixMaxPrice != null ? item.matrixMaxPrice : null);
+                          const matrixUnit = item.matrixData?.unit || null;
+
+                          const errorFlags = Array.isArray(item.errorFlags) ? item.errorFlags : [];
+                          const isUnitMismatch = !!(matrixUnit && receiptUnit && matrixUnit.trim().toLowerCase() !== receiptUnit.trim().toLowerCase());
+                          const hasMatrixMax = matrixMaxPrice != null && matrixMaxPrice > 0;
+
+                          return (
+                            <tr key={originalIndex} className="align-top border-b border-neutral-200">
+                              <td className="py-2 px-2 text-center font-mono">{originalIndex + 1}</td>
+                              <td className="py-2 px-2">
+                                <div className="font-bold text-black">{itemName}</div>
+                                {matrixName && (
+                                  <div className="text-[10px] text-neutral-600">
+                                    (เทียบราคากลาง: {matrixName})
+                                  </div>
+                                )}
+                                {/* Failure explanation / flags */}
+                                {isFail && (
+                                  <div className="mt-1 text-[10px] text-black font-semibold">
+                                    <span className="underline">หมายเหตุข้อผิดพลาด:</span>{" "}
+                                    {errorFlags.map((flag) => `[${flag}]`).join(" ")}
+                                    {item.message && ` - ${item.message}`}
+                                  </div>
+                                )}
+                                {isNotFound && (
+                                  <div className="mt-1 text-[10px] text-neutral-700 italic">
+                                    * ไม่อยู่ในฐานข้อมูลราคากลาง (ต้องใช้ดุลยพินิจของคณะกรรมการ)
+                                  </div>
+                                )}
+                              </td>
+                              <td className="py-2 px-2 text-right font-mono whitespace-nowrap">
+                                {qty} {receiptUnit} × ฿{Number(unitPrice).toFixed(2)}
+                                {isUnitMismatch && (
+                                  <div className="text-[9px] text-neutral-600 font-sans">
+                                    (หน่วยกลาง: {matrixUnit})
+                                  </div>
+                                )}
+                              </td>
+                              <td className="py-2 px-2 text-right font-mono font-semibold whitespace-nowrap">
+                                ฿{Number(totalPrice).toLocaleString("th-TH", { minimumFractionDigits: 2 })}
+                              </td>
+                              <td className="py-2 px-2 text-right font-mono whitespace-nowrap">
+                                {hasMatrixMax ? (
+                                  `฿${Number(matrixMaxPrice).toLocaleString("th-TH", { minimumFractionDigits: 2 })} / ${matrixUnit || receiptUnit}`
+                                ) : (
+                                  <span className="text-neutral-400">-</span>
+                                )}
+                              </td>
+                              <td className="py-2 px-2 text-center font-mono">
+                                <span
+                                  className={`inline-block px-1.5 py-0.5 text-[10px] font-bold border ${
+                                    isPass
+                                      ? "border-black bg-neutral-100 text-black"
+                                      : isFail
+                                      ? "border-black bg-black text-white"
+                                      : "border-neutral-500 bg-neutral-200 text-black"
+                                  }`}
+                                >
+                                  {item.status}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+
+                        {/* Category Subtotal Row */}
+                        <tr className="bg-neutral-100 border-b-2 border-neutral-400 font-bold text-xs">
+                          <td colSpan={3} className="py-2 px-2 text-right text-neutral-800">
+                            รวมเงิน{group.category} ({group.items.length} รายการ):
+                          </td>
+                          <td className="py-2 px-2 text-right font-mono text-black font-extrabold whitespace-nowrap">
+                            ฿{group.subtotal.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
+                          </td>
+                          <td colSpan={2}></td>
+                        </tr>
+                      </React.Fragment>
+                    ))
+                  ) : (
+                    analysisResults.map((item, idx) => {
+                      const isPass = item.status === "PASS";
+                      const isFail = item.status === "FAIL";
+                      const isNotFound = item.status === "NOT_FOUND";
+
+                      const itemName = item.receiptData?.itemName || item.itemInReceipt || "รายการที่ตรวจพบ";
+                      const qty = item.receiptData?.qty != null ? item.receiptData.qty : 1;
+                      const receiptUnit = item.receiptData?.unit || item.unit || "หน่วย";
+                      const unitPrice = item.receiptData?.unitPrice != null ? item.receiptData.unitPrice : (item.detectedPrice || 0);
+                      const totalPrice = item.receiptData?.totalPrice != null ? item.receiptData.totalPrice : (qty * unitPrice);
+
+                      const matrixName = item.matrixData?.itemName || item.matchedMatrixItem || null;
+                      const matrixMaxPrice = item.matrixData?.maxPrice != null ? item.matrixData.maxPrice : (item.matrixMaxPrice != null ? item.matrixMaxPrice : null);
+                      const matrixUnit = item.matrixData?.unit || null;
+
+                      const errorFlags = Array.isArray(item.errorFlags) ? item.errorFlags : [];
+                      const isUnitMismatch = !!(matrixUnit && receiptUnit && matrixUnit.trim().toLowerCase() !== receiptUnit.trim().toLowerCase());
+                      const hasMatrixMax = matrixMaxPrice != null && matrixMaxPrice > 0;
+
+                      return (
+                        <tr key={idx} className="align-top">
+                          <td className="py-2 px-2 text-center font-mono">{idx + 1}</td>
+                          <td className="py-2 px-2">
+                            <div className="font-bold text-black">{itemName}</div>
+                            {matrixName && (
+                              <div className="text-[10px] text-neutral-600">
+                                (เทียบราคากลาง: {matrixName})
+                              </div>
+                            )}
+                            {isFail && (
+                              <div className="mt-1 text-[10px] text-black font-semibold">
+                                <span className="underline">หมายเหตุข้อผิดพลาด:</span>{" "}
+                                {errorFlags.map((flag) => `[${flag}]`).join(" ")}
+                                {item.message && ` - ${item.message}`}
+                              </div>
+                            )}
+                            {isNotFound && (
+                              <div className="mt-1 text-[10px] text-neutral-700 italic">
+                                * ไม่อยู่ในฐานข้อมูลราคากลาง (ต้องใช้ดุลยพินิจของคณะกรรมการ)
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-2 px-2 text-right font-mono whitespace-nowrap">
+                            {qty} {receiptUnit} × ฿{Number(unitPrice).toFixed(2)}
+                            {isUnitMismatch && (
+                              <div className="text-[9px] text-neutral-600 font-sans">
+                                (หน่วยกลาง: {matrixUnit})
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-2 px-2 text-right font-mono font-semibold whitespace-nowrap">
+                            ฿{Number(totalPrice).toLocaleString("th-TH", { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="py-2 px-2 text-right font-mono whitespace-nowrap">
+                            {hasMatrixMax ? (
+                              `฿${Number(matrixMaxPrice).toLocaleString("th-TH", { minimumFractionDigits: 2 })} / ${matrixUnit || receiptUnit}`
+                            ) : (
+                              <span className="text-neutral-400">-</span>
+                            )}
+                          </td>
+                          <td className="py-2 px-2 text-center font-mono">
+                            <span
+                              className={`inline-block px-1.5 py-0.5 text-[10px] font-bold border ${
+                                isPass
+                                  ? "border-black bg-neutral-100 text-black"
+                                  : isFail
+                                  ? "border-black bg-black text-white"
+                                  : "border-neutral-500 bg-neutral-200 text-black"
+                              }`}
+                            >
+                              {item.status}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
+
+            {/* Category Breakdown Summary Box in Print */}
+            {groupedExpenseCategories.length > 0 && (
+              <div className="border border-black p-3 mb-4 bg-neutral-50">
+                <h3 className="text-xs font-bold uppercase tracking-wider mb-2 border-b border-black pb-1">
+                  สรุปยอดเงินแยกตามหมวดหมู่งบประมาณ 6 หมวด (Expense Category Subtotals)
+                </h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+                  {groupedExpenseCategories.map((group) => (
+                    <div key={group.category} className="border border-neutral-300 bg-white p-2 flex justify-between items-center">
+                      <span className="font-semibold text-neutral-800">{group.category} ({group.items.length}):</span>
+                      <span className="font-mono font-bold text-black whitespace-nowrap">
+                        ฿{group.subtotal.toLocaleString("th-TH", { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Financial Summary Breakdown */}
             <div className="border border-black p-4 mb-6 bg-neutral-50">

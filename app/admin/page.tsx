@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { db, isFirebaseConfigured } from "@/lib/firebase";
+import { SUT_EXPENSE_CATEGORIES, normalizeExpenseCategory } from "@/lib/types";
 import {
   collection,
   onSnapshot,
@@ -47,7 +48,10 @@ export interface PriceMatrixItem {
   updatedAt?: number;
 }
 
-const CATEGORIES = ["อาหาร", "อุปกรณ์สำนักงาน", "บริการ", "อื่นๆ"];
+const CATEGORIES = [
+  ...SUT_EXPENSE_CATEGORIES,
+  "อื่นๆ",
+];
 
 export default function AdminDashboardPage() {
   const { user, loading: authLoading, logout, isDemoMode } = useAuth();
@@ -80,7 +84,7 @@ export default function AdminDashboardPage() {
   const aiFileInputRef = useRef<HTMLInputElement>(null);
 
   const [itemName, setItemName] = useState("");
-  const [category, setCategory] = useState("อาหาร");
+  const [category, setCategory] = useState("หมวดโภชนาการ");
   const [maxPrice, setMaxPrice] = useState("");
   const [unit, setUnit] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
@@ -122,7 +126,7 @@ export default function AdminDashboardPage() {
 
   const resetFormFields = () => {
     setItemName("");
-    setCategory("อาหาร");
+    setCategory("หมวดโภชนาการ");
     setMaxPrice("");
     setUnit("");
     setEditingItem(null);
@@ -397,7 +401,7 @@ export default function AdminDashboardPage() {
       for (const itemData of extractedItems) {
         const formattedItem = {
           itemName: itemData.itemName || "รายการไม่มีชื่อ",
-          category: CATEGORIES.includes(itemData.category) ? itemData.category : "อื่นๆ",
+          category: normalizeExpenseCategory(itemData.category, itemData.itemName),
           maxPrice: Number(itemData.maxPrice) || 0,
           unit: itemData.unit || "รายการ",
         };
