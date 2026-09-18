@@ -48,9 +48,11 @@ export interface PriceMatrixItem {
   updatedAt?: number;
 }
 
-const CATEGORIES = [
+const CATEGORIES = [...SUT_EXPENSE_CATEGORIES];
+
+const FILTER_CATEGORIES = [
+  "ทั้งหมด",
   ...SUT_EXPENSE_CATEGORIES,
-  "อื่นๆ",
 ];
 
 export default function AdminDashboardPage() {
@@ -146,7 +148,7 @@ export default function AdminDashboardPage() {
   const handleOpenEditModal = (item: PriceMatrixItem) => {
     setEditingItem(item);
     setItemName(item.itemName);
-    setCategory(item.category);
+    setCategory(normalizeExpenseCategory(item.category, item.itemName));
     setMaxPrice(item.maxPrice.toString());
     setUnit(item.unit);
     setFormError(null);
@@ -469,7 +471,11 @@ export default function AdminDashboardPage() {
     return items
       .filter((item) => {
         const matchesSearch = item.itemName.toLowerCase().includes(searchTerm.toLowerCase().trim());
-        const matchesCat = selectedCategory === "ทั้งหมด" || item.category === selectedCategory;
+        const normalizedItemCat = normalizeExpenseCategory(item.category, item.itemName);
+        const matchesCat =
+          selectedCategory === "ทั้งหมด" ||
+          item.category === selectedCategory ||
+          normalizedItemCat === selectedCategory;
         return matchesSearch && matchesCat;
       })
       .sort((a, b) => {
@@ -554,11 +560,11 @@ export default function AdminDashboardPage() {
             </div>
             <div className="flex items-center space-x-1 bg-neutral-950 border border-neutral-800 p-1 text-xs font-mono overflow-x-auto">
               <Filter className="w-3.5 h-3.5 text-neutral-500 ml-1 mr-1 shrink-0" />
-              {["ทั้งหมด", "อาหาร", "อุปกรณ์สำนักงาน", "บริการ", "อื่นๆ"].map((cat) => (
+              {FILTER_CATEGORIES.map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setSelectedCategory(cat)}
-                  className={`px-3 py-1 text-[11px] whitespace-nowrap transition ${
+                  className={`px-3 py-1 text-[11px] whitespace-nowrap transition cursor-pointer ${
                     selectedCategory === cat ? "bg-white text-black font-bold" : "text-neutral-400 hover:text-white hover:bg-neutral-900"
                   }`}
                 >

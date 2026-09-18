@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { PriceMatrixItem, PriceMatrixFormData, SUT_EXPENSE_CATEGORIES } from "@/lib/types";
+import { PriceMatrixItem, PriceMatrixFormData, SUT_EXPENSE_CATEGORIES, normalizeExpenseCategory } from "@/lib/types";
 import { X, Save, PlusCircle, AlertCircle } from "lucide-react";
 
 interface ItemModalProps {
@@ -11,17 +11,7 @@ interface ItemModalProps {
   initialData?: PriceMatrixItem | null;
 }
 
-const CATEGORIES = [
-  ...SUT_EXPENSE_CATEGORIES,
-  "อาหาร",
-  "อุปกรณ์สำนักงาน",
-  "บริการ",
-  "อื่นๆ",
-  "Food",
-  "Material",
-  "Service",
-  "Other",
-];
+const CATEGORIES = [...SUT_EXPENSE_CATEGORIES];
 
 export default function ItemModal({
   isOpen,
@@ -41,7 +31,7 @@ export default function ItemModal({
   useEffect(() => {
     if (initialData) {
       setItemName(initialData.itemName);
-      setCategory(initialData.category);
+      setCategory(normalizeExpenseCategory(initialData.category, initialData.itemName));
       setMaxPrice((initialData.maxPrice || initialData.unitPrice || 0).toString());
       setUnit(initialData.unit || initialData.unitType || "");
     } else {

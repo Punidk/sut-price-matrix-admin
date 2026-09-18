@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { PriceMatrixItem } from "@/lib/types";
+import { PriceMatrixItem, SUT_EXPENSE_CATEGORIES, normalizeExpenseCategory } from "@/lib/types";
 import {
   Search,
   Edit2,
@@ -9,9 +9,12 @@ import {
   Plus,
   Filter,
   ArrowUpDown,
-  UtensilsCrossed,
-  Package,
-  Wrench,
+  Coins,
+  Utensils,
+  Car,
+  Hammer,
+  Paperclip,
+  Cpu,
   Grid,
 } from "lucide-react";
 
@@ -23,6 +26,11 @@ interface PriceMatrixTableProps {
   loading?: boolean;
 }
 
+const FILTER_CATEGORIES = [
+  "ทั้งหมด",
+  ...SUT_EXPENSE_CATEGORIES,
+];
+
 export default function PriceMatrixTable({
   items,
   onAddNew,
@@ -31,7 +39,7 @@ export default function PriceMatrixTable({
   loading = false,
 }: PriceMatrixTableProps) {
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
+  const [selectedCategory, setSelectedCategory] = useState<string>("ทั้งหมด");
   const [sortField, setSortField] = useState<"itemName" | "maxPrice" | "category">("itemName");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
@@ -41,13 +49,12 @@ export default function PriceMatrixTable({
         const matchesSearch = item.itemName
           .toLowerCase()
           .includes(searchTerm.toLowerCase().trim());
+        const normalizedItemCat = normalizeExpenseCategory(item.category, item.itemName);
         const matchesCategory =
+          selectedCategory === "ทั้งหมด" ||
           selectedCategory === "ALL" ||
           item.category === selectedCategory ||
-          (selectedCategory === "Food" && item.category === "อาหาร") ||
-          (selectedCategory === "Material" && item.category === "อุปกรณ์สำนักงาน") ||
-          (selectedCategory === "Service" && item.category === "บริการ") ||
-          (selectedCategory === "Other" && item.category === "อื่นๆ");
+          normalizedItemCat === selectedCategory;
         return matchesSearch && matchesCategory;
       })
       .sort((a, b) => {
@@ -75,34 +82,35 @@ export default function PriceMatrixTable({
   };
 
   const getCategoryBadge = (cat: string) => {
-    if (cat === "Food" || cat === "อาหาร") {
-      return (
-        <span className="inline-flex items-center space-x-1 border border-neutral-700 bg-neutral-900 text-neutral-200 px-2 py-0.5 text-[11px] font-mono">
-          <UtensilsCrossed className="w-3 h-3 text-neutral-400" />
-          <span>{cat}</span>
-        </span>
-      );
+    const normalized = normalizeExpenseCategory(cat);
+    let IconComponent = Grid;
+    switch (normalized) {
+      case "หมวดค่าตอบแทน":
+        IconComponent = Coins;
+        break;
+      case "หมวดโภชนาการ":
+        IconComponent = Utensils;
+        break;
+      case "หมวดยานพาหนะ":
+        IconComponent = Car;
+        break;
+      case "หมวดอุปกรณ์ก่อสร้าง":
+        IconComponent = Hammer;
+        break;
+      case "หมวดอุปกรณ์สำนักงาน":
+        IconComponent = Paperclip;
+        break;
+      case "หมวดอุปกรณ์อิเล็กทรอนิกส์":
+        IconComponent = Cpu;
+        break;
+      default:
+        IconComponent = Grid;
     }
-    if (cat === "Material" || cat === "อุปกรณ์สำนักงาน") {
-      return (
-        <span className="inline-flex items-center space-x-1 border border-neutral-700 bg-neutral-900 text-neutral-200 px-2 py-0.5 text-[11px] font-mono">
-          <Package className="w-3 h-3 text-neutral-400" />
-          <span>{cat}</span>
-        </span>
-      );
-    }
-    if (cat === "Service" || cat === "บริการ") {
-      return (
-        <span className="inline-flex items-center space-x-1 border border-neutral-700 bg-neutral-900 text-neutral-200 px-2 py-0.5 text-[11px] font-mono">
-          <Wrench className="w-3 h-3 text-neutral-400" />
-          <span>{cat}</span>
-        </span>
-      );
-    }
+
     return (
       <span className="inline-flex items-center space-x-1 border border-neutral-700 bg-neutral-900 text-neutral-200 px-2 py-0.5 text-[11px] font-mono">
-        <Grid className="w-3 h-3 text-neutral-400" />
-        <span>{cat}</span>
+        <IconComponent className="w-3 h-3 text-neutral-400" />
+        <span>{normalized}</span>
       </span>
     );
   };
@@ -137,19 +145,19 @@ export default function PriceMatrixTable({
 
         {/* Category Filters & Add Button */}
         <div className="flex flex-wrap items-center gap-2.5">
-          <div className="flex items-center space-x-1 bg-neutral-950 border border-neutral-800 p-1 text-xs font-mono">
-            <Filter className="w-3.5 h-3.5 text-neutral-500 ml-1 mr-1" />
-            {["ALL", "อาหาร", "อุปกรณ์สำนักงาน", "บริการ", "อื่นๆ"].map((cat) => (
+          <div className="flex items-center space-x-1 bg-neutral-950 border border-neutral-800 p-1 text-xs font-mono overflow-x-auto">
+            <Filter className="w-3.5 h-3.5 text-neutral-500 ml-1 mr-1 shrink-0" />
+            {FILTER_CATEGORIES.map((cat) => (
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
-                className={`px-2.5 py-1 text-[11px] transition ${
+                className={`px-2.5 py-1 text-[11px] whitespace-nowrap transition cursor-pointer ${
                   selectedCategory === cat
                     ? "bg-white text-black font-bold"
                     : "text-neutral-400 hover:text-white hover:bg-neutral-900"
                 }`}
               >
-                {cat.toUpperCase()}
+                {cat}
               </button>
             ))}
           </div>
