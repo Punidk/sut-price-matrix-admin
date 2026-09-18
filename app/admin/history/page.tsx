@@ -63,6 +63,25 @@ export interface MerchantInfo {
   isHandwritten: boolean;
 }
 
+export interface CustomerInfo {
+  name?: string;
+  address?: string;
+  taxId?: string;
+  phone?: string;
+  isSutCustomer?: boolean;
+  hasCorrectAddress?: boolean;
+  hasCorrectTaxId?: boolean;
+  hasCorrectPhone?: boolean;
+}
+
+export interface QuotationTermsData {
+  isQuotation?: boolean;
+  priceValidity?: string;
+  deliveryTerm?: string;
+  hasTextAmount?: boolean;
+  hasQuotationSign?: boolean;
+}
+
 export interface FinancialSummaryData {
   subtotal: number;
   discount: number;
@@ -78,6 +97,9 @@ export interface AuditLogEntry {
   failCount: number;
   scanResults: AuditScanItem[];
   merchant?: MerchantInfo | null;
+  customer?: CustomerInfo | null;
+  quotationTerms?: QuotationTermsData | null;
+  documentType?: string | null;
   financialSummary?: FinancialSummaryData | null;
   warnings?: string[];
   overallStatus?: string | null;
@@ -184,6 +206,9 @@ export default function AdminAuditHistoryPage() {
                 failCount: Number(data.failCount) || 0,
                 scanResults: Array.isArray(data.scanResults) ? data.scanResults : [],
                 merchant: data.merchant || null,
+                customer: data.customer || null,
+                quotationTerms: data.quotationTerms || null,
+                documentType: data.documentType || null,
                 financialSummary: data.financialSummary || null,
                 warnings: Array.isArray(data.warnings) ? data.warnings : [],
                 overallStatus: data.overallStatus || null,
@@ -494,6 +519,11 @@ export default function AdminAuditHistoryPage() {
                                   <XCircle className="w-3.5 h-3.5 shrink-0 text-rose-400" />
                                   <span>เอกสารไม่ถูกต้อง</span>
                                 </span>
+                              ) : (log.warnings && log.warnings.some((w) => typeof w === "string" && w.includes("[ระเบียบ มทส.]"))) ? (
+                                <span className="inline-flex items-center space-x-1 border border-rose-600/80 bg-rose-950/60 text-rose-300 text-[11px] font-mono px-2.5 py-1">
+                                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-rose-400" />
+                                  <span>ผิดระเบียบ มทส.</span>
+                                </span>
                               ) : (log.overallStatus !== "INVALID_DOCUMENT" && (log.itemsAnalyzed ?? 0) > 0 && log.financialSummary?.isMathCorrect === false) ? (
                                 <span className="inline-flex items-center space-x-1 border border-rose-600/80 bg-rose-950/60 text-rose-300 text-[11px] font-mono px-2.5 py-1">
                                   <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-rose-400" />
@@ -640,6 +670,8 @@ export default function AdminAuditHistoryPage() {
                                         <span className="px-2 py-0.5 border border-neutral-700 bg-neutral-950 text-neutral-300 text-[10px]">
                                           {log.overallStatus === "INVALID_DOCUMENT"
                                             ? "-"
+                                            : log.documentType === "QUOTATION" || log.quotationTerms?.isQuotation
+                                            ? "ใบเสนอราคา (Quotation)"
                                             : log.merchant.isHandwritten
                                             ? "บิลเขียนมือ"
                                             : "บิลพิมพ์/คอมพิวเตอร์"}
@@ -675,6 +707,155 @@ export default function AdminAuditHistoryPage() {
                                       </div>
                                     </div>
                                   )}
+                                </div>
+                              )}
+
+                              {/* SUT Quotation Compliance Section (8 ข้อกำหนดระเบียบ มทส.) */}
+                              {(log.documentType === "QUOTATION" || log.quotationTerms || log.customer || log.warnings?.some((w) => typeof w === "string" && w.includes("[ระเบียบ มทส.]"))) && (
+                                <div className="bg-neutral-900 border border-neutral-800 p-4 space-y-3 font-mono text-xs">
+                                  <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2.5 border-b border-neutral-800 gap-2">
+                                    <div className="flex items-center space-x-2">
+                                      <ShieldCheck className="w-4 h-4 text-orange-400" />
+                                      <span className="font-bold text-white uppercase">
+                                        ผลการตรวจสอบตามระเบียบใบเสนอราคา มทส. (8 ข้อกำหนด)
+                                      </span>
+                                    </div>
+                                    <span className={`px-2 py-0.5 border text-[11px] font-bold ${
+                                      log.warnings?.some((w) => typeof w === "string" && w.includes("[ระเบียบ มทส.]"))
+                                        ? "bg-rose-950/60 border-rose-600 text-rose-300"
+                                        : "bg-emerald-950/60 border-emerald-600 text-emerald-300"
+                                    }`}>
+                                      {log.warnings?.some((w) => typeof w === "string" && w.includes("[ระเบียบ มทส.]"))
+                                        ? "✕ ผิดระเบียบ มทส."
+                                        : "✓ ครบถ้วนตามระเบียบ"}
+                                    </span>
+                                  </div>
+
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-[11px]">
+                                    {/* 1. ข้อมูลลูกค้า */}
+                                    <div className="space-y-2 bg-neutral-950/60 p-3 border border-neutral-800/80">
+                                      <span className="text-[10px] text-neutral-400 font-bold uppercase block border-b border-neutral-800 pb-1">
+                                        1. ข้อมูลลูกค้า มทส. (Customer)
+                                      </span>
+                                      <div className="space-y-1.5">
+                                        <div className="flex items-start space-x-2">
+                                          {log.customer?.isSutCustomer ? (
+                                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                                          ) : (
+                                            <XCircle className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />
+                                          )}
+                                          <div>
+                                            <span className="text-neutral-400">1. ชื่อลูกค้า: </span>
+                                            <span className="text-neutral-200">{log.customer?.name || "ไม่ระบุ"}</span>
+                                            {!log.customer?.isSutCustomer && (
+                                              <span className="text-rose-400 block text-[10px]">* ต้องเป็นชื่อ มหาวิทยาลัยเทคโนโลยีสุรนารี</span>
+                                            )}
+                                          </div>
+                                        </div>
+
+                                        <div className="flex items-start space-x-2">
+                                          {log.customer?.hasCorrectAddress ? (
+                                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                                          ) : (
+                                            <XCircle className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />
+                                          )}
+                                          <div>
+                                            <span className="text-neutral-400">2. ที่อยู่: </span>
+                                            <span className="text-neutral-200">{log.customer?.address || "ไม่ระบุ"}</span>
+                                            {!log.customer?.hasCorrectAddress && (
+                                              <span className="text-rose-400 block text-[10px]">* ต้องมี 111 ถ.มหาวิทยาลัย ต.สุรนารี...</span>
+                                            )}
+                                          </div>
+                                        </div>
+
+                                        <div className="flex items-start space-x-2">
+                                          {log.customer?.hasCorrectTaxId ? (
+                                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                                          ) : (
+                                            <XCircle className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />
+                                          )}
+                                          <div>
+                                            <span className="text-neutral-400">3. เลขผู้เสียภาษี: </span>
+                                            <span className="text-neutral-200">{log.customer?.taxId || "ไม่ระบุ"}</span>
+                                            {!log.customer?.hasCorrectTaxId && (
+                                              <span className="text-rose-400 block text-[10px]">* ต้องเป็น 0994000288654</span>
+                                            )}
+                                          </div>
+                                        </div>
+
+                                        <div className="flex items-start space-x-2">
+                                          {log.customer?.hasCorrectPhone ? (
+                                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                                          ) : (
+                                            <XCircle className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />
+                                          )}
+                                          <div>
+                                            <span className="text-neutral-400">4. โทรศัพท์: </span>
+                                            <span className="text-neutral-200">{log.customer?.phone || "ไม่ระบุ"}</span>
+                                            {!log.customer?.hasCorrectPhone && (
+                                              <span className="text-rose-400 block text-[10px]">* ต้องเป็น 04-422-0000</span>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    {/* 2. เงื่อนไขเอกสาร */}
+                                    <div className="space-y-2 bg-neutral-950/60 p-3 border border-neutral-800/80">
+                                      <span className="text-[10px] text-neutral-400 font-bold uppercase block border-b border-neutral-800 pb-1">
+                                        2. เงื่อนไขและข้อตกลง (Terms & Conditions)
+                                      </span>
+                                      <div className="space-y-1.5">
+                                        <div className="flex items-start space-x-2">
+                                          {Boolean(log.quotationTerms?.priceValidity && log.quotationTerms.priceValidity.trim() !== "") ? (
+                                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                                          ) : (
+                                            <XCircle className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />
+                                          )}
+                                          <div>
+                                            <span className="text-neutral-400">5. ระยะเวลายืนราคา: </span>
+                                            <span className="text-neutral-200">{log.quotationTerms?.priceValidity || "ไม่ระบุ"}</span>
+                                          </div>
+                                        </div>
+
+                                        <div className="flex items-start space-x-2">
+                                          {Boolean(log.quotationTerms?.deliveryTerm && log.quotationTerms.deliveryTerm.trim() !== "") ? (
+                                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                                          ) : (
+                                            <XCircle className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />
+                                          )}
+                                          <div>
+                                            <span className="text-neutral-400">6. กำหนดส่งมอบ: </span>
+                                            <span className="text-neutral-200">{log.quotationTerms?.deliveryTerm || "ไม่ระบุ"}</span>
+                                          </div>
+                                        </div>
+
+                                        <div className="flex items-start space-x-2">
+                                          {log.quotationTerms?.hasTextAmount ? (
+                                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                                          ) : (
+                                            <XCircle className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />
+                                          )}
+                                          <div>
+                                            <span className="text-neutral-400">7. ตัวหนังสือกำกับยอด: </span>
+                                            <span className="text-neutral-200">{log.quotationTerms?.hasTextAmount ? "มีตัวหนังสือกำกับ" : "ไม่พบตัวหนังสือ"}</span>
+                                          </div>
+                                        </div>
+
+                                        <div className="flex items-start space-x-2">
+                                          {log.quotationTerms?.hasQuotationSign ? (
+                                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                                          ) : (
+                                            <XCircle className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />
+                                          )}
+                                          <div>
+                                            <span className="text-neutral-400">8. ลายเซ็นผู้เสนอราคา: </span>
+                                            <span className="text-neutral-200">{log.quotationTerms?.hasQuotationSign ? "พบลายเซ็น/ตรายาง" : "ขาดลายเซ็น"}</span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
                                 </div>
                               )}
 

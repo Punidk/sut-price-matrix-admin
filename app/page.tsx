@@ -82,6 +82,25 @@ export interface FinancialSummaryData {
   isMathCorrect?: boolean;
 }
 
+export interface CustomerInfo {
+  name?: string;
+  address?: string;
+  taxId?: string;
+  phone?: string;
+  isSutCustomer?: boolean;
+  hasCorrectAddress?: boolean;
+  hasCorrectTaxId?: boolean;
+  hasCorrectPhone?: boolean;
+}
+
+export interface QuotationTermsData {
+  isQuotation?: boolean;
+  priceValidity?: string;
+  deliveryTerm?: string;
+  hasTextAmount?: boolean;
+  hasQuotationSign?: boolean;
+}
+
 export interface UploadedFileItem {
   id: string;
   file: File;
@@ -104,6 +123,10 @@ export default function UserFrontendPage() {
   // AI Analysis Results state (Array of items + Header metadata)
   const [analysisResults, setAnalysisResults] = useState<AnalysisItemResult[] | null>(null);
   const [merchantInfo, setMerchantInfo] = useState<MerchantInfo | null>(null);
+  const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null);
+  const [quotationTerms, setQuotationTerms] = useState<QuotationTermsData | null>(null);
+  const [documentType, setDocumentType] = useState<string | null>(null);
+  const [isQuotationCheck, setIsQuotationCheck] = useState<boolean>(false);
   const [financialSummary, setFinancialSummary] = useState<FinancialSummaryData | null>(null);
   const [documentWarnings, setDocumentWarnings] = useState<string[]>([]);
   const [overallStatus, setOverallStatus] = useState<string | null>(null);
@@ -258,27 +281,112 @@ export default function UserFrontendPage() {
     setSelectedFiles((prev) => prev.filter((item) => item.id !== id));
   };
 
-  // Sample file preview simulation
+  // Sample file preview simulation - สร้างใบเสนอราคาตามระเบียบ มทส. 8 ข้อ
   const handleSelectSample = () => {
     const canvas = document.createElement("canvas");
-    canvas.width = 500;
-    canvas.height = 350;
+    canvas.width = 750;
+    canvas.height = 580;
     const ctx = canvas.getContext("2d");
     if (ctx) {
-      ctx.fillStyle = "#ea580c";
-      ctx.fillRect(0, 0, 500, 350);
       ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 22px sans-serif";
-      ctx.fillText("ใบเสนอราคาโครงการกิจกรรมนักศึกษา มทส.", 30, 80);
-      ctx.font = "16px sans-serif";
-      ctx.fillText("1. ข้าวกล่อง (กระเพราไก่ไข่ดาว) - 45 บาท/กล่อง", 30, 140);
-      ctx.fillText("2. น้ำดื่มขวด 600ml - 7 บาท/ขวด", 30, 180);
-      ctx.fillText("3. ป้ายไวนิลโครงการ 1x3m - 350 บาท/ผืน", 30, 220);
+      ctx.fillRect(0, 0, 750, 580);
+
+      // Header Bar
+      ctx.fillStyle = "#ea580c";
+      ctx.fillRect(0, 0, 750, 42);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 18px sans-serif";
+      ctx.fillText("ใบเสนอราคา (QUOTATION)", 25, 28);
+
+      // Vendor Info
+      ctx.fillStyle = "#0f172a";
+      ctx.font = "bold 14px sans-serif";
+      ctx.fillText("ผู้เสนอราคา: บริษัท สุรนารี ออฟฟิศ ซัพพลาย แอนด์ เซอร์วิส จำกัด", 25, 70);
+      ctx.font = "12px sans-serif";
+      ctx.fillText("เลขผู้เสียภาษีผู้ขาย: 0105559012345 | โทร. 044-112233 | วันที่: 15 มกราคม 2568", 25, 90);
+
+      // Customer Info Box (ตามระเบียบ มทส.)
+      ctx.fillStyle = "#f8fafc";
+      ctx.fillRect(25, 105, 700, 95);
+      ctx.strokeStyle = "#cbd5e1";
+      ctx.strokeRect(25, 105, 700, 95);
+
+      ctx.fillStyle = "#0f172a";
+      ctx.font = "bold 12px sans-serif";
+      ctx.fillText("ลูกค้า / ผู้รับการเสนอราคา (Customer):", 35, 125);
+      ctx.font = "12px sans-serif";
+      ctx.fillText("ชื่อลูกค้า: มหาวิทยาลัยเทคโนโลยีสุรนารี", 35, 145);
+      ctx.fillText("ที่อยู่: 111 ถนนมหาวิทยาลัย ตำบล สุรนารี อำเภอเมือง จังหวัดนครราชสีมา 30000", 35, 165);
+      ctx.fillText("เลขประจำตัวผู้เสียภาษี: 0994000288654   |   เบอร์โทรศัพท์: 04-422-0000", 35, 185);
+
+      // Items Table
+      ctx.fillStyle = "#ea580c";
+      ctx.fillRect(25, 215, 700, 26);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 12px sans-serif";
+      ctx.fillText("ลำดับ", 35, 233);
+      ctx.fillText("รายการพัสดุ / บริการ", 90, 233);
+      ctx.fillText("จำนวน", 400, 233);
+      ctx.fillText("ราคา/หน่วย", 490, 233);
+      ctx.fillText("จำนวนเงิน (บาท)", 600, 233);
+
+      ctx.fillStyle = "#1e293b";
+      ctx.font = "12px sans-serif";
+      ctx.fillText("1", 45, 260);
+      ctx.fillText("ข้าวกล่อง (กระเพราไก่ไข่ดาว)", 90, 260);
+      ctx.fillText("100 กล่อง", 400, 260);
+      ctx.fillText("45.00", 500, 260);
+      ctx.fillText("4,500.00", 620, 260);
+
+      ctx.fillText("2", 45, 285);
+      ctx.fillText("น้ำดื่มขวด 600ml", 90, 285);
+      ctx.fillText("100 ขวด", 400, 285);
+      ctx.fillText("7.00", 500, 285);
+      ctx.fillText("700.00", 620, 285);
+
+      ctx.fillText("3", 45, 310);
+      ctx.fillText("ป้ายไวนิลโครงการ 1x3m", 90, 310);
+      ctx.fillText("1 ผืน", 400, 310);
+      ctx.fillText("350.00", 500, 310);
+      ctx.fillText("350.00", 620, 310);
+
+      // Total Line
+      ctx.strokeStyle = "#94a3b8";
+      ctx.beginPath();
+      ctx.moveTo(25, 330);
+      ctx.lineTo(725, 330);
+      ctx.stroke();
+
+      ctx.font = "bold 13px sans-serif";
+      ctx.fillText("ยอดรวมสุทธิทั้งสิ้น (Grand Total): ฿5,550.00", 430, 355);
+      ctx.fillStyle = "#ea580c";
+      ctx.font = "bold 12px sans-serif";
+      ctx.fillText("(จำนวนเงินตัวหนังสือ: ห้าพันห้าร้อยห้าสิบบาทถ้วน)", 300, 375);
+
+      // Terms Box
+      ctx.fillStyle = "#f8fafc";
+      ctx.fillRect(25, 395, 700, 160);
+      ctx.strokeStyle = "#cbd5e1";
+      ctx.strokeRect(25, 395, 700, 160);
+
+      ctx.fillStyle = "#0f172a";
+      ctx.font = "bold 12px sans-serif";
+      ctx.fillText("เงื่อนไขและข้อตกลงทางการค้า (Terms & Conditions):", 35, 418);
+      ctx.font = "12px sans-serif";
+      ctx.fillText("1. กำหนดยืนราคา: 30 วัน นับจากวันที่ออกใบเสนอราคา", 35, 440);
+      ctx.fillText("2. กำหนดเวลาส่งมอบพัสดุ: ภายใน 7 วัน นับถัดจากวันได้รับใบสั่งจ้าง", 35, 462);
+
+      ctx.fillText("ลงชื่อผู้เสนอราคา: .....................................................", 420, 495);
+      ctx.font = "bold 12px sans-serif";
+      ctx.fillText("(นายสมชาย สุรนารี)", 495, 520);
+      ctx.font = "italic 11px sans-serif";
+      ctx.fillText("ผู้จัดการฝ่ายขาย / ประทับตรา", 480, 538);
     }
 
     canvas.toBlob((blob) => {
       if (blob) {
-        const sampleFile = new File([blob], "ใบเสนอราคา_กิจกรรมนักศึกษา_มทส.jpg", { type: "image/jpeg" });
+        const sampleFile = new File([blob], "ใบเสนอราคา_มทส_ตามระเบียบ.jpg", { type: "image/jpeg" });
+        setIsQuotationCheck(true);
         addFiles([sampleFile]);
       }
     }, "image/jpeg");
@@ -289,12 +397,16 @@ export default function UserFrontendPage() {
     setSelectedFiles([]);
     setAnalysisResults(null);
     setMerchantInfo(null);
+    setCustomerInfo(null);
+    setQuotationTerms(null);
+    setDocumentType(null);
     setFinancialSummary(null);
     setDocumentWarnings([]);
     setOverallStatus(null);
     setUploadError(null);
     setIsProcessing(false);
     setProcessingStep(0);
+    setIsQuotationCheck(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (cameraInputRef.current) cameraInputRef.current.value = "";
   };
@@ -363,6 +475,7 @@ export default function UserFrontendPage() {
           files: payloadFiles,
           excelText: combinedExcelText.trim(),
           priceMatrix: priceMatrix,
+          isQuotationCheck: isQuotationCheck,
         }),
       });
 
@@ -374,6 +487,9 @@ export default function UserFrontendPage() {
       const data = await aiRes.json();
       let results: AnalysisItemResult[] = [];
       let merchant: MerchantInfo | null = null;
+      let customer: CustomerInfo | null = null;
+      let qTerms: QuotationTermsData | null = null;
+      let docTypeStr: string | null = null;
       let finSummary: FinancialSummaryData | null = null;
       let warningsList: string[] = [];
       let overallStatusStr: string | null = null;
@@ -381,6 +497,9 @@ export default function UserFrontendPage() {
       if (data && typeof data === "object" && !Array.isArray(data)) {
         results = Array.isArray(data.items) ? data.items : [];
         merchant = data.merchant || null;
+        customer = data.customer || null;
+        qTerms = data.quotationTerms || null;
+        docTypeStr = data.documentType || null;
         finSummary = data.financialSummary || null;
         warningsList = Array.isArray(data.warnings) ? data.warnings : [];
         overallStatusStr = data.overallStatus || null;
@@ -461,6 +580,9 @@ export default function UserFrontendPage() {
       }
 
       setMerchantInfo(merchant);
+      setCustomerInfo(customer);
+      setQuotationTerms(qTerms);
+      setDocumentType(docTypeStr);
       setFinancialSummary(finSummary);
       setDocumentWarnings(warningsList);
       setOverallStatus(overallStatusStr);
@@ -477,6 +599,9 @@ export default function UserFrontendPage() {
           failCount: failCount,
           scanResults: results,
           merchant: merchant || null,
+          customer: customer || null,
+          quotationTerms: qTerms || null,
+          documentType: docTypeStr || null,
           financialSummary: finSummary || null,
           warnings: warningsList,
           overallStatus: overallStatusStr || (failCount > 0 ? "FAIL" : "PASS"),
@@ -543,22 +668,34 @@ export default function UserFrontendPage() {
     documentWarnings?.find((w) => typeof w === "string" && w.includes("ตรวจพบบิลที่อาจซ้ำซ้อน")) || null;
   const hasDuplicate = !isInvalidDocument && Boolean(duplicateWarningText);
 
+  const hasSutQuotationViolation =
+    !isInvalidDocument &&
+    (documentWarnings?.some((w) => typeof w === "string" && w.includes("[ระเบียบ มทส.]")) ?? false);
+
+  const isQuotationDoc =
+    documentType === "QUOTATION" ||
+    Boolean(quotationTerms?.isQuotation) ||
+    isQuotationCheck ||
+    hasSutQuotationViolation;
+
   const isOverallPass =
     !isInvalidDocument &&
     !isMathError &&
     !hasTampering &&
     !hasDuplicate &&
+    !hasSutQuotationViolation &&
     totalItemsCount > 0 &&
     hasApprovedItems &&
     hasValidAmount &&
     failItemsCount === 0 &&
     notFoundItemsCount === 0;
 
-  const isOverallHasFail = !isInvalidDocument && (failItemsCount > 0 || isMathError || hasTampering);
+  const isOverallHasFail = !isInvalidDocument && (failItemsCount > 0 || isMathError || hasTampering || hasSutQuotationViolation);
   const isOverallPendingReview =
     !isInvalidDocument &&
     !isMathError &&
     !hasTampering &&
+    !hasSutQuotationViolation &&
     (hasDuplicate || (totalItemsCount > 0 && failItemsCount === 0 && (notFoundItemsCount > 0 || !hasApprovedItems || !hasValidAmount)));
 
   const totalPassAmount = analysisResults
@@ -903,6 +1040,29 @@ export default function UserFrontendPage() {
               </div>
             )}
 
+            {/* SUT Quotation Rules Toggle */}
+            <div className="bg-orange-50/70 border border-orange-200 rounded-xl p-3 flex items-center justify-between">
+              <label className="flex items-center space-x-2.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={isQuotationCheck}
+                  onChange={(e) => setIsQuotationCheck(e.target.checked)}
+                  className="w-4 h-4 text-orange-600 rounded border-slate-300 focus:ring-orange-500 cursor-pointer"
+                />
+                <div>
+                  <span className="text-xs font-bold text-slate-800 block">
+                    ตรวจสอบตามระเบียบใบเสนอราคา มทส. (Quotation Validation Rule)
+                  </span>
+                  <span className="text-[11px] text-slate-500 block">
+                    ตรวจข้อมูลลูกค้า (มหาวิทยาลัย, ที่อยู่, เลขผู้เสียภาษี 0994000288654, โทร 04-422-0000) และเงื่อนไขยืนราคา/ส่งมอบ/ตัวหนังสือ/ลายเซ็น
+                  </span>
+                </div>
+              </label>
+              <span className="text-[10px] bg-orange-100 text-orange-800 font-bold px-2 py-0.5 rounded-full border border-orange-200 hidden sm:inline-block">
+                8 ข้อกำหนด
+              </span>
+            </div>
+
             {/* Audit Action Button */}
             <div className="pt-2">
               <button
@@ -971,6 +1131,8 @@ export default function UserFrontendPage() {
                         ? "พบข้อสงสัยดัดแปลงเอกสาร"
                         : hasDuplicate
                         ? "ตรวจพบบิลที่อาจซ้ำซ้อน"
+                        : hasSutQuotationViolation
+                        ? "ผิดระเบียบใบเสนอราคา มทส."
                         : isOverallPass
                         ? "ทุกรายการผ่านเกณฑ์"
                         : isMathError
@@ -986,6 +1148,8 @@ export default function UserFrontendPage() {
                         ? "พบข้อสงสัย: ตัวเลขในเอกสารอาจมีการดัดแปลงหรือแก้ไข"
                         : hasDuplicate
                         ? "ตรวจพบบิลที่อาจซ้ำซ้อน: เคยมีประวัติการตรวจสอบบิลนี้ในระบบแล้ว"
+                        : hasSutQuotationViolation
+                        ? "เอกสารไม่ผ่านระเบียบใบเสนอราคา มหาวิทยาลัยเทคโนโลยีสุรนารี"
                         : isOverallPass
                         ? "ผ่านการตรวจสอบราคากลางทั้งหมด"
                         : isMathError
@@ -999,6 +1163,8 @@ export default function UserFrontendPage() {
                         ? (documentWarnings && documentWarnings.length > 0
                             ? documentWarnings[0]
                             : "รูปภาพที่ส่งเข้ามาไม่ใช่เอกสารทางการเงินหรือใบเสร็จรับเงิน กรุณาถ่ายภาพใบเสร็จให้ชัดเจน")
+                        : hasSutQuotationViolation
+                        ? (documentWarnings?.find((w) => typeof w === "string" && w.includes("[ระเบียบ มทส.]")) || "พบข้อกำหนดไม่ตรงตามระเบียบการจัดซื้อจัดจ้าง มทส.")
                         : `ตรวจพบทั้งหมด ${totalItemsCount} รายการ (ผ่าน ${passItemsCount} รายการ${
                             failItemsCount > 0 ? `, ไม่ผ่าน ${failItemsCount} รายการ` : ""
                           }${notFoundItemsCount > 0 ? `, ไม่อยู่ในฐานข้อมูล ${notFoundItemsCount} รายการ` : ""})`}
@@ -1035,9 +1201,9 @@ export default function UserFrontendPage() {
             </div>
 
             {/* Document Integrity Warnings Alert Box */}
-            {(isMathError || hasTampering || hasDuplicate || (documentWarnings && documentWarnings.length > 0)) && (
+            {(isMathError || hasTampering || hasDuplicate || hasSutQuotationViolation || (documentWarnings && documentWarnings.length > 0)) && (
               <div className={`border-2 p-4 sm:p-5 rounded-2xl space-y-3 shadow-sm animate-in fade-in duration-300 ${
-                isInvalidDocument || isMathError || hasTampering
+                isInvalidDocument || isMathError || hasTampering || hasSutQuotationViolation
                   ? "bg-rose-50 border-rose-400 text-rose-900"
                   : "bg-amber-50 border-amber-400 text-amber-900"
               }`}>
@@ -1046,6 +1212,14 @@ export default function UserFrontendPage() {
                   <div className="bg-rose-600 text-white font-bold text-xs sm:text-sm py-2.5 px-4 rounded-xl flex items-center space-x-2 shadow-xs">
                     <AlertTriangle className="w-4 h-4 shrink-0 text-white" />
                     <span>⚠️ พบข้อสงสัย: ตรวจพบร่องรอยการตัดต่อ ดัดแปลง หรือแก้ไขตัวเลขในเอกสาร</span>
+                  </div>
+                )}
+
+                {/* Red Alert Bar for SUT Quotation Violation */}
+                {!isInvalidDocument && hasSutQuotationViolation && (
+                  <div className="bg-rose-600 text-white font-bold text-xs sm:text-sm py-2.5 px-4 rounded-xl flex items-center space-x-2 shadow-xs">
+                    <FileWarning className="w-4 h-4 shrink-0 text-white" />
+                    <span>⚠️ เอกสารผิดระเบียบใบเสนอราคา มทส.: ตรวจพบข้อกำหนดที่ไม่เป็นไปตามระเบียบของมหาวิทยาลัย</span>
                   </div>
                 )}
 
@@ -1065,16 +1239,18 @@ export default function UserFrontendPage() {
                   </div>
                 )}
 
-                <div className={`flex items-center space-x-2.5 font-bold text-sm ${isInvalidDocument || isMathError || hasTampering ? "text-rose-800" : "text-amber-800"}`}>
-                  <AlertTriangle className={`w-5 h-5 shrink-0 ${isInvalidDocument || isMathError || hasTampering ? "text-rose-600" : "text-amber-600"}`} />
+                <div className={`flex items-center space-x-2.5 font-bold text-sm ${isInvalidDocument || isMathError || hasTampering || hasSutQuotationViolation ? "text-rose-800" : "text-amber-800"}`}>
+                  <AlertTriangle className={`w-5 h-5 shrink-0 ${isInvalidDocument || isMathError || hasTampering || hasSutQuotationViolation ? "text-rose-600" : "text-amber-600"}`} />
                   <span>แจ้งเตือนความสมบูรณ์ของเอกสาร (Document Integrity Warnings):</span>
                 </div>
                 {documentWarnings && documentWarnings.length > 0 && (
-                  <ul className={`list-disc list-inside text-xs font-semibold space-y-1.5 pl-1.5 ${isInvalidDocument || isMathError || hasTampering ? "text-rose-900" : "text-amber-900"}`}>
+                  <ul className={`list-disc list-inside text-xs font-semibold space-y-1.5 pl-1.5 ${isInvalidDocument || isMathError || hasTampering || hasSutQuotationViolation ? "text-rose-900" : "text-amber-900"}`}>
                     {documentWarnings
                       .filter((warning) => (!isInvalidDocument || !warning.includes("คณิตศาสตร์")) && (!hasDuplicate || warning !== duplicateWarningText))
                       .map((warning, wIdx) => (
-                        <li key={wIdx}>{warning}</li>
+                        <li key={wIdx} className={warning.includes("[ระเบียบ มทส.]") ? "text-rose-700 font-bold" : ""}>
+                          {warning}
+                        </li>
                       ))}
                   </ul>
                 )}
@@ -1108,6 +1284,8 @@ export default function UserFrontendPage() {
                       <span className="text-slate-800 font-medium">
                         {isInvalidDocument
                           ? "-"
+                          : isQuotationDoc
+                          ? "ใบเสนอราคา (Quotation)"
                           : merchantInfo?.isHandwritten
                           ? "บิลเงินสดเขียนมือ"
                           : "ใบเสร็จพิมพ์ / POS"}
@@ -1174,6 +1352,276 @@ export default function UserFrontendPage() {
                           ? "-"
                           : `฿${totalBillAmount.toLocaleString("th-TH", { minimumFractionDigits: 2 })}`}
                       </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* SUT Quotation Compliance Audit Card (8 ข้อกำหนดระเบียบ มทส.) */}
+            {!isInvalidDocument && (isQuotationDoc || quotationTerms || customerInfo) && (
+              <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+                  <div className="flex items-center space-x-2.5">
+                    <div className="p-2 bg-orange-100 text-orange-600 rounded-xl">
+                      <ShieldCheck className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-900 flex items-center space-x-2">
+                        <span>ผลการตรวจสอบตามระเบียบใบเสนอราคา มทส. (8 ข้อกำหนด)</span>
+                        <span className="text-[10px] bg-orange-100 text-orange-800 font-mono px-2 py-0.5 rounded-full border border-orange-200">
+                          SUT Procurement Rules
+                        </span>
+                      </h4>
+                      <p className="text-[11px] text-slate-500">
+                        เกณฑ์ข้อกำหนดสำหรับใบเสนอราคาในการจัดซื้อจัดจ้าง มหาวิทยาลัยเทคโนโลยีสุรนารี
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className={`text-xs font-bold font-mono px-3 py-1 rounded-full border ${
+                      hasSutQuotationViolation
+                        ? "bg-rose-100 text-rose-800 border-rose-300"
+                        : "bg-emerald-100 text-emerald-800 border-emerald-300"
+                    }`}>
+                      {hasSutQuotationViolation ? "✕ ผิดระเบียบ มทส." : "✓ ครบถ้วนตามระเบียบ มทส."}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 8 Rules Checklist Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Category 1: ข้อมูลลูกค้า (Customer Info) */}
+                  <div className="bg-slate-50/80 border border-slate-200/80 rounded-xl p-3.5 space-y-3">
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-slate-600 flex items-center space-x-1.5 border-b border-slate-200/60 pb-1.5">
+                      <Building2 className="w-3.5 h-3.5 text-orange-600" />
+                      <span>1. ข้อมูลมหาวิทยาลัยผู้จัดซื้อ (Customer Details)</span>
+                    </div>
+                    <div className="space-y-2.5 text-xs">
+                      {/* Rule 1: Customer Name */}
+                      <div className="flex items-start space-x-2">
+                        {customerInfo?.isSutCustomer ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                        ) : (
+                          <XCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                        )}
+                        <div className="space-y-0.5 flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <span className="font-semibold text-slate-800 text-[11px]">
+                              1. ชื่อลูกค้า: &ldquo;มหาวิทยาลัยเทคโนโลยีสุรนารี&rdquo;
+                            </span>
+                            <span className={`text-[10px] font-bold ${customerInfo?.isSutCustomer ? "text-emerald-700" : "text-rose-600"}`}>
+                              {customerInfo?.isSutCustomer ? "ผ่าน" : "ไม่ผ่าน"}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-600 truncate" title={customerInfo?.name || "ไม่ระบุ"}>
+                            ที่ตรวจพบ: <span className="font-medium text-slate-900">{customerInfo?.name || "ไม่ระบุ"}</span>
+                          </p>
+                          {!customerInfo?.isSutCustomer && (
+                            <p className="text-[10px] text-rose-600 font-medium">
+                              * ต้องเป็นชื่อ &ldquo;มหาวิทยาลัยเทคโนโลยีสุรนารี&rdquo; เท่านั้น (ห้ามเป็นชื่อนักศึกษา/ชมรม/อาจารย์)
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Rule 2: Customer Address */}
+                      <div className="flex items-start space-x-2">
+                        {customerInfo?.hasCorrectAddress ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                        ) : (
+                          <XCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                        )}
+                        <div className="space-y-0.5 flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <span className="font-semibold text-slate-800 text-[11px]">
+                              2. ที่อยู่ลูกค้า: ระบุที่อยู่ มทส. ครบถ้วน
+                            </span>
+                            <span className={`text-[10px] font-bold ${customerInfo?.hasCorrectAddress ? "text-emerald-700" : "text-rose-600"}`}>
+                              {customerInfo?.hasCorrectAddress ? "ผ่าน" : "ไม่ผ่าน"}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-600 line-clamp-2" title={customerInfo?.address || "ไม่ระบุ"}>
+                            ที่ตรวจพบ: <span className="font-medium text-slate-900">{customerInfo?.address || "ไม่ระบุ"}</span>
+                          </p>
+                          {!customerInfo?.hasCorrectAddress && (
+                            <p className="text-[10px] text-rose-600 font-medium">
+                              * ต้องมี &ldquo;111 ถนนมหาวิทยาลัย ตำบล สุรนารี อำเภอเมือง จังหวัดนครราชสีมา 30000&rdquo;
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Rule 3: Customer Tax ID */}
+                      <div className="flex items-start space-x-2">
+                        {customerInfo?.hasCorrectTaxId ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                        ) : (
+                          <XCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                        )}
+                        <div className="space-y-0.5 flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <span className="font-semibold text-slate-800 text-[11px]">
+                              3. เลขประจำตัวผู้เสียภาษี: 0994000288654
+                            </span>
+                            <span className={`text-[10px] font-bold ${customerInfo?.hasCorrectTaxId ? "text-emerald-700" : "text-rose-600"}`}>
+                              {customerInfo?.hasCorrectTaxId ? "ผ่าน" : "ไม่ผ่าน"}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-600 font-mono">
+                            ที่ตรวจพบ: <span className="font-medium text-slate-900">{customerInfo?.taxId || "ไม่ระบุ"}</span>
+                          </p>
+                          {!customerInfo?.hasCorrectTaxId && (
+                            <p className="text-[10px] text-rose-600 font-medium">
+                              * ขาดหรือระบุไม่ตรงกับเลขประจำตัวผู้เสียภาษี มทส. (0994000288654)
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Rule 4: Customer Phone */}
+                      <div className="flex items-start space-x-2">
+                        {customerInfo?.hasCorrectPhone ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                        ) : (
+                          <XCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                        )}
+                        <div className="space-y-0.5 flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <span className="font-semibold text-slate-800 text-[11px]">
+                              4. เบอร์โทรศัพท์ลูกค้า: 04-422-0000
+                            </span>
+                            <span className={`text-[10px] font-bold ${customerInfo?.hasCorrectPhone ? "text-emerald-700" : "text-rose-600"}`}>
+                              {customerInfo?.hasCorrectPhone ? "ผ่าน" : "ไม่ผ่าน"}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-600 font-mono">
+                            ที่ตรวจพบ: <span className="font-medium text-slate-900">{customerInfo?.phone || "ไม่ระบุ"}</span>
+                          </p>
+                          {!customerInfo?.hasCorrectPhone && (
+                            <p className="text-[10px] text-rose-600 font-medium">
+                              * ขาดหรือไม่พบเบอร์โทรศัพท์ของมหาวิทยาลัย (04-422-0000)
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Category 2: เงื่อนไขเอกสาร (Terms & Conditions) */}
+                  <div className="bg-slate-50/80 border border-slate-200/80 rounded-xl p-3.5 space-y-3">
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-slate-600 flex items-center space-x-1.5 border-b border-slate-200/60 pb-1.5">
+                      <FileCheck className="w-3.5 h-3.5 text-orange-600" />
+                      <span>2. เงื่อนไขและข้อกำหนด (Terms & Conditions)</span>
+                    </div>
+                    <div className="space-y-2.5 text-xs">
+                      {/* Rule 5: Price Validity */}
+                      <div className="flex items-start space-x-2">
+                        {Boolean(quotationTerms?.priceValidity && quotationTerms.priceValidity.trim() !== "") ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                        ) : (
+                          <XCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                        )}
+                        <div className="space-y-0.5 flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <span className="font-semibold text-slate-800 text-[11px]">
+                              5. ระยะเวลายืนราคา (Price Validity)
+                            </span>
+                            <span className={`text-[10px] font-bold ${Boolean(quotationTerms?.priceValidity && quotationTerms.priceValidity.trim() !== "") ? "text-emerald-700" : "text-rose-600"}`}>
+                              {Boolean(quotationTerms?.priceValidity && quotationTerms.priceValidity.trim() !== "") ? "ผ่าน" : "ไม่ผ่าน"}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-600">
+                            ที่ตรวจพบ: <span className="font-medium text-slate-900">{quotationTerms?.priceValidity || "ไม่ระบุ"}</span>
+                          </p>
+                          {!Boolean(quotationTerms?.priceValidity && quotationTerms.priceValidity.trim() !== "") && (
+                            <p className="text-[10px] text-rose-600 font-medium">
+                              * ไม่พบข้อความระบุระยะเวลายืนราคา (เช่น 30 วัน, 60 วัน)
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Rule 6: Delivery Term */}
+                      <div className="flex items-start space-x-2">
+                        {Boolean(quotationTerms?.deliveryTerm && quotationTerms.deliveryTerm.trim() !== "") ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                        ) : (
+                          <XCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                        )}
+                        <div className="space-y-0.5 flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <span className="font-semibold text-slate-800 text-[11px]">
+                              6. กำหนดเวลาส่งมอบพัสดุ (Delivery Time)
+                            </span>
+                            <span className={`text-[10px] font-bold ${Boolean(quotationTerms?.deliveryTerm && quotationTerms.deliveryTerm.trim() !== "") ? "text-emerald-700" : "text-rose-600"}`}>
+                              {Boolean(quotationTerms?.deliveryTerm && quotationTerms.deliveryTerm.trim() !== "") ? "ผ่าน" : "ไม่ผ่าน"}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-600">
+                            ที่ตรวจพบ: <span className="font-medium text-slate-900">{quotationTerms?.deliveryTerm || "ไม่ระบุ"}</span>
+                          </p>
+                          {!Boolean(quotationTerms?.deliveryTerm && quotationTerms.deliveryTerm.trim() !== "") && (
+                            <p className="text-[10px] text-rose-600 font-medium">
+                              * ไม่พบข้อความระบุกำหนดเวลาส่งมอบพัสดุ
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Rule 7: Text Amount */}
+                      <div className="flex items-start space-x-2">
+                        {Boolean(quotationTerms?.hasTextAmount) ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                        ) : (
+                          <XCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                        )}
+                        <div className="space-y-0.5 flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <span className="font-semibold text-slate-800 text-[11px]">
+                              7. ตัวหนังสือกำกับยอดสุทธิ (Text Amount)
+                            </span>
+                            <span className={`text-[10px] font-bold ${Boolean(quotationTerms?.hasTextAmount) ? "text-emerald-700" : "text-rose-600"}`}>
+                              {Boolean(quotationTerms?.hasTextAmount) ? "ผ่าน" : "ไม่ผ่าน"}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-600">
+                            สถานะ: <span className="font-medium text-slate-900">{quotationTerms?.hasTextAmount ? "✓ มีตัวหนังสือภาษาไทยกำกับ" : "✕ ไม่พบตัวหนังสือ"}</span>
+                          </p>
+                          {!Boolean(quotationTerms?.hasTextAmount) && (
+                            <p className="text-[10px] text-rose-600 font-medium">
+                              * ยอดสุทธิขาดตัวหนังสือกำกับจำนวนเงิน (Text Amount)
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Rule 8: Quotation Signature */}
+                      <div className="flex items-start space-x-2">
+                        {Boolean(quotationTerms?.hasQuotationSign) ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                        ) : (
+                          <XCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                        )}
+                        <div className="space-y-0.5 flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <span className="font-semibold text-slate-800 text-[11px]">
+                              8. ลายมือชื่อผู้เสนอราคา / ตรายาง
+                            </span>
+                            <span className={`text-[10px] font-bold ${Boolean(quotationTerms?.hasQuotationSign) ? "text-emerald-700" : "text-rose-600"}`}>
+                              {Boolean(quotationTerms?.hasQuotationSign) ? "ผ่าน" : "ไม่ผ่าน"}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-600">
+                            สถานะ: <span className="font-medium text-slate-900">{quotationTerms?.hasQuotationSign ? "✓ พบลายเซ็น/ตราประทับร้านค้า" : "✕ ขาดลายเซ็นผู้เสนอราคา"}</span>
+                          </p>
+                          {!Boolean(quotationTerms?.hasQuotationSign) && (
+                            <p className="text-[10px] text-rose-600 font-medium">
+                              * ขาดลายมือชื่อผู้เสนอราคาหรือตราประทับ
+                            </p>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1535,18 +1983,40 @@ export default function UserFrontendPage() {
                     <span>{merchantInfo.date || "ไม่ระบุ"}</span>
                   </div>
                   <div>
-                    <span className="text-neutral-500">การลงนามผู้รับเงิน:</span>{" "}
+                    <span className="text-neutral-500">ประเภท / การลงนาม:</span>{" "}
                     <span className={merchantInfo.hasReceiptSign ? "text-black" : "text-black font-bold"}>
-                      {merchantInfo.hasReceiptSign ? "✓ มีลายเซ็น/ตรายาง" : "✕ ขาดลายเซ็นผู้รับเงิน"}
-                      {merchantInfo.isHandwritten && " (บิลเขียนมือ)"}
+                      {isQuotationDoc ? "ใบเสนอราคา" : merchantInfo.isHandwritten ? "บิลเขียนมือ" : "บิลพิมพ์/POS"} -{" "}
+                      {merchantInfo.hasReceiptSign ? "✓ มีลายเซ็น" : "✕ ขาดลายเซ็น"}
                     </span>
+                  </div>
+                </div>
+              )}
+
+              {/* SUT Quotation Compliance Summary in Print */}
+              {isQuotationDoc && (
+                <div className="mt-2 p-2 border border-black bg-neutral-50 text-[10px] space-y-1">
+                  <div className="flex justify-between items-center font-bold border-b border-neutral-300 pb-0.5">
+                    <span>ผลตรวจสอบตามระเบียบใบเสนอราคา มทส. (8 ข้อกำหนด):</span>
+                    <span className={hasSutQuotationViolation ? "font-bold text-black" : "text-black"}>
+                      {hasSutQuotationViolation ? "✕ ผิดระเบียบ มทส." : "✓ ครบถ้วนตามระเบียบ"}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[9px] leading-tight">
+                    <div>1. ลูกค้า: {customerInfo?.isSutCustomer ? "✓ มหาวิทยาลัยเทคโนโลยีสุรนารี" : `✕ ไม่ถูกต้อง (${customerInfo?.name || "-"})`}</div>
+                    <div>5. ระยะเวลายืนราคา: {quotationTerms?.priceValidity ? `✓ ${quotationTerms.priceValidity}` : "✕ ไม่ระบุ"}</div>
+                    <div>2. ที่อยู่: {customerInfo?.hasCorrectAddress ? "✓ 111 ถ.มหาวิทยาลัย..." : "✕ ไม่ครบถ้วน"}</div>
+                    <div>6. กำหนดส่งมอบ: {quotationTerms?.deliveryTerm ? `✓ ${quotationTerms.deliveryTerm}` : "✕ ไม่ระบุ"}</div>
+                    <div>3. เลขผู้เสียภาษี: {customerInfo?.hasCorrectTaxId ? "✓ 0994000288654" : `✕ ${customerInfo?.taxId || "ไม่ระบุ"}`}</div>
+                    <div>7. ตัวหนังสือกำกับยอด: {quotationTerms?.hasTextAmount ? "✓ มีตัวหนังสือกำกับ" : "✕ ขาดตัวหนังสือ"}</div>
+                    <div>4. โทรศัพท์: {customerInfo?.hasCorrectPhone ? "✓ 04-422-0000" : `✕ ${customerInfo?.phone || "ไม่ระบุ"}`}</div>
+                    <div>8. ลายเซ็นผู้เสนอราคา: {quotationTerms?.hasQuotationSign ? "✓ พบลายเซ็น/ตรายาง" : "✕ ขาดลายเซ็น"}</div>
                   </div>
                 </div>
               )}
 
               {/* Document Warnings Banner in Print */}
               {documentWarnings && documentWarnings.length > 0 && (
-                <div className="mt-3 p-2 bg-neutral-100 border border-black text-[10px] space-y-1">
+                <div className="mt-2 p-2 bg-neutral-100 border border-black text-[10px] space-y-1">
                   <span className="font-bold underline block">ข้อสังเกตความสมบูรณ์ของเอกสาร:</span>
                   <ul className="list-disc list-inside">
                     {documentWarnings.map((w, wIdx) => (
