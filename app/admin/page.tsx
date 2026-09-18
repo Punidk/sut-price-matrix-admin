@@ -155,17 +155,24 @@ export default function AdminDashboardPage() {
     setIsAddModalOpen(true);
   };
 
-  // ฟังก์ชันปรับชื่อสินค้าให้เป็น Unique Key มาตรฐาน (Lowercase, Trim, Replace spaces with dashes)
-  const normalizeItemKey = (name: string): string => {
-    return name
+  // ฟังก์ชันปรับชื่อสินค้าและหน่วยนับให้เป็น Unique Key มาตรฐาน (Name + Unit)
+  const normalizeItemKey = (name: string, unit: string = ""): string => {
+    const cleanName = (name || "")
       .trim()
       .toLowerCase()
       .replace(/\s+/g, "-")
       .replace(/[^\w\u0E00-\u0E7F-]/g, "")
       .replace(/--+/g, "-");
+    const cleanUnit = (unit || "")
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "-")
+      .replace(/[^\w\u0E00-\u0E7F-]/g, "")
+      .replace(/--+/g, "-");
+    return cleanUnit ? `${cleanName}__${cleanUnit}` : cleanName;
   };
 
-  // 🔥 ฟังก์ชัน Save พร้อมตรวจสอบชื่อรายการซ้ำในระบบ (Unique Key via setDoc)
+  // 🔥 ฟังก์ชัน Save พร้อมตรวจสอบชื่อรายการและหน่วยนับซ้ำในระบบ (Unique Key via setDoc)
   const handleFormSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setFormError(null);
@@ -179,14 +186,21 @@ export default function AdminDashboardPage() {
     const formattedName = itemName.trim();
     const formattedUnit = unit.trim();
     const currentEdit = editingItem;
-    const normalizedKey = normalizeItemKey(formattedName);
+    const normalizedKey = normalizeItemKey(formattedName, formattedUnit);
 
     if (!normalizedKey) {
       setFormError("ชื่อรายการไม่ถูกต้อง กรุณาระบุชื่อสินค้า");
       return;
     }
 
-    // 1. ตรวจสอบชื่อรายการซ้ำ
+    // 1. ตรวจสอบชื่อรายการและหน่วยนับซ้ำ (ปฏิเสธเฉพาะกรณีที่ทั้งชื่อสินค้าและหน่วยนับตรงกันทั้งหมด)
+    const isDuplicateLocal = items.some((i) => {
+      if (currentEdit && i.id === currentEdit.id) return false;
+      const sameName = (i.itemName || "").trim().toLowerCase() === formattedName.toLowerCase();
+      const sameUnit = (i.unit || "").trim().toLowerCase() === formattedUnit.toLowerCase();
+      return sameName && sameUnit;
+    });
+
     if (!currentEdit) {
       // กรณีกำลังเพิ่มรายการใหม่
       if (isFirebaseConfigured && db) {
@@ -194,7 +208,7 @@ export default function AdminDashboardPage() {
           const docRef = doc(db, "price_matrix", normalizedKey);
           const docSnap = await getDoc(docRef);
           if (docSnap.exists()) {
-            setFormError(`รายการ "${formattedName}" นี้มีอยู่ในระบบแล้ว`);
+            setFormError(`รายการ "${formattedName}" (หน่วยนับ: ${formattedUnit}) นี้มีอยู่ในระบบแล้ว`);
             return;
           }
         } catch (err: any) {
@@ -202,23 +216,20 @@ export default function AdminDashboardPage() {
         }
       }
 
-      const isDuplicateLocal = items.some(
-        (i) => normalizeItemKey(i.itemName) === normalizedKey || i.id === normalizedKey
-      );
       if (isDuplicateLocal) {
-        setFormError(`รายการ "${formattedName}" นี้มีอยู่ในระบบแล้ว`);
+        setFormError(`รายการ "${formattedName}" (หน่วยนับ: ${formattedUnit}) นี้มีอยู่ในระบบแล้ว`);
         return;
       }
     } else {
-      // กรณีกำลังแก้ไขรายการเดิม (ถ้าเปลี่ยนชื่อใหม่ ต้องไม่ซ้ำกับรายการอื่น)
-      const originalKey = normalizeItemKey(currentEdit.itemName);
+      // กรณีกำลังแก้ไขรายการเดิม (ถ้าเปลี่ยนชื่อหรือหน่วยนับใหม่ ต้องไม่ซ้ำกับรายการอื่น)
+      const originalKey = normalizeItemKey(currentEdit.itemName, currentEdit.unit);
       if (normalizedKey !== originalKey && normalizedKey !== currentEdit.id) {
         if (isFirebaseConfigured && db) {
           try {
             const docRef = doc(db, "price_matrix", normalizedKey);
             const docSnap = await getDoc(docRef);
             if (docSnap.exists()) {
-              setFormError(`รายการ "${formattedName}" นี้มีอยู่ในระบบแล้ว`);
+              setFormError(`รายการ "${formattedName}" (หน่วยนับ: ${formattedUnit}) นี้มีอยู่ในระบบแล้ว`);
               return;
             }
           } catch (err: any) {
@@ -226,11 +237,8 @@ export default function AdminDashboardPage() {
           }
         }
 
-        const isDuplicateLocal = items.some(
-          (i) => i.id !== currentEdit.id && (normalizeItemKey(i.itemName) === normalizedKey || i.id === normalizedKey)
-        );
         if (isDuplicateLocal) {
-          setFormError(`รายการ "${formattedName}" นี้มีอยู่ในระบบแล้ว`);
+          setFormError(`รายการ "${formattedName}" (หน่วยนับ: ${formattedUnit}) นี้มีอยู่ในระบบแล้ว`);
           return;
         }
       }
@@ -362,35 +370,45 @@ export default function AdminDashboardPage() {
     setAiScanError(null);
 
     try {
-      // 1. Convert Image to Base64 and send directly to Gemini AI
+      // 1. Convert Image or PDF to Base64 and send directly to Gemini AI
       setAiScanStep(1);
-      setAiScanStatusText("กำลังแปลงไฟล์รูปภาพและส่งให้ Gemini AI อ่านตารางราคากลาง...");
+      const isPdf = aiScanFile.type === "application/pdf" || aiScanFile.name.toLowerCase().endsWith(".pdf");
+      setAiScanStatusText(
+        isPdf
+          ? "กำลังอ่านและสกัดตารางราคากลางจากไฟล์ PDF ด้วย Gemini AI..."
+          : "กำลังแปลงไฟล์และส่งให้ Gemini AI อ่านตารางราคากลาง..."
+      );
 
       const base64Data = await fileToBase64(aiScanFile);
+      const mimeType = isPdf ? "application/pdf" : (aiScanFile.type || "image/jpeg");
 
       const resExtract = await fetch("/api/extract-matrix", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           imageBase64: base64Data,
-          mimeType: aiScanFile.type || "image/jpeg",
+          mimeType,
         }),
       });
 
       if (!resExtract.ok) {
         const errJson = await resExtract.json().catch(() => ({}));
-        throw new Error(errJson.details || errJson.error || "ไม่สามารถสกัดข้อมูลจากรูปภาพด้วย Gemini AI ได้");
+        throw new Error(errJson.details || errJson.error || "ไม่สามารถสกัดข้อมูลจากเอกสารด้วย Gemini AI ได้");
       }
 
       const extractedItems: Array<{
-        itemName: string;
-        category: string;
-        maxPrice: number;
-        unit: string;
+        itemName?: string;
+        name?: string;
+        category?: string;
+        maxPrice?: number;
+        price?: number;
+        unit?: string;
+        id?: number | string;
+        note?: string;
       }> = await resExtract.json();
 
       if (!Array.isArray(extractedItems) || extractedItems.length === 0) {
-        throw new Error("Gemini AI ไม่พบข้อมูลรายการราคากลางในรูปภาพนี้");
+        throw new Error("Gemini AI ไม่พบข้อมูลรายการราคากลางในเอกสารนี้");
       }
 
       // 2. Saving Extracted Items to Firestore collection `price_matrix` using Unique Keys
@@ -401,14 +419,16 @@ export default function AdminDashboardPage() {
       let duplicateCount = 0;
 
       for (const itemData of extractedItems) {
+        const itemName = (itemData.itemName || itemData.name || "รายการไม่มีชื่อ").trim();
+        const maxPrice = Number(itemData.maxPrice != null ? itemData.maxPrice : itemData.price) || 0;
         const formattedItem = {
-          itemName: itemData.itemName || "รายการไม่มีชื่อ",
-          category: normalizeExpenseCategory(itemData.category, itemData.itemName),
-          maxPrice: Number(itemData.maxPrice) || 0,
-          unit: itemData.unit || "รายการ",
+          itemName,
+          category: normalizeExpenseCategory(itemData.category, itemName),
+          maxPrice,
+          unit: (itemData.unit || "รายการ").trim(),
         };
 
-        const normalizedKey = normalizeItemKey(formattedItem.itemName) || `pm-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+        const normalizedKey = normalizeItemKey(formattedItem.itemName, formattedItem.unit) || `pm-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
 
         if (isFirebaseConfigured && db) {
           const docRef = doc(db, "price_matrix", normalizedKey);
@@ -416,7 +436,7 @@ export default function AdminDashboardPage() {
 
           if (docSnap.exists()) {
             duplicateCount++;
-            console.warn(`ข้ามรายการที่มีอยู่แล้วในระบบ: "${formattedItem.itemName}"`);
+            console.warn(`ข้ามรายการที่มีอยู่แล้วในระบบ: "${formattedItem.itemName}" (${formattedItem.unit})`);
             continue;
           }
 
@@ -431,7 +451,11 @@ export default function AdminDashboardPage() {
             updatedAt: Date.now(),
           });
         } else {
-          const isDup = items.some((i) => i.id === normalizedKey || normalizeItemKey(i.itemName) === normalizedKey);
+          const isDup = items.some((i) => {
+            const sameName = (i.itemName || "").trim().toLowerCase() === formattedItem.itemName.trim().toLowerCase();
+            const sameUnit = (i.unit || "").trim().toLowerCase() === formattedItem.unit.trim().toLowerCase();
+            return (sameName && sameUnit) || i.id === normalizedKey;
+          });
           if (isDup) {
             duplicateCount++;
             continue;
@@ -526,10 +550,10 @@ export default function AdminDashboardPage() {
             {/* AI Matrix Scan Button */}
             <button
               onClick={handleOpenAIScanModal}
-              className="bg-amber-400 hover:bg-amber-300 text-black font-bold font-mono text-xs py-2.5 px-4 transition border border-amber-400 flex items-center justify-center space-x-2 rounded-none shadow-sm"
+              className="bg-amber-400 hover:bg-amber-300 text-black font-bold font-mono text-xs py-2.5 px-4 transition border border-amber-400 flex items-center justify-center space-x-2 rounded-none shadow-sm cursor-pointer"
             >
               <Sparkles className="w-4 h-4 stroke-[2.5]" />
-              <span>สแกนจากรูปภาพ (AI)</span>
+              <span>สแกนจากรูปภาพ / PDF (AI)</span>
             </button>
 
             {/* Create Item Button */}
@@ -718,13 +742,13 @@ export default function AdminDashboardPage() {
               <div className="flex items-center space-x-2.5">
                 <Sparkles className="w-5 h-5 text-amber-400" />
                 <h3 className="text-base font-bold font-mono uppercase tracking-tight text-white">
-                  สแกนราคากลางจากรูปภาพด้วย Gemini AI
+                  สแกนราคากลางจากรูปภาพ / PDF ด้วย Gemini AI
                 </h3>
               </div>
               <button
                 onClick={handleCloseAIScanModal}
                 disabled={aiScanStep > 0}
-                className="text-neutral-400 hover:text-white p-1 transition disabled:opacity-30"
+                className="text-neutral-400 hover:text-white p-1 transition disabled:opacity-30 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -747,8 +771,8 @@ export default function AdminDashboardPage() {
                     <UploadCloud className="w-6 h-6" />
                   </div>
                   <div className="space-y-1">
-                    <p className="text-sm font-bold text-white">คลิกเพื่ออัปโหลดรูปภาพประกาศราคากลาง</p>
-                    <p className="text-xs text-neutral-500 font-mono">รองรับไฟล์รูปภาพ JPG, PNG (ตารางประกาศราคากลาง)</p>
+                    <p className="text-sm font-bold text-white">คลิกเพื่ออัปโหลดเอกสารประกาศราคากลาง</p>
+                    <p className="text-xs text-neutral-500 font-mono">รองรับไฟล์ JPG, PNG, PDF (เอกสารประกาศราคากลาง)</p>
                   </div>
                 </div>
               ) : (
@@ -757,21 +781,30 @@ export default function AdminDashboardPage() {
                     <div className="flex items-center space-x-2 truncate">
                       <FileText className="w-4 h-4 text-amber-400 shrink-0" />
                       <span className="text-white truncate">{aiScanFile.name}</span>
+                      <span className="text-neutral-500 text-[10px]">
+                        ({(aiScanFile.size / 1024).toFixed(1)} KB)
+                      </span>
                     </div>
                     <button
                       type="button"
                       onClick={() => setAiScanFile(null)}
                       disabled={aiScanStep > 0}
-                      className="text-neutral-500 hover:text-white ml-2 shrink-0 disabled:opacity-30"
+                      className="text-neutral-500 hover:text-white ml-2 shrink-0 disabled:opacity-30 cursor-pointer"
                     >
-                      เปลี่ยนรูป
+                      เปลี่ยนไฟล์
                     </button>
                   </div>
 
-                  {aiScanPreview && (
+                  {aiScanPreview ? (
                     <div className="bg-neutral-950 border border-neutral-800 max-h-56 flex items-center justify-center overflow-hidden p-2">
                       {/* eslint-disable-next-html-element-suppression */}
                       <img src={aiScanPreview} alt="Matrix Document" className="max-h-52 object-contain" />
+                    </div>
+                  ) : (
+                    <div className="bg-neutral-950 border border-neutral-800 p-6 flex flex-col items-center justify-center space-y-2 text-center font-mono">
+                      <FileText className="w-10 h-10 text-amber-400" />
+                      <span className="text-xs text-neutral-300 font-bold">{aiScanFile.name}</span>
+                      <span className="text-[10px] text-neutral-500">เอกสาร PDF พร้อมสำหรับการสแกนตารางราคากลาง</span>
                     </div>
                   )}
                 </div>
@@ -780,7 +813,7 @@ export default function AdminDashboardPage() {
               <input
                 type="file"
                 ref={aiFileInputRef}
-                accept="image/*"
+                accept="image/*,application/pdf"
                 onChange={handleAIScanFileChange}
                 className="hidden"
               />

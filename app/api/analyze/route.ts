@@ -215,20 +215,31 @@ ${isQuotationCheck ? "- [คำสั่งพิเศษ]: ผู้ใช้�
     "[เอกสารไม่สมบูรณ์: ขาดลายเซ็นผู้รับเงิน]"
 
 ========================================
-4. การตรวจสอบรายการและดักจับรายการคลุมเครือ (Item Audit & Ambiguous Item Rules):
+4. การจับคู่ราคากลาง (Price Matrix Matching) และการตรวจสอบรายการ (Item Audit):
 ========================================
+[กฎเหล็กการจับคู่ราคากลางด้วยชื่อสินค้าและหน่วยนับ (Name + Unit Matching Rule)]:
+- ในฐานข้อมูล priceMatrix อาจมีรายการที่ชื่อสินค้าเดียวกันแต่มีหลายหน่วยนับและราคาต่างกัน เช่น:
+  * "ถ่านขนาด AA" หน่วย "กล่อง" เพดานราคากลาง 450 บาท
+  * "ถ่านขนาด AA" หน่วย "แพ็ก" เพดานราคากลาง 55 บาท
+- คุณต้องตรวจสอบทั้ง "ชื่อสินค้า" และ "หน่วยนับในบิล (receiptData.unit)" ให้ตรงกันก่อนดึงเพดานราคากลาง (maxPrice) มาเปรียบเทียบเสมอ:
+  * ถ้าในบิลระบุเป็น 'แพ็ก' ต้องเทียบกับราคากลางของหน่วย 'แพ็ก' (55 บาท) ห้ามไปเทียบกับหน่วย 'กล่อง' (450 บาท) เด็ดขาด
+  * ถ้าในบิลระบุเป็น 'กล่อง' ให้เทียบกับราคากลางของหน่วย 'กล่อง'
+  * หากใน priceMatrix มีหลายรายการที่ชื่อเดียวกัน ให้เลือกรายการที่มีหน่วยนับ (unit) ตรงกับในบิลมากที่สุด
+  * หากชื่อสินค้าตรงกันแต่หน่วยในบิลไม่ตรงกับหน่วยใดในราคากลางของสินค้านั้นเลย จึงจะระบุ errorFlags เป็น "หน่วยไม่ตรง"
+
+[เกณฑ์การประเมินสถานะของแต่ละรายการ]:
 1. [รายการคลุมเครือ]: หากชื่อรายการมีลักษณะกว้าง คลุมเครือ ไม่แจกแจงรายละเอียดว่าคือสิ่งของชนิดใด เช่น "ค่าวัสดุ", "ค่าอุปกรณ์", "วัสดุอุปกรณ์", "ค่าใช้จ่ายเบ็ดเตล็ด", "ค่าสิ่งของ", "ค่าของ", "อุปกรณ์จัดกิจกรรม", "ของใช้":
    - กำหนด status: "FAIL"
    - เพิ่ม "[รายการคลุมเครือ: ต้องแนบใบแจกแจงรายการย่อย]" ลงใน errorFlags
 2. [ไม่อยู่ในราคากลาง (NOT_FOUND)]: หากค้นหาไม่พบหรือไม่ใกล้เคียงกับรายการใดใน priceMatrix:
    - กำหนด status: "NOT_FOUND", errorFlags: [], และกำหนดข้อมูลใน matrixData เป็น null
-3. [ราคาต่อหน่วยเกินราคากลาง]: ราคาต่อหน่วยในบิลสูงกว่าเพดานราคากลาง:
+3. [ราคาต่อหน่วยเกินราคากลาง]: เมื่อจับคู่ชื่อสินค้าและหน่วยนับตรงกันแล้ว หากราคาต่อหน่วยในบิลสูงกว่าเพดานราคากลาง (receiptData.unitPrice > matrixData.maxPrice):
    - กำหนด status: "FAIL" และเพิ่ม "ราคาเกินเกณฑ์" ลงใน errorFlags
-4. [หน่วยนับไม่ตรง]: หน่วยในบิลไม่ตรงกับหน่วยในราคากลาง:
+4. [หน่วยนับไม่ตรง]: พบชื่อสินค้าใน priceMatrix แต่หน่วยนับในบิลไม่ตรงกับหน่วยใดของสินค้านั้นในราคากลาง:
    - กำหนด status: "FAIL" และเพิ่ม "หน่วยไม่ตรง" ลงใน errorFlags
-5. [คำนวณเลขผิด]: จำนวน × ราคาต่อหน่วย ไม่เท่ากับ ราคารวม:
+5. [คำนวณเลขผิด]: จำนวน × ราคาต่อหน่วย ไม่เท่ากับ ราคารวม (qty × unitPrice != totalPrice):
    - กำหนด status: "FAIL" และเพิ่ม "คำนวณเลขผิด" ลงใน errorFlags
-- [ผ่านเกณฑ์ (PASS)]: หากไม่มีข้อผิดพลาดใดๆ กำหนด status: "PASS" และ errorFlags: []
+- [ผ่านเกณฑ์ (PASS)]: หากจับคู่ราคากลางตรงทั้งชื่อและหน่วยนับ ราคาไม่เกินเกณฑ์ และคำนวณเลขถูกต้อง: กำหนด status: "PASS" และ errorFlags: []
 
 ========================================
 5. การจำแนกหมวดหมู่งบประมาณสภานักศึกษา (Expense Category Classification - 6 หมวดหลัก):
@@ -462,12 +473,67 @@ ${isQuotationCheck ? "- [คำสั่งพิเศษ]: ผู้ใช้�
 
     parsedData.items.forEach((item: any) => {
       const name = (item.receiptData?.itemName || item.itemInReceipt || "").trim();
+      const receiptUnit = (item.receiptData?.unit || item.unit || "").trim().toLowerCase();
 
       // การจัดหมวดหมู่มาตรฐาน 6 หมวดตามแบบฟอร์มสภานักศึกษา มทส.
       const rawCat = item.category || item.matrixData?.category || null;
       item.category = normalizeExpenseCategory(rawCat, name);
       if (item.matrixData) {
         item.matrixData.category = item.category;
+      }
+
+      // Programmatic Guardrail: ตรวจสอบการจับคู่ราคากลางให้ตรงกับหน่วยนับ (Unit Matching Guardrail)
+      if (Array.isArray(priceMatrix) && priceMatrix.length > 0 && receiptUnit) {
+        const currentMatrixName = (item.matrixData?.itemName || item.matchedMatrixItem || "").trim().toLowerCase();
+        const currentMatrixUnit = (item.matrixData?.unit || "").trim().toLowerCase();
+
+        // ค้นหารายการทั้งหมดใน priceMatrix ที่ตรงกับชื่อสินค้าหรือรายการที่ AI จับคู่
+        const candidateMatches = priceMatrix.filter((pm: any) => {
+          const pmName = (pm.itemName || "").trim().toLowerCase();
+          return (
+            (currentMatrixName && (pmName === currentMatrixName || currentMatrixName.includes(pmName) || pmName.includes(currentMatrixName))) ||
+            (name && (pmName === name.toLowerCase() || name.toLowerCase().includes(pmName) || pmName.includes(name.toLowerCase())))
+          );
+        });
+
+        if (candidateMatches.length > 0) {
+          // หากมีรายการที่หน่วยนับตรงกับในบิลเป๊ะ
+          const exactUnitMatch = candidateMatches.find(
+            (pm: any) => (pm.unit || "").trim().toLowerCase() === receiptUnit
+          );
+
+          if (exactUnitMatch && (!item.matrixData || currentMatrixUnit !== receiptUnit)) {
+            item.matrixData = {
+              itemName: exactUnitMatch.itemName,
+              category: item.category,
+              maxPrice: Number(exactUnitMatch.maxPrice) || 0,
+              unit: exactUnitMatch.unit,
+            };
+            item.matchedMatrixItem = exactUnitMatch.itemName;
+            item.matrixMaxPrice = Number(exactUnitMatch.maxPrice) || 0;
+
+            // ปลด flag หน่วยไม่ตรงออกเพราะพบหน่วยที่ตรงกัน
+            item.errorFlags = (item.errorFlags || []).filter((f: string) => f !== "หน่วยไม่ตรง");
+
+            // ประเมินราคาใหม่ตามเพดานราคาของหน่วยที่ตรง
+            const unitPrice = Number(item.receiptData?.unitPrice) || 0;
+            const maxPrice = Number(exactUnitMatch.maxPrice) || 0;
+
+            if (maxPrice > 0 && unitPrice > maxPrice) {
+              if (!item.errorFlags.includes("ราคาเกินเกณฑ์")) {
+                item.errorFlags.push("ราคาเกินเกณฑ์");
+              }
+              item.status = "FAIL";
+              item.message = `ราคาต่อหน่วย (฿${unitPrice.toFixed(2)}) เกินเพดานราคากลางหน่วย '${exactUnitMatch.unit}' (฿${maxPrice.toFixed(2)}/${exactUnitMatch.unit})`;
+            } else {
+              item.errorFlags = (item.errorFlags || []).filter((f: string) => f !== "ราคาเกินเกณฑ์");
+              if (item.errorFlags.length === 0) {
+                item.status = "PASS";
+                item.message = `ราคาต่อหน่วย (฿${unitPrice.toFixed(2)}) ผ่านเกณฑ์ราคากลางหน่วย '${exactUnitMatch.unit}' (เพดาน ฿${maxPrice.toFixed(2)}/${exactUnitMatch.unit})`;
+              }
+            }
+          }
+        }
       }
 
       const isAmbiguous = AMBIGUOUS_KEYWORDS.some(
