@@ -2,15 +2,18 @@ export const SUT_EXPENSE_CATEGORIES = [
   "หมวดค่าตอบแทน",
   "หมวดโภชนาการ",
   "หมวดยานพาหนะ",
+  "หมวดวัสดุก่อสร้าง",
   "หมวดอุปกรณ์ก่อสร้าง",
   "หมวดอุปกรณ์สำนักงาน",
   "หมวดอุปกรณ์อิเล็กทรอนิกส์",
+  "หมวดอื่นๆ",
 ] as const;
 
 export type SutExpenseCategory = (typeof SUT_EXPENSE_CATEGORIES)[number];
 
 export type CategoryType =
   | SutExpenseCategory
+  | "หมวดอุปกรณ์ก่อสร้าง"
   | "หมวดพาหนะ"
   | "อาหาร"
   | "อุปกรณ์สำนักงาน"
@@ -28,6 +31,12 @@ export function normalizeExpenseCategory(cat?: string | null, itemName?: string 
   }
   if (catText === "หมวดพาหนะ") {
     return "หมวดยานพาหนะ";
+  }
+  if (catText === "หมวดอุปกรณ์ก่อสร้าง") {
+    return "หมวดวัสดุก่อสร้าง";
+  }
+  if (catText === "หมวดอื่นๆ" || catText === "อื่นๆ") {
+    return "หมวดอื่นๆ";
   }
 
   const combined = `${catText} ${itemName || ""}`.toLowerCase();
@@ -86,7 +95,7 @@ export function normalizeExpenseCategory(cat?: string | null, itemName?: string 
     combined.includes("กระดาษทราย") ||
     combined.includes("construction")
   ) {
-    return "หมวดอุปกรณ์ก่อสร้าง";
+    return "หมวดวัสดุก่อสร้าง";
   }
 
   // 5. หมวดอุปกรณ์อิเล็กทรอนิกส์
@@ -115,7 +124,6 @@ export function normalizeExpenseCategory(cat?: string | null, itemName?: string 
     combined.includes("กระดาษ") ||
     combined.includes("ปากกา") ||
     combined.includes("แฟ้ม") ||
-    combined.includes("ไวนิล") ||
     combined.includes("เทป") ||
     combined.includes("คลิป") ||
     combined.includes("เครื่องเขียน") ||
@@ -126,8 +134,21 @@ export function normalizeExpenseCategory(cat?: string | null, itemName?: string 
     return "หมวดอุปกรณ์สำนักงาน";
   }
 
+  // 7. หมวดอื่นๆ
+  if (
+    combined.includes("อื่นๆ") ||
+    combined.includes("other") ||
+    combined.includes("สเปรย์") ||
+    combined.includes("ถุงขยะ") ||
+    combined.includes("ทิชชู่") ||
+    combined.includes("กระสอบ") ||
+    combined.includes("ไวนิล")
+  ) {
+    return "หมวดอื่นๆ";
+  }
+
   // Default fallback
-  return "หมวดอุปกรณ์สำนักงาน";
+  return "หมวดอื่นๆ";
 }
 
 export interface PriceMatrixItem {

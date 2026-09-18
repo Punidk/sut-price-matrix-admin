@@ -94,6 +94,7 @@ export default function PriceMatrixTable({
       case "หมวดยานพาหนะ":
         IconComponent = Car;
         break;
+      case "หมวดวัสดุก่อสร้าง":
       case "หมวดอุปกรณ์ก่อสร้าง":
         IconComponent = Hammer;
         break;

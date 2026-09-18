@@ -41,10 +41,10 @@ import {
   Zap,
 } from "lucide-react";
 import {
-  MASTER_PRICE_MATRIX_2569,
-  getMasterDocId,
-  seedMasterPriceMatrix2569,
-} from "@/lib/masterData2569";
+  PRICE_MATRIX_2569,
+  getCompositeKey,
+  syncMasterPriceMatrix2569,
+} from "@/lib/priceMatrix2569";
 
 export interface PriceMatrixItem {
   id: string;
@@ -57,11 +57,25 @@ export interface PriceMatrixItem {
   updatedAt?: number;
 }
 
-const CATEGORIES = [...SUT_EXPENSE_CATEGORIES];
+const CATEGORIES = [
+  "หมวดค่าตอบแทน",
+  "หมวดโภชนาการ",
+  "หมวดยานพาหนะ",
+  "หมวดวัสดุก่อสร้าง",
+  "หมวดอุปกรณ์สำนักงาน",
+  "หมวดอุปกรณ์อิเล็กทรอนิกส์",
+  "หมวดอื่นๆ",
+];
 
 const FILTER_CATEGORIES = [
   "ทั้งหมด",
-  ...SUT_EXPENSE_CATEGORIES,
+  "หมวดค่าตอบแทน",
+  "หมวดโภชนาการ",
+  "หมวดยานพาหนะ",
+  "หมวดวัสดุก่อสร้าง",
+  "หมวดอุปกรณ์สำนักงาน",
+  "หมวดอุปกรณ์อิเล็กทรอนิกส์",
+  "หมวดอื่นๆ",
 ];
 
 export default function AdminDashboardPage() {
@@ -94,6 +108,8 @@ export default function AdminDashboardPage() {
 
   // ควบคุมหน้าต่าง Master Sync 2569 & Toast แจ้งเตือน
   const [isMasterSyncModalOpen, setIsMasterSyncModalOpen] = useState(false);
+  const [clearOldData, setClearOldData] = useState(true);
+  const [syncProgressMessage, setSyncProgressMessage] = useState("");
   const [isSyncing, setIsSyncing] = useState(false);
   const [toast, setToast] = useState<{ title: string; message?: string } | null>(null);
   const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -517,43 +533,55 @@ export default function AdminDashboardPage() {
     }
   };
 
-  // Master Sync ราคากลางปี 2569 ทั้ง 6 หมวด
+  // Master Sync ราคากลางปี 2569 ทั้ง 7 หมวดจากเอกสาร docs/
   const handleExecuteMasterSync = async () => {
     setIsSyncing(true);
+    setSyncProgressMessage("กำลังเริ่มต้นการซิงค์ข้อมูล...");
     try {
       if (isFirebaseConfigured && db) {
-        await seedMasterPriceMatrix2569(db);
+        await syncMasterPriceMatrix2569({
+          clearOldData,
+          dbInstance: db,
+          onProgress: (_curr, _total, msg) => {
+            setSyncProgressMessage(msg);
+          },
+        });
       }
 
       // ปรับปรุง State ท้องถิ่นทันที (Local State Immediate Refresh) เพื่อให้ตารางรีเฟรชทันที
-      const formattedMasterItems: PriceMatrixItem[] = MASTER_PRICE_MATRIX_2569.map((m) => ({
-        id: getMasterDocId(m.category, m.itemName, m.unit),
-        itemName: m.itemName,
+      const formattedMasterItems: PriceMatrixItem[] = PRICE_MATRIX_2569.map((m) => ({
+        id: getCompositeKey(m.category, m.name, m.unit),
+        itemName: m.name,
         category: m.category,
-        maxPrice: m.maxPrice,
+        maxPrice: m.price,
         unit: m.unit,
         condition: m.condition,
         note: m.note,
         updatedAt: Date.now(),
       }));
 
-      setItems((prev) => {
-        const itemMap = new Map<string, PriceMatrixItem>();
-        prev.forEach((it) => itemMap.set(it.id, it));
-        formattedMasterItems.forEach((it) => itemMap.set(it.id, it));
-        return Array.from(itemMap.values());
-      });
+      if (clearOldData) {
+        setItems(formattedMasterItems);
+      } else {
+        setItems((prev) => {
+          const itemMap = new Map<string, PriceMatrixItem>();
+          prev.forEach((it) => itemMap.set(it.id, it));
+          formattedMasterItems.forEach((it) => itemMap.set(it.id, it));
+          return Array.from(itemMap.values());
+        });
+      }
 
       setIsMasterSyncModalOpen(false);
       showToast(
         "อัปเดตราคากลางปี 2569 สำเร็จทั้งหมด",
-        `บันทึกข้อมูลราคากลางปี 2569 ครบทั้ง 6 หมวด (${MASTER_PRICE_MATRIX_2569.length} รายการ) ลงฐานข้อมูล price_matrix สำเร็จเรียบร้อย`
+        `บันทึกข้อมูลราคากลางปี 2569 จากเอกสารทั้ง 7 หมวด (${PRICE_MATRIX_2569.length} รายการ) ลงฐานข้อมูล price_matrix สำเร็จเรียบร้อย`
       );
     } catch (err: any) {
       console.error("Master sync error:", err);
       showToast("เกิดข้อผิดพลาดในการซิงค์ข้อมูล", err.message || "ไม่สามารถซิงค์ราคากลางได้");
     } finally {
       setIsSyncing(false);
+      setSyncProgressMessage("");
     }
   };
 
@@ -618,14 +646,14 @@ export default function AdminDashboardPage() {
               onClick={() => setIsMasterSyncModalOpen(true)}
               disabled={isSyncing}
               className="bg-emerald-500 hover:bg-emerald-400 text-black font-bold font-mono text-xs py-2.5 px-4 transition border border-emerald-400 flex items-center justify-center space-x-2 rounded-none shadow-sm cursor-pointer disabled:opacity-50"
-              title="ซิงค์ฐานข้อมูลราคากลางปี 2569 ทั้ง 6 หมวดเข้าสู่ระบบ"
+              title="ซิงค์ฐานข้อมูลราคากลางปี 2569 จากเอกสาร PDF ทั้ง 7 หมวดเข้าสู่ระบบ"
             >
               {isSyncing ? (
                 <RefreshCw className="w-4 h-4 animate-spin stroke-[2.5]" />
               ) : (
                 <Zap className="w-4 h-4 fill-current stroke-1" />
               )}
-              <span>⚡ ซิงค์ราคากลางปี 2569 ทั้งหมด (Master Sync)</span>
+              <span>⚡ ซิงค์ราคากลางปี 2569 (Master Sync)</span>
             </button>
 
             {/* AI Matrix Scan Button */}
@@ -974,43 +1002,68 @@ export default function AdminDashboardPage() {
 
             <div className="p-6 space-y-4">
               <p className="text-xs text-neutral-300 leading-relaxed font-sans">
-                ระบบจะทำการเขียนชุดข้อมูลราคากลางมาตรฐานปี 2569 ของสภานักศึกษา มทส. ทั้งหมด{" "}
-                <span className="text-white font-bold font-mono">{MASTER_PRICE_MATRIX_2569.length} รายการ</span>{" "}
-                (ครอบคลุมครบ 6 หมวด) ลงใน Firestore คอลเลกชัน{" "}
+                ระบบจะทำการเขียนชุดข้อมูลราคากลางมาตรฐานปี 2569 ที่สกัดจากเอกสาร PDF สภานักศึกษา มทส. ทั้งหมด{" "}
+                <span className="text-white font-bold font-mono">{PRICE_MATRIX_2569.length} รายการ</span>{" "}
+                (ครอบคลุมครบทั้ง 7 หมวด) ลงใน Firestore คอลเลกชัน{" "}
                 <code className="bg-neutral-950 px-1.5 py-0.5 border border-neutral-800 text-emerald-400 font-mono">price_matrix</code>
               </p>
 
               <div className="bg-neutral-950 border border-neutral-800 p-4 space-y-2 text-xs font-mono text-neutral-400">
                 <div className="text-[11px] font-bold uppercase text-white flex items-center space-x-1.5">
                   <Database className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>รูปแบบ Document ID มาตรฐาน:</span>
+                  <span>รูปแบบ Document ID มาตรฐาน (Composite Key):</span>
                 </div>
                 <div className="text-neutral-300 bg-neutral-900 px-2.5 py-1.5 border border-neutral-800 text-[11px]">
-                  <code>[หมวดหมู่]_[ชื่อรายการ]_[หน่วยนับ]</code>
+                  <code>`${'{category}'}_${'{name}'}_${'{unit}'}`</code>
                 </div>
                 <p className="text-[11px] text-neutral-400 font-sans leading-normal">
-                  ✓ ป้องกันข้อมูลทับซ้อนและรองรับสินค้าชื่อเดียวกันแต่คนละหน่วยนับได้อย่างสมบูรณ์
+                  ✓ ป้องกันข้อมูลทับซ้อน รองรับสินค้าชื่อเดียวกันแต่คนละหน่วยนับ และแยกรายการเงื่อนไขวันทำการได้อย่างสมบูรณ์
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
+              {/* Checkbox เลือก ล้างข้อมูลเดิม */}
+              <label className="flex items-center space-x-2.5 text-xs font-mono text-neutral-300 cursor-pointer bg-neutral-950 p-2.5 border border-neutral-800 hover:border-neutral-700 transition">
+                <input
+                  type="checkbox"
+                  checked={clearOldData}
+                  onChange={(e) => setClearOldData(e.target.checked)}
+                  disabled={isSyncing}
+                  className="rounded-none border-neutral-700 text-emerald-500 focus:ring-0 focus:ring-offset-0 bg-neutral-900 w-4 h-4 cursor-pointer"
+                />
+                <span className="select-none text-[11px]">
+                  ล้างข้อมูลเดิมในคอลเลกชัน price_matrix ทั้งหมดก่อนบันทึกใหม่ (Batch Delete)
+                </span>
+              </label>
+
+              {/* สถานะความคืบหน้าระหว่างซิงค์ */}
+              {isSyncing && syncProgressMessage && (
+                <div className="bg-emerald-950/40 border border-emerald-500/50 p-3 text-xs font-mono text-emerald-300 flex items-center space-x-2 animate-pulse">
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin shrink-0 text-emerald-400" />
+                  <span>{syncProgressMessage}</span>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] font-mono">
                 <div className="bg-neutral-950/60 border border-neutral-800 p-2 text-neutral-300">
-                  <span className="text-neutral-500 block text-[10px]">หมวดค่าตอบแทน:</span> 10 รายการ
+                  <span className="text-neutral-500 block text-[10px]">หมวดค่าตอบแทน:</span> 11 รายการ
                 </div>
                 <div className="bg-neutral-950/60 border border-neutral-800 p-2 text-neutral-300">
-                  <span className="text-neutral-500 block text-[10px]">หมวดโภชนาการ:</span> 10 รายการ
+                  <span className="text-neutral-500 block text-[10px]">หมวดโภชนาการ:</span> 9 รายการ
                 </div>
                 <div className="bg-neutral-950/60 border border-neutral-800 p-2 text-neutral-300">
-                  <span className="text-neutral-500 block text-[10px]">หมวดยานพาหนะ:</span> 8 รายการ
+                  <span className="text-neutral-500 block text-[10px]">หมวดยานพาหนะ:</span> 13 รายการ
                 </div>
                 <div className="bg-neutral-950/60 border border-neutral-800 p-2 text-neutral-300">
-                  <span className="text-neutral-500 block text-[10px]">หมวดอุปกรณ์ก่อสร้าง:</span> 14 รายการ
+                  <span className="text-neutral-500 block text-[10px]">หมวดอุปกรณ์อิเล็กทรอนิกส์:</span> 10 รายการ
                 </div>
                 <div className="bg-neutral-950/60 border border-neutral-800 p-2 text-neutral-300">
-                  <span className="text-neutral-500 block text-[10px]">หมวดอุปกรณ์สำนักงาน:</span> 15 รายการ
+                  <span className="text-neutral-500 block text-[10px]">หมวดอุปกรณ์สำนักงาน:</span> 108 รายการ
                 </div>
                 <div className="bg-neutral-950/60 border border-neutral-800 p-2 text-neutral-300">
-                  <span className="text-neutral-500 block text-[10px]">หมวดอุปกรณ์อิเล็กทรอนิกส์:</span> 15 รายการ
+                  <span className="text-neutral-500 block text-[10px]">หมวดวัสดุก่อสร้าง:</span> 118 รายการ
+                </div>
+                <div className="bg-neutral-950/60 border border-neutral-800 p-2 text-neutral-300 col-span-2 sm:col-span-1">
+                  <span className="text-neutral-500 block text-[10px]">หมวดอื่นๆ:</span> 99 รายการ
                 </div>
               </div>
 
@@ -1032,12 +1085,12 @@ export default function AdminDashboardPage() {
                   {isSyncing ? (
                     <>
                       <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      <span>กำลังซิงค์ราคากลางปี 2569...</span>
+                      <span>กำลังประมวลผล...</span>
                     </>
                   ) : (
                     <>
                       <Zap className="w-3.5 h-3.5 fill-current" />
-                      <span>ยืนยันซิงค์ข้อมูล ({MASTER_PRICE_MATRIX_2569.length} รายการ)</span>
+                      <span>ยืนยันซิงค์ข้อมูล ({PRICE_MATRIX_2569.length} รายการ)</span>
                     </>
                   )}
                 </button>
