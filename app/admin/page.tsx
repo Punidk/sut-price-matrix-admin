@@ -44,6 +44,7 @@ import {
   PRICE_MATRIX_2569,
   getCompositeKey,
   syncMasterPriceMatrix2569,
+  clearAllPriceMatrix,
 } from "@/lib/priceMatrix2569";
 
 export interface PriceMatrixItem {
@@ -111,6 +112,13 @@ export default function AdminDashboardPage() {
   const [clearOldData, setClearOldData] = useState(true);
   const [syncProgressMessage, setSyncProgressMessage] = useState("");
   const [isSyncing, setIsSyncing] = useState(false);
+
+  // ควบคุมหน้าต่าง Clear All Price Matrix (Double Confirmation)
+  const [isClearAllModalOpen, setIsClearAllModalOpen] = useState(false);
+  const [clearConfirmText, setClearConfirmText] = useState("");
+  const [isClearingAll, setIsClearingAll] = useState(false);
+  const [clearProgressMessage, setClearProgressMessage] = useState("");
+
   const [toast, setToast] = useState<{ title: string; message?: string } | null>(null);
   const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -585,6 +593,44 @@ export default function AdminDashboardPage() {
     }
   };
 
+  // ฟังก์ชันล้างราคากลางทั้งหมดออกจาก Firestore แบบ Batch Delete
+  const handleExecuteClearAll = async () => {
+    if (clearConfirmText.trim().toUpperCase() !== "DELETE") {
+      return;
+    }
+
+    setIsClearingAll(true);
+    setClearProgressMessage("กำลังเริ่มต้นการล้างฐานข้อมูล...");
+
+    try {
+      let deletedCount = items.length;
+      if (isFirebaseConfigured && db) {
+        const res = await clearAllPriceMatrix({
+          dbInstance: db,
+          onProgress: (_curr, _total, msg) => {
+            setClearProgressMessage(msg);
+          },
+        });
+        deletedCount = res.deletedCount;
+      }
+
+      // รีเฟรชตารางเป็นค่าว่างทันที (Immediate Refresh to empty)
+      setItems([]);
+      setIsClearAllModalOpen(false);
+      setClearConfirmText("");
+      showToast(
+        "ล้างฐานข้อมูลราคากลางทั้งหมดเรียบร้อยแล้ว",
+        `ลบข้อมูลราคากลางทั้งหมด (${deletedCount} รายการ) ออกจากฐานข้อมูลสำเร็จ`
+      );
+    } catch (err: any) {
+      console.error("Clear all price matrix error:", err);
+      showToast("เกิดข้อผิดพลาดในการล้างข้อมูล", err.message || "ไม่สามารถล้างฐานข้อมูลได้");
+    } finally {
+      setIsClearingAll(false);
+      setClearProgressMessage("");
+    }
+  };
+
   const filteredItems = useMemo(() => {
     return items
       .filter((item) => {
@@ -644,7 +690,7 @@ export default function AdminDashboardPage() {
             {/* Master Sync 2569 Button */}
             <button
               onClick={() => setIsMasterSyncModalOpen(true)}
-              disabled={isSyncing}
+              disabled={isSyncing || isClearingAll}
               className="bg-emerald-500 hover:bg-emerald-400 text-black font-bold font-mono text-xs py-2.5 px-4 transition border border-emerald-400 flex items-center justify-center space-x-2 rounded-none shadow-sm cursor-pointer disabled:opacity-50"
               title="ซิงค์ฐานข้อมูลราคากลางปี 2569 จากเอกสาร PDF ทั้ง 7 หมวดเข้าสู่ระบบ"
             >
@@ -654,6 +700,24 @@ export default function AdminDashboardPage() {
                 <Zap className="w-4 h-4 fill-current stroke-1" />
               )}
               <span>⚡ ซิงค์ราคากลางปี 2569 (Master Sync)</span>
+            </button>
+
+            {/* Clear All Button */}
+            <button
+              onClick={() => {
+                setClearConfirmText("");
+                setIsClearAllModalOpen(true);
+              }}
+              disabled={isSyncing || isClearingAll}
+              className="bg-red-600 hover:bg-red-500 text-white font-bold font-mono text-xs py-2.5 px-4 transition border border-red-500 flex items-center justify-center space-x-2 rounded-none shadow-sm cursor-pointer disabled:opacity-50"
+              title="ล้างข้อมูลราคากลางทั้งหมดในระบบ"
+            >
+              {isClearingAll ? (
+                <RefreshCw className="w-4 h-4 animate-spin stroke-[2.5]" />
+              ) : (
+                <Trash2 className="w-4 h-4 stroke-[2]" />
+              )}
+              <span>🗑️ ล้างราคากลางทั้งหมด</span>
             </button>
 
             {/* AI Matrix Scan Button */}
@@ -1091,6 +1155,94 @@ export default function AdminDashboardPage() {
                     <>
                       <Zap className="w-3.5 h-3.5 fill-current" />
                       <span>ยืนยันซิงค์ข้อมูล ({PRICE_MATRIX_2569.length} รายการ)</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. Modal ยืนยันการล้างฐานข้อมูลราคากลางทั้งหมด (Double Confirmation) */}
+      {isClearAllModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-neutral-900 border border-red-500/80 w-full max-w-lg shadow-2xl rounded-none text-left">
+            <div className="p-4 border-b border-neutral-800 flex justify-between items-center bg-neutral-950">
+              <div className="flex items-center space-x-2.5 text-red-400">
+                <AlertTriangle className="w-5 h-5 text-red-500 shrink-0" />
+                <h3 className="font-bold text-sm uppercase tracking-wider font-mono text-white">
+                  ยืนยันการล้างฐานข้อมูลราคากลางทั้งหมด (Clear All)
+                </h3>
+              </div>
+              <button
+                onClick={() => !isClearingAll && setIsClearAllModalOpen(false)}
+                disabled={isClearingAll}
+                className="text-neutral-400 hover:text-white transition cursor-pointer disabled:opacity-30"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 font-sans">
+              <div className="bg-red-950/40 border border-red-500/40 p-4 space-y-2 text-xs text-red-200 leading-relaxed font-mono">
+                <div className="font-bold text-red-400 flex items-center space-x-1.5 uppercase">
+                  <AlertTriangle className="w-4 h-4" />
+                  <span>คำเตือน: การกระทำนี้ไม่สามารถเรียกคืนข้อมูลได้!</span>
+                </div>
+                <p>
+                  ระบบจะทำการลบเอกสารทั้งหมดในคอลเลกชัน <code className="bg-black/60 px-1 text-red-300">price_matrix</code> จำนวน{" "}
+                  <strong className="text-white underline">{items.length} รายการ</strong> อย่างถาวรแบบ Batch Delete
+                </p>
+              </div>
+
+              {/* สถานะความคืบหน้าระหว่างลบ */}
+              {isClearingAll && clearProgressMessage && (
+                <div className="bg-red-950/60 border border-red-500/60 p-3 text-xs font-mono text-red-300 flex items-center space-x-2 animate-pulse">
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin shrink-0 text-red-400" />
+                  <span>{clearProgressMessage}</span>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <label className="block text-xs font-mono text-neutral-300">
+                  เพื่อความปลอดภัย กรุณาพิมพ์คำว่า <span className="font-bold text-red-400 bg-neutral-950 px-1.5 py-0.5 border border-red-900">DELETE</span> เพื่อยืนยันการล้างข้อมูล:
+                </label>
+                <input
+                  type="text"
+                  value={clearConfirmText}
+                  onChange={(e) => setClearConfirmText(e.target.value)}
+                  disabled={isClearingAll}
+                  placeholder="พิมพ์คำว่า DELETE ที่นี่"
+                  className="w-full bg-neutral-950 border border-neutral-700 focus:border-red-500 text-white font-mono px-3.5 py-2.5 text-sm focus:outline-none transition rounded-none uppercase"
+                  autoFocus
+                />
+              </div>
+
+              <div className="pt-4 border-t border-neutral-800 flex items-center justify-end space-x-3 font-mono">
+                <button
+                  type="button"
+                  onClick={() => setIsClearAllModalOpen(false)}
+                  disabled={isClearingAll}
+                  className="bg-neutral-950 hover:bg-neutral-800 text-neutral-400 border border-neutral-800 px-4 py-2 text-xs transition rounded-none disabled:opacity-30 cursor-pointer"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExecuteClearAll}
+                  disabled={clearConfirmText.trim().toUpperCase() !== "DELETE" || isClearingAll}
+                  className="bg-red-600 hover:bg-red-500 text-white font-bold border border-red-500 px-5 py-2 text-xs transition disabled:opacity-40 rounded-none flex items-center space-x-2 cursor-pointer shadow-sm"
+                >
+                  {isClearingAll ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>กำลังล้างฐานข้อมูล...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>ยืนยันล้างข้อมูลทั้งหมด</span>
                     </>
                   )}
                 </button>

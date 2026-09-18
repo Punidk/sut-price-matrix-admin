@@ -34,6 +34,9 @@ export function getCompositeKey(category: string, name: string, unit: string): s
   return `${sanitize(category)}_${sanitize(name)}_${sanitize(unit)}`;
 }
 
+import { clearAllPriceMatrix } from "./priceMatrixService";
+export { clearAllPriceMatrix };
+
 export interface SyncMasterOptions {
   clearOldData?: boolean;
   dbInstance: Firestore;
@@ -65,32 +68,13 @@ export async function syncMasterPriceMatrix2569({
 
   // 1. ล้างข้อมูลเดิมใน collection `price_matrix` (ถ้ากำหนด clearOldData = true)
   if (clearOldData) {
-    onProgress?.(0, PRICE_MATRIX_2569.length, "กำลังค้นหารายการเดิมเพื่อล้างข้อมูล...");
-    const existingSnapshot = await getDocs(collection(dbInstance, "price_matrix"));
-    deletedOldCount = existingSnapshot.size;
-
-    if (deletedOldCount > 0) {
-      const deleteBatches: WriteBatch[] = [];
-      let currentDeleteBatch = writeBatch(dbInstance);
-      let opCount = 0;
-
-      for (const docSnap of existingSnapshot.docs) {
-        currentDeleteBatch.delete(docSnap.ref);
-        opCount++;
-        if (opCount % 400 === 0) {
-          deleteBatches.push(currentDeleteBatch);
-          currentDeleteBatch = writeBatch(dbInstance);
-        }
-      }
-      if (opCount % 400 !== 0) {
-        deleteBatches.push(currentDeleteBatch);
-      }
-
-      onProgress?.(0, PRICE_MATRIX_2569.length, `กำลังล้างข้อมูลเดิม ${deletedOldCount} รายการ...`);
-      for (const b of deleteBatches) {
-        await b.commit();
-      }
-    }
+    const clearRes = await clearAllPriceMatrix({
+      dbInstance,
+      onProgress: (curr, _tot, msg) => {
+        onProgress?.(curr, PRICE_MATRIX_2569.length, msg);
+      },
+    });
+    deletedOldCount = clearRes.deletedCount;
   }
 
   // 2. บันทึกข้อมูล Master 2569 แบบ Write Batch (ชุดละไม่เกิน 400 รายการ)
