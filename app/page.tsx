@@ -52,11 +52,16 @@ import {
 
 export interface ReceiptItemData {
   itemName: string;
-  personCount?: number;
   qty: number;
   unit: string;
   unitPrice: number;
   totalPrice: number;
+  personCount?: number;
+  name?: string;
+  rawUnit?: string;
+  quantity?: number;
+  unitPriceInBill?: number;
+  totalInBill?: number;
 }
 
 export interface MatrixItemData {

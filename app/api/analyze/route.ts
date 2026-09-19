@@ -1,8 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { normalizeExpenseCategory, SUT_EXPENSE_CATEGORIES } from "@/lib/types";
+import {
+  normalizeExpenseCategory,
+  SUT_EXPENSE_CATEGORIES,
+  ExtractedProposalItem,
+  extractPersonCount,
+  normalizeUnit,
+  normalizeProposalItem,
+} from "@/lib/types";
 import { db } from "@/lib/firebase";
 import { collection, getDocs } from "firebase/firestore";
 import { PRICE_MATRIX_2569, getCompositeKey } from "@/lib/priceMatrix2569";
+
+export { extractPersonCount, normalizeUnit, normalizeProposalItem };
 
 // ขยายเวลา Serverless Function เพื่อป้องกันปัญหา Vercel Timeout (504 Gateway Timeout)
 export const maxDuration = 60;
@@ -28,53 +37,18 @@ function getBaseItemName(name: string): string {
     .toLowerCase();
 }
 
-// Helper: ตรวจจับและสกัดจำนวนคน/ผู้เข้าร่วม จากชื่อรายการ หรือฟิลด์ที่ AI สกัดมา
-function extractPersonCount(itemName: string, aiPersonCount?: any): number {
-  if (typeof aiPersonCount === "number" && !isNaN(aiPersonCount) && aiPersonCount > 0) {
-    return Math.round(aiPersonCount);
-  }
-  if (typeof aiPersonCount === "string") {
-    const parsed = parseInt(aiPersonCount.replace(/[^\d]/g, ""), 10);
-    if (!isNaN(parsed) && parsed > 0) return parsed;
-  }
-
-  if (!itemName) return 1;
-
-  // แปลงเลขไทยเป็นเลขอารบิก
-  const thaiDigits = ["๐", "๑", "๒", "๓", "๔", "๕", "๖", "๗", "๘", "๙"];
-  let cleanName = itemName;
-  thaiDigits.forEach((td, idx) => {
-    cleanName = cleanName.replaceAll(td, String(idx));
-  });
-
-  // 1. ตรวจจับในวงเล็บ เช่น "(40 คน)", "(นักศึกษา 40 คน)", "(ผู้เข้าร่วม 40 คน)", "(40 ท่าน)", "[3 ราย]"
-  const parenMatch = cleanName.match(/[\(\[\{][^\)\]\}]*?(\d+)\s*(?:คน|ท่าน|ราย)[^\)\]\}]*?[\)\]\}]/);
-  if (parenMatch && parenMatch[1]) {
-    const num = parseInt(parenMatch[1], 10);
-    if (!isNaN(num) && num > 0) return num;
-  }
-
-  // 2. ตรวจจับนอกวงเล็บ เช่น "40 คน", "40 ท่าน", "40 ราย", "วิทยากร 2 คน", "จำนวน 40 คน"
-  const generalMatch = cleanName.match(/(?:จำนวน\s*)?(\d+)\s*(?:คน|ท่าน|ราย)/);
-  if (generalMatch && generalMatch[1]) {
-    const num = parseInt(generalMatch[1], 10);
-    if (!isNaN(num) && num > 0) return num;
-  }
-
-  return 1;
-}
-
 // Helper: ตรวจสอบว่าหน่วยนับ หรือบริบทรายการ มีมิติของตัวคูณ "คน" หรือไม่
 function isPerPersonUnit(unit: string, itemName: string, personCount: number): boolean {
-  const cleanU = (unit || "").trim().toLowerCase();
+  const normU = normalizeUnit(unit);
+  const cleanU = (normU || unit || "").trim().toLowerCase();
   const cleanN = (itemName || "").toLowerCase();
 
-  // 1. หากหน่วยมีคำว่า คน, ท่าน, ราย เช่น "คน/มื้อ", "คน/วัน", "คน/ชม.", "บาท/คน/มื้อ", "คน"
+  // 1. หากหน่วยมีคำว่า คน, ท่าน, ราย เช่น "คน/มื้อ", "คน/วัน", "คน/ชั่วโมง", "คน/เเมต", "คน"
   if (/คน|ท่าน|ราย/i.test(cleanU)) {
     return true;
   }
 
-  // 2. หากระบุจำนวนคน (personCount > 1) และหน่วยเป็นหน่วยเวลาหรือรอบ เช่น มื้อ, วัน, ชม., ชั่วโมง, คืน, ครั้ง, แมตช์, เเมต
+  // 2. หากระบุจำนวนคน (personCount > 1) และหน่วยเป็นหน่วยเวลาหรือรอบ เช่น มื้อ, วัน, ชม., ชั่วโมง, คืน, ครั้ง, แมตช์, เเมต, แมต
   if (personCount > 1 && /มื้อ|วัน|ชม|ชั่วโมง|คืน|ครั้ง|เเมต|แมต/i.test(cleanU)) {
     return true;
   }
@@ -89,23 +63,27 @@ function isPerPersonUnit(unit: string, itemName: string, personCount: number): b
 
 // Helper: ตรวจสอบความเข้ากันได้ของหน่วยนับในเอกสารกับหน่วยในราคากลาง (โดยเฉพาะหน่วยที่มีมิติคน)
 function isUnitCompatible(docUnit: string, matrixUnit: string, personCount: number): boolean {
-  const d = cleanText(docUnit);
-  const m = cleanText(matrixUnit);
-  if (!d || !m) return true;
+  const dNorm = normalizeUnit(docUnit);
+  const mNorm = normalizeUnit(matrixUnit);
+  if (!dNorm || !mNorm) return true;
+  if (dNorm === mNorm) return true;
+
+  const d = cleanText(dNorm);
+  const m = cleanText(mNorm);
   if (d === m) return true;
 
-  const dClean = d.replace(/\./g, "").trim();
-  const mClean = m.replace(/\./g, "").trim();
+  const dClean = d.replace(/\./g, "").replace(/\s+/g, "");
+  const mClean = m.replace(/\./g, "").replace(/\s+/g, "");
   if (dClean === mClean) return true;
 
-  // กรณีมิติคน เช่น ในราคากลางระบุ "คน/มื้อ" แต่ในตารางงบเขียน "มื้อ" (เพราะมีจำนวนคนระบุในชื่อหรือ personCount แล้ว)
+  // กรณีมิติคน เช่น ในราคากลางระบุ "คน/มื้อ" แต่ในตารางงบเขียน "มื้อ" หรือ "คน/เเมต" กับ "แมต"
   if (personCount > 1 || /คน|ท่าน|ราย/i.test(dClean) || /คน|ท่าน|ราย/i.test(mClean)) {
     if (
       (mClean.includes("มื้อ") && dClean.includes("มื้อ")) ||
       (mClean.includes("วัน") && dClean.includes("วัน")) ||
       (mClean.includes("ชม") && dClean.includes("ชม")) ||
       (mClean.includes("ชั่วโมง") && dClean.includes("ชั่วโมง")) ||
-      (mClean.includes("เเมต") && (dClean.includes("เเมต") || dClean.includes("แมต"))) ||
+      ((mClean.includes("เเมต") || mClean.includes("แมต")) && (dClean.includes("เเมต") || dClean.includes("แมต"))) ||
       (mClean.includes("คน") && dClean.includes("คน"))
     ) {
       return true;
@@ -383,14 +361,14 @@ export async function POST(req: NextRequest) {
 2. วันที่ (date): วันที่จัดกิจกรรมหรือวันที่ทำเอกสาร (หากไม่พบให้ใส่ "-")
 3. ยอดงบประมาณรวมที่ขอสนับสนุน (requestedBudgetTotal): ดึงตัวเลขยอดเงินรวมทั้งสิ้นที่ขอรับการสนับสนุนจากเอกสาร เช่น "งบประมาณที่ขอรับการสนับสนุนทั้งสิ้น ... บาท" หรือ "รวมเงินทั้งสิ้น ... บาท" (สกัดเป็น number)
 4. ยอดรวมแต่ละหมวดตามที่ระบุในเอกสาร (detectedCategorySubtotals): ค้นหาแถวสรุปยอดรวมของแต่ละหมวด เช่น "รวมเงินหมวดค่าตอบแทน ... บาท" สกัดเป็น array: [{ "category": "ชื่อหมวด", "subtotal": ตัวเลข }]
-5. ดึงรายการค่าใช้จ่ายทุกแถวในตารางออกมาใน items:
+5. ดึงรายการค่าใช้จ่ายทุกแถวในตารางออกมาใน items โดยใช้ฟิลด์มาตรฐาน:
    - category: จัดกลุ่มเข้า 1 ใน 6 หมวดหลัก ได้แก่ 'หมวดค่าตอบแทน', 'หมวดโภชนาการ', 'หมวดยานพาหนะ', 'หมวดวัสดุก่อสร้าง', 'หมวดอุปกรณ์สำนักงาน', 'หมวดอุปกรณ์อิเล็กทรอนิกส์' (หรือ 'หมวดอื่นๆ')
-   - itemName: ชื่อรายการตามตาราง (เช่น "ค่าอาหารและเครื่องดื่ม (40 คน)")
-   - personCount: ตรวจจับตัวเลข "จำนวนคน/ผู้เข้าร่วม" ที่อยู่ในชื่อรายการ หรือในวงเล็บ เช่น "(40 คน)", "(1 คน)", "(3 คน)" หรือ "วิทยากร 2 คน" ให้สกัดตัวเลขออกมาเป็น number เช่น 40, 1, 3 (หากไม่ระบุจำนวนคนให้ใส่ null หรือ 1)
-   - qty: จำนวน (number) เช่น 1, 2, 4
-   - unit: หน่วยนับ (string เช่น คน/วัน, ชม., กล่อง, แพ็ก, ชิ้น, ม้วน, มื้อ, วัน, คัน)
-   - unitPrice: ราคาต่อหน่วยตามที่เขียนในเอกสาร (number)
-   - totalPrice: ยอดรวมเป็นเงินตามที่เขียนในช่องรวมเงินของแถวนั้น (number)
+   - name: ชื่อรายการตามตาราง (เช่น "ค่าอาหารและเครื่องดื่ม (40 คน)")
+   - rawUnit: หน่วยนับตามที่ระบุในตาราง (เช่น คน/วัน, ชม., นัด, กล่อง, แพ็ก, ชิ้น, ม้วน, มื้อ, วัน, คัน, คน)
+   - quantity: จำนวน (number) เช่น 1, 2, 4
+   - unitPriceInBill: ราคาต่อหน่วยตามที่เขียนในเอกสาร (number)
+   - totalInBill: ยอดรวมเป็นเงินตามที่เขียนในช่องรวมเงินของแถวนั้น (number)
+   - personCount: สกัดตัวเลข "จำนวนคน/ผู้เข้าร่วม" ที่อยู่ในชื่อรายการ หรือในวงเล็บ เช่น "(40 คน)", "(1 คน)", "(3 คน)" หรือ "วิทยากร 2 คน" ให้ส่งเป็น number เช่น 40, 1, 3 (หากไม่ระบุจำนวนคนให้ใส่ 1)
 
 *** ข้อสำคัญ: ไม่ต้องคำนวณเลขใหม่ ไม่ต้องเทียบราคากลาง ดึงตัวเลขดิบตามที่ปรากฏบนเอกสารเท่านั้น ***
 
@@ -408,12 +386,12 @@ export async function POST(req: NextRequest) {
   "items": [
     {
       "category": "หมวดโภชนาการ",
-      "itemName": "ค่าอาหารและเครื่องดื่ม (40 คน)",
-      "personCount": 40,
-      "qty": 1,
-      "unit": "มื้อ",
-      "unitPrice": 40.00,
-      "totalPrice": 1600.00
+      "name": "ค่าอาหารและเครื่องดื่ม (40 คน)",
+      "rawUnit": "มื้อ",
+      "quantity": 1,
+      "unitPriceInBill": 40.00,
+      "totalInBill": 1600.00,
+      "personCount": 40
     }
   ]
 }`;
@@ -774,37 +752,39 @@ ${matrixContext}
         ? parsedData
         : [];
 
+      // 1. แปลงผลลัพธ์การสกัดข้อมูลของแต่ละรายการจากตารางงบประมาณให้อยู่ในโครงสร้างมาตรฐาน:
+      // {
+      //   name: string,
+      //   rawUnit: string,
+      //   quantity: number,
+      //   unitPriceInBill: number,
+      //   totalInBill: number,
+      //   personCount: number // ได้จาก extractPersonCount(name)
+      // }
+      const extractedProposalItems: ExtractedProposalItem[] = rawExtractedItems
+        .map((rawItem: any) => normalizeProposalItem(rawItem))
+        .filter((item) => item.name.length > 0);
+
       const finalItems: any[] = [];
       const proposalWarnings: string[] = [];
 
-      for (const rawItem of rawExtractedItems) {
-        const rawName = (
-          rawItem.itemName ||
-          rawItem.receiptData?.itemName ||
-          rawItem.name ||
-          rawItem.itemInReceipt ||
-          ""
-        ).trim();
-
-        if (!rawName) continue;
-
+      // ส่งโครงสร้างข้อมูลนี้เข้าสู่กระบวนการตรวจสอบของ Engine
+      for (const item of extractedProposalItems) {
+        const rawName = item.name;
         const cleanDisplayItemName = cleanProposalItemName(rawName);
         const baseItemName = getBaseItemName(rawName);
 
-        const aiPersonCount = rawItem.personCount ?? rawItem.receiptData?.personCount;
-        const personCount = extractPersonCount(rawName, aiPersonCount);
+        const personCount = item.personCount;
+        const qty = item.quantity;
+        const rawUnit = item.rawUnit;
+        const normalizedUnit = normalizeUnit(rawUnit);
+        const cleanUnit = cleanText(normalizedUnit || rawUnit);
 
-        const qty = Number(rawItem.qty ?? rawItem.receiptData?.qty) || 1;
-        const rawUnit = (rawItem.unit || rawItem.receiptData?.unit || "").trim();
-        const cleanUnit = cleanText(rawUnit);
-
-        const unitPrice = Number(rawItem.unitPrice ?? rawItem.receiptData?.unitPrice) || 0;
-        const rawTotalPrice = Number(rawItem.totalPrice ?? rawItem.receiptData?.totalPrice);
-        const totalPrice = !isNaN(rawTotalPrice) && rawTotalPrice > 0 ? rawTotalPrice : qty * unitPrice;
+        const unitPrice = item.unitPriceInBill;
+        const totalPrice = item.totalInBill;
 
         // จัดหมวดหมู่งบประมาณมาตรฐาน
-        const rawCat = rawItem.category || rawItem.receiptData?.category || "";
-        const category = normalizeExpenseCategory(rawCat, rawName);
+        const category = normalizeExpenseCategory(item.category, rawName);
 
         const errorFlags: string[] = [];
         let itemStatus: "PASS" | "FAIL" | "NOT_FOUND" = "PASS";
@@ -906,7 +886,7 @@ ${matrixContext}
             matchedMatrixData = weekdayCandidate;
             const weekdayRate = Number(weekdayCandidate.maxPrice) || 0;
             const weekendRate = weekendCandidate ? Number(weekendCandidate.maxPrice) || 0 : 0;
-            const targetUnit = weekdayCandidate.unit || rawUnit || "คน/วัน";
+            const targetUnit = weekdayCandidate.unit || normalizedUnit || rawUnit || "คน/วัน";
 
             const isClaimingWeekend =
               (weekendRate > weekdayRate && unitPrice >= weekendRate) ||
@@ -946,7 +926,8 @@ ${matrixContext}
 
           matchedMatrixData = exactPriceMatch || withinBudgetMatch || candidatePool[0];
 
-          if (compatibleCandidates.length === 0 && cleanUnit && cleanText(matchedMatrixData.unit) !== cleanUnit) {
+          const matchedUnitNorm = cleanText(normalizeUnit(matchedMatrixData.unit));
+          if (compatibleCandidates.length === 0 && cleanUnit && matchedUnitNorm !== cleanUnit) {
             itemStatus = "FAIL";
             if (!errorFlags.includes("หน่วยไม่ตรง")) errorFlags.push("หน่วยไม่ตรง");
             message = `หน่วยนับ '${rawUnit}' ไม่ตรงกับหน่วยในราคากลาง ('${candidates.map((c: any) => c.unit).join(", ")}')`;
@@ -974,10 +955,18 @@ ${matrixContext}
           errorFlags: errorFlags,
           message: message,
           receiptData: {
-            itemName: cleanDisplayItemName,
+            // โครงสร้างมาตรฐานตาม Step 2
+            name: item.name,
+            rawUnit: item.rawUnit,
+            quantity: qty,
+            unitPriceInBill: unitPrice,
+            totalInBill: totalPrice,
             personCount: personCount > 1 ? personCount : undefined,
+
+            // ฟิลด์ดั้งเดิมสำหรับรองรับ UI และการแสดงผลเดิม
+            itemName: cleanDisplayItemName,
             qty: qty,
-            unit: rawUnit,
+            unit: normalizedUnit || rawUnit,
             unitPrice: unitPrice,
             totalPrice: totalPrice,
           },
@@ -1179,7 +1168,18 @@ ${matrixContext}
 
     parsedData.items.forEach((item: any) => {
       const name = (item.receiptData?.itemName || item.itemInReceipt || "").trim();
-      const receiptUnit = (item.receiptData?.unit || item.unit || "").trim().toLowerCase();
+      const rawUnit = (item.receiptData?.rawUnit || item.receiptData?.unit || item.unit || "").trim();
+      const receiptUnit = (normalizeUnit(rawUnit) || rawUnit).trim().toLowerCase();
+      const personCount = extractPersonCount(name);
+
+      if (item.receiptData) {
+        if (!item.receiptData.name) item.receiptData.name = name;
+        if (!item.receiptData.rawUnit) item.receiptData.rawUnit = rawUnit;
+        if (item.receiptData.quantity == null) item.receiptData.quantity = item.receiptData.qty;
+        if (item.receiptData.unitPriceInBill == null) item.receiptData.unitPriceInBill = item.receiptData.unitPrice;
+        if (item.receiptData.totalInBill == null) item.receiptData.totalInBill = item.receiptData.totalPrice;
+        if (personCount > 1 && !item.receiptData.personCount) item.receiptData.personCount = personCount;
+      }
 
       // การจัดหมวดหมู่มาตรฐาน 6 หมวดตามแบบฟอร์มสภานักศึกษา มทส.
       const rawCat = item.category || item.matrixData?.category || null;
@@ -1191,7 +1191,7 @@ ${matrixContext}
       // Programmatic Guardrail: ตรวจสอบการจับคู่ราคากลางให้ตรงกับหน่วยนับ (Unit Matching Guardrail)
       if (Array.isArray(priceMatrix) && priceMatrix.length > 0 && receiptUnit) {
         const currentMatrixName = (item.matrixData?.itemName || item.matchedMatrixItem || "").trim().toLowerCase();
-        const currentMatrixUnit = (item.matrixData?.unit || "").trim().toLowerCase();
+        const currentMatrixUnit = (normalizeUnit(item.matrixData?.unit || "") || item.matrixData?.unit || "").trim().toLowerCase();
 
         // ค้นหารายการทั้งหมดใน priceMatrix ที่ตรงกับชื่อสินค้าหรือรายการที่ AI จับคู่
         const candidateMatches = priceMatrix.filter((pm: any) => {
@@ -1203,10 +1203,12 @@ ${matrixContext}
         });
 
         if (candidateMatches.length > 0) {
-          // หากมีรายการที่หน่วยนับตรงกับในบิลเป๊ะ
-          const exactUnitMatch = candidateMatches.find(
-            (pm: any) => (pm.unit || "").trim().toLowerCase() === receiptUnit
-          );
+          // หากมีรายการที่หน่วยนับตรงกับในบิลเป๊ะ (เปรียบเทียบทั้งแบบ normalize และ raw)
+          const exactUnitMatch = candidateMatches.find((pm: any) => {
+            const pmNorm = (normalizeUnit(pm.unit) || pm.unit || "").trim().toLowerCase();
+            const pmRaw = (pm.unit || "").trim().toLowerCase();
+            return pmNorm === receiptUnit || pmRaw === receiptUnit || pmRaw === rawUnit.toLowerCase();
+          });
 
           if (exactUnitMatch && (!item.matrixData || currentMatrixUnit !== receiptUnit)) {
             item.matrixData = {

@@ -200,11 +200,33 @@ export interface ProposalAuditData {
   isHorizontalMathCorrect?: boolean;
   categoryChecks?: CategorySubtotalCheck[];
 }
+
+export interface ExtractedProposalItem {
+  name: string;
+  rawUnit: string;
+  quantity: number;
+  unitPriceInBill: number;
+  totalInBill: number;
+  personCount: number;
+  category?: string;
+}
+
 export interface ReceiptItemData {
+  // Legacy / UI display fields
   itemName: string;
-  personCount?: number;
   qty: number;
   unit: string;
   unitPrice: number;
   totalPrice: number;
+  personCount?: number;
+
+  // Proposal extraction standardized fields
+  name?: string;
+  rawUnit?: string;
+  quantity?: number;
+  unitPriceInBill?: number;
+  totalInBill?: number;
 }
+
+export { extractPersonCount, normalizeUnit, normalizeProposalItem } from "./normalizer";
+
