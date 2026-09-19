@@ -166,10 +166,16 @@ export default function UserFrontendPage() {
             const data = docSnap.data();
             return {
               id: docSnap.id,
-              itemName: data.itemName || "",
-              category: data.category || "อื่นๆ",
-              maxPrice: Number(data.maxPrice || data.unitPrice) || 0,
+              name: data.name || data.itemName || "",
+              itemName: data.itemName || data.name || "",
+              category: data.category || "หมวดอื่นๆ",
+              price: Number(data.price ?? data.maxPrice ?? data.unitPrice) || 0,
+              maxPrice: Number(data.maxPrice ?? data.price ?? data.unitPrice) || 0,
               unit: data.unit || data.unitType || "",
+              note: data.note || "",
+              pricingType: data.pricingType || "unit",
+              maxCap: data.maxCap !== undefined ? data.maxCap : null,
+              exclusiveWith: Array.isArray(data.exclusiveWith) ? data.exclusiveWith : [],
               updatedAt: data.updatedAt?.toMillis ? data.updatedAt.toMillis() : Date.now(),
             };
           });

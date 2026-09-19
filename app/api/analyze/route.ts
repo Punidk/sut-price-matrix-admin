@@ -216,11 +216,16 @@ async function getEffectivePriceMatrix(clientMatrix?: any[]): Promise<any[]> {
           return {
             id: docSnap.id,
             itemName: d.itemName || d.name || "",
+            name: d.name || d.itemName || "",
             category: d.category || "หมวดอื่นๆ",
             maxPrice: Number(d.maxPrice ?? d.unitPrice ?? d.price) || 0,
+            price: Number(d.price ?? d.maxPrice ?? d.unitPrice) || 0,
             unit: d.unit || d.unitType || "",
             condition: d.condition || null,
             note: d.note || "",
+            pricingType: d.pricingType || "unit",
+            maxCap: d.maxCap !== undefined ? d.maxCap : null,
+            exclusiveWith: Array.isArray(d.exclusiveWith) ? d.exclusiveWith : [],
           };
         });
       }
@@ -231,11 +236,16 @@ async function getEffectivePriceMatrix(clientMatrix?: any[]): Promise<any[]> {
   return PRICE_MATRIX_2569.map((m) => ({
     id: getCompositeKey(m.category, m.name, m.unit),
     itemName: m.name,
+    name: m.name,
     category: m.category,
     maxPrice: m.price,
+    price: m.price,
     unit: m.unit,
     condition: m.condition || null,
     note: m.note || "",
+    pricingType: m.pricingType || "unit",
+    maxCap: m.maxCap !== undefined ? m.maxCap : null,
+    exclusiveWith: Array.isArray(m.exclusiveWith) ? m.exclusiveWith : [],
   }));
 }
 

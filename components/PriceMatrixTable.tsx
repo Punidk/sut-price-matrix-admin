@@ -46,10 +46,11 @@ export default function PriceMatrixTable({
   const filteredItems = useMemo(() => {
     return items
       .filter((item) => {
-        const matchesSearch = item.itemName
+        const displayName = item.itemName || item.name || "";
+        const matchesSearch = displayName
           .toLowerCase()
           .includes(searchTerm.toLowerCase().trim());
-        const normalizedItemCat = normalizeExpenseCategory(item.category, item.itemName);
+        const normalizedItemCat = normalizeExpenseCategory(item.category, displayName);
         const matchesCategory =
           selectedCategory === "ทั้งหมด" ||
           selectedCategory === "ALL" ||
@@ -58,8 +59,10 @@ export default function PriceMatrixTable({
         return matchesSearch && matchesCategory;
       })
       .sort((a, b) => {
-        let valA: any = sortField === "maxPrice" ? (a.maxPrice ?? a.unitPrice ?? 0) : a[sortField];
-        let valB: any = sortField === "maxPrice" ? (b.maxPrice ?? b.unitPrice ?? 0) : b[sortField];
+        const nameA = a.itemName || a.name || "";
+        const nameB = b.itemName || b.name || "";
+        let valA: any = sortField === "maxPrice" ? (a.maxPrice ?? a.price ?? a.unitPrice ?? 0) : sortField === "itemName" ? nameA : a[sortField];
+        let valB: any = sortField === "maxPrice" ? (b.maxPrice ?? b.price ?? b.unitPrice ?? 0) : sortField === "itemName" ? nameB : b[sortField];
 
         if (typeof valA === "string") {
           valA = (valA as string).toLowerCase();
@@ -233,7 +236,7 @@ export default function PriceMatrixTable({
               </tr>
             ) : (
               filteredItems.map((item, index) => {
-                const price = item.maxPrice ?? item.unitPrice ?? 0;
+                const price = item.maxPrice ?? item.price ?? item.unitPrice ?? 0;
                 const unitStr = item.unit || item.unitType || "";
                 return (
                   <tr
@@ -244,7 +247,7 @@ export default function PriceMatrixTable({
                       {index + 1}
                     </td>
                     <td className="py-3.5 px-4 font-medium text-white group-hover:text-white">
-                      {item.itemName}
+                      {item.itemName || item.name}
                     </td>
                     <td className="py-3.5 px-4">
                       {getCategoryBadge(item.category)}

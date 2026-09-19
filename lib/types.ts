@@ -151,20 +151,36 @@ export function normalizeExpenseCategory(cat?: string | null, itemName?: string 
   return "หมวดอื่นๆ";
 }
 
+export type PricingType = "unit" | "per_person" | "lump_sum" | "project_fixed";
+
 export interface PriceMatrixItem {
-  id: string;
-  itemName: string;
+  id?: string;
   category: string;
-  maxPrice: number;
+  name: string;
+  price: number;
   unit: string;
+  note?: string;
+  pricingType: PricingType;
+  maxCap?: number | null;          // เพดานเหมาจ่ายสูงสุด เช่น วิทยากรภายนอก 2400
+  exclusiveWith?: string[];        // รายการที่ห้ามขอพร้อมกัน เช่น ['ค่าของที่ระลึก']
+
+  // Optional compatibility fields for existing UI components
+  itemName?: string;
+  maxPrice?: number;
   unitPrice?: number;
   unitType?: string;
   condition?: string;
-  note?: string;
-  updatedAt?: number;
+  updatedAt?: any;
 }
 
-export type PriceMatrixFormData = Omit<PriceMatrixItem, "id" | "updatedAt">;
+export type PriceMatrixFormData = Partial<PriceMatrixItem> & {
+  category: string;
+  unit: string;
+  name?: string;
+  price?: number;
+  itemName?: string;
+  maxPrice?: number;
+};
 
 export type DocumentMode = "PROPOSAL" | "QUOTATION";
 

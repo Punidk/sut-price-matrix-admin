@@ -8,6 +8,7 @@ import {
   WriteBatch,
 } from "firebase/firestore";
 import rawData from "@/data/priceMatrix2569.json";
+import { PricingType } from "@/lib/types";
 
 export interface PriceMatrixMasterItem {
   category: string;
@@ -16,6 +17,9 @@ export interface PriceMatrixMasterItem {
   unit: string;
   note: string;
   condition?: "WEEKDAY" | "WEEKEND" | string;
+  pricingType: PricingType;
+  maxCap?: number | null;
+  exclusiveWith?: string[];
 }
 
 export const PRICE_MATRIX_2569: PriceMatrixMasterItem[] = rawData as PriceMatrixMasterItem[];
@@ -96,6 +100,9 @@ export async function syncMasterPriceMatrix2569({
       unit: item.unit,
       note: item.note || "",
       condition: item.condition || "",
+      pricingType: item.pricingType || "unit",
+      maxCap: item.maxCap !== undefined ? item.maxCap : null,
+      exclusiveWith: Array.isArray(item.exclusiveWith) ? item.exclusiveWith : [],
       source: "MASTER_SEED_2569",
       updatedAt: serverTimestamp(),
     });

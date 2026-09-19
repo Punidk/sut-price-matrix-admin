@@ -47,14 +47,21 @@ import {
   clearAllPriceMatrix,
 } from "@/lib/priceMatrix2569";
 
+import { PricingType } from "@/lib/types";
+
 export interface PriceMatrixItem {
   id: string;
   itemName: string;
+  name?: string;
   category: string;
   maxPrice: number;
+  price?: number;
   unit: string;
   condition?: string;
   note?: string;
+  pricingType?: PricingType;
+  maxCap?: number | null;
+  exclusiveWith?: string[];
   updatedAt?: number;
 }
 
@@ -151,14 +158,24 @@ export default function AdminDashboardPage() {
       const unsubscribe = onSnapshot(
         matrixCollectionRef,
         (snapshot) => {
-          const list: PriceMatrixItem[] = snapshot.docs.map((docSnap) => ({
-            id: docSnap.id,
-            itemName: docSnap.data().itemName || "",
-            category: docSnap.data().category || "อื่นๆ",
-            maxPrice: Number(docSnap.data().maxPrice) || 0,
-            unit: docSnap.data().unit || "",
-            updatedAt: docSnap.data().updatedAt?.toMillis ? docSnap.data().updatedAt.toMillis() : Date.now(),
-          }));
+          const list: PriceMatrixItem[] = snapshot.docs.map((docSnap) => {
+            const data = docSnap.data();
+            return {
+              id: docSnap.id,
+              name: data.name || data.itemName || "",
+              itemName: data.itemName || data.name || "",
+              category: data.category || "อื่นๆ",
+              maxPrice: Number(data.maxPrice ?? data.price) || 0,
+              price: Number(data.price ?? data.maxPrice) || 0,
+              unit: data.unit || "",
+              condition: data.condition || "",
+              note: data.note || "",
+              pricingType: data.pricingType || "unit",
+              maxCap: data.maxCap !== undefined ? data.maxCap : null,
+              exclusiveWith: Array.isArray(data.exclusiveWith) ? data.exclusiveWith : [],
+              updatedAt: data.updatedAt?.toMillis ? data.updatedAt.toMillis() : Date.now(),
+            };
+          });
           setItems(list);
           setDataLoading(false);
         },
@@ -560,11 +577,16 @@ export default function AdminDashboardPage() {
       const formattedMasterItems: PriceMatrixItem[] = PRICE_MATRIX_2569.map((m) => ({
         id: getCompositeKey(m.category, m.name, m.unit),
         itemName: m.name,
+        name: m.name,
         category: m.category,
         maxPrice: m.price,
+        price: m.price,
         unit: m.unit,
         condition: m.condition,
         note: m.note,
+        pricingType: m.pricingType || "unit",
+        maxCap: m.maxCap !== undefined ? m.maxCap : null,
+        exclusiveWith: Array.isArray(m.exclusiveWith) ? m.exclusiveWith : [],
         updatedAt: Date.now(),
       }));
 

@@ -30,9 +30,9 @@ export default function ItemModal({
 
   useEffect(() => {
     if (initialData) {
-      setItemName(initialData.itemName);
-      setCategory(normalizeExpenseCategory(initialData.category, initialData.itemName));
-      setMaxPrice((initialData.maxPrice || initialData.unitPrice || 0).toString());
+      setItemName(initialData.name || initialData.itemName || "");
+      setCategory(normalizeExpenseCategory(initialData.category, initialData.name || initialData.itemName));
+      setMaxPrice((initialData.price ?? initialData.maxPrice ?? initialData.unitPrice ?? 0).toString());
       setUnit(initialData.unit || initialData.unitType || "");
     } else {
       setItemName("");

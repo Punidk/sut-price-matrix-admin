@@ -4,28 +4,40 @@
     "name": "ค่ากรรมการตัดสิน (ภายนอก)",
     "price": 300.0,
     "unit": "คน/เเมต",
-    "note": "กรณีเป็นบุคคลภายนอก ให้ได้สูงสุด 10 เเมต ต่อ โครงการ ***จะต้องเเนบรายชื่อกรรมการพร้อมใบ CV"
+    "note": "กรณีเป็นบุคคลภายนอก ให้ได้สูงสุด 10 เเมต ต่อ โครงการ ***จะต้องเเนบรายชื่อกรรมการพร้อมใบ CV",
+    "pricingType": "per_person",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดค่าตอบแทน",
     "name": "ค่ากรรมการตัดสิน (ภายใน)",
     "price": 200.0,
     "unit": "คน/เเมต",
-    "note": "กรณีเป็นนักศึกษาตัดสิน ให้ได้สูงสุด 10 เเมต ต่อ โครงการ ***จะต้องเเนบรายชื่อกรรมการด้วย"
+    "note": "กรณีเป็นนักศึกษาตัดสิน ให้ได้สูงสุด 10 เเมต ต่อ โครงการ ***จะต้องเเนบรายชื่อกรรมการด้วย",
+    "pricingType": "per_person",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดค่าตอบแทน",
     "name": "ค่าจ้างคนเดินเก็บขยะ",
     "price": 359.0,
     "unit": "คน/วัน",
-    "note": "วันจันทร์-วันศุกร์ เวลาราชการ 08.30-16.30 น."
+    "note": "วันจันทร์-วันศุกร์ เวลาราชการ 08.30-16.30 น.",
+    "pricingType": "per_person",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดค่าตอบแทน",
     "name": "ค่าจ้างพนักงานทำความสะอาด",
     "price": 359.0,
     "unit": "คน/วัน",
-    "note": "วันจันทร์-วันศุกร์ เวลาราชการ 07.00-16.00 น./ 17.00-24.00 น."
+    "note": "วันจันทร์-วันศุกร์ เวลาราชการ 07.00-16.00 น./ 17.00-24.00 น.",
+    "pricingType": "per_person",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดค่าตอบแทน",
@@ -33,6 +45,9 @@
     "price": 240.0,
     "unit": "คน/วัน",
     "note": "วันจันทร์-วันศุกร์ เวลาราชการ",
+    "pricingType": "per_person",
+    "maxCap": null,
+    "exclusiveWith": [],
     "condition": "WEEKDAY"
   },
   {
@@ -41,6 +56,9 @@
     "price": 420.0,
     "unit": "คน/วัน",
     "note": "วันเสาร์-วันอาทิตย์ เเละวันหยุดนักขัตฤกษ์",
+    "pricingType": "per_person",
+    "maxCap": null,
+    "exclusiveWith": [],
     "condition": "WEEKEND"
   },
   {
@@ -48,119 +66,182 @@
     "name": "ค่าวิทยากร (ภายนอก)",
     "price": 600.0,
     "unit": "คน/ชั่วโมง เหมาจ่าย",
-    "note": "บุคคลภายนอก ***เเนบรายชื่อพร้อมใบ CV"
+    "note": "บุคคลภายนอก ***เเนบรายชื่อพร้อมใบ CV",
+    "pricingType": "per_person",
+    "maxCap": 2400,
+    "exclusiveWith": [
+      "ค่าของที่ระลึก"
+    ]
   },
   {
     "category": "หมวดค่าตอบแทน",
     "name": "ค่าวิทยากร (ภายใน)",
     "price": 300.0,
     "unit": "คน/ชั่วโมง เหมาจ่าย",
-    "note": "บุคคลภายใน ***เเนบรายชื่อพร้อมใบ CV"
+    "note": "บุคคลภายใน ***เเนบรายชื่อพร้อมใบ CV",
+    "pricingType": "per_person",
+    "maxCap": 900,
+    "exclusiveWith": [
+      "ค่าของที่ระลึก"
+    ]
   },
   {
     "category": "หมวดค่าตอบแทน",
     "name": "ค่าสนับสนุนชมรมนักศึกษา",
     "price": 3000.0,
     "unit": "ชมรม/",
-    "note": "การเเสดง ให้ใช้เฉพาะ องค์การบริหารฯ เเละ สภานักศึกษา เท่านั้น"
+    "note": "การเเสดง ให้ใช้เฉพาะ องค์การบริหารฯ เเละ สภานักศึกษา เท่านั้น",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดค่าตอบแทน",
     "name": "ค่าสนับสนุนชมรม",
     "price": 1000.0,
     "unit": "ชมรม",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดค่าตอบแทน",
     "name": "ค่าสนับสนุนสาขาวิชา",
     "price": 1000.0,
     "unit": "สาขา",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดโภชนาการ",
     "name": "ค่าอาหารว่าง",
     "price": 20.0,
     "unit": "คน/วัน",
-    "note": ""
+    "note": "",
+    "pricingType": "per_person",
+    "maxCap": null,
+    "exclusiveWith": [
+      "น้ำแดงเฮลบลูบอย"
+    ]
   },
   {
     "category": "หมวดโภชนาการ",
     "name": "ค่าอาหารว่างวิทยากร",
     "price": 50.0,
     "unit": "คน/วัน",
-    "note": ""
+    "note": "",
+    "pricingType": "per_person",
+    "maxCap": null,
+    "exclusiveWith": [
+      "น้ำแดงเฮลบลูบอย"
+    ]
   },
   {
     "category": "หมวดโภชนาการ",
     "name": "ค่าอาหารและเครื่องดื่ม (ข้าวกล่องสำหรับนักศึกษา มทส.)",
     "price": 50.0,
     "unit": "คน/มื้อ",
-    "note": "ข้าวกล่องสำหรับนักศึกษา มทส."
+    "note": "ข้าวกล่องสำหรับนักศึกษา มทส.",
+    "pricingType": "per_person",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดโภชนาการ",
     "name": "ค่าอาหารและเครื่องดื่ม (ประกอบอาหารเอง สำหรับนักศึกษา มทส.)",
     "price": 40.0,
     "unit": "คน/มื้อ",
-    "note": "ประกอบอาหารเอง สำหรับนักศึกษา มทส."
+    "note": "ประกอบอาหารเอง สำหรับนักศึกษา มทส.",
+    "pricingType": "per_person",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดโภชนาการ",
     "name": "ค่าอาหารและเครื่องดื่ม (นักเรียนผู้เข้าร่วม)",
     "price": 30.0,
     "unit": "คน/มื้อ",
-    "note": "นักเรียนผู้เข้าร่วม"
+    "note": "นักเรียนผู้เข้าร่วม",
+    "pricingType": "per_person",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดโภชนาการ",
     "name": "เครื่องดื่มเกลือแร่ (ลัง)",
     "price": 243.0,
     "unit": "ลัง",
-    "note": "ให้เฉพาะกรณีที่มีการแข่งขันกีฬาทั้งภายในและ ภายนอกมหาวิทยาลัย"
+    "note": "ให้เฉพาะกรณีที่มีการแข่งขันกีฬาทั้งภายในและ ภายนอกมหาวิทยาลัย",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดโภชนาการ",
     "name": "เครื่องดื่มเกลือแร่ (ขวด)",
     "price": 12.0,
     "unit": "ขวด",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดโภชนาการ",
     "name": "น้ำแดงเฮลบลูบอย",
     "price": 68.0,
     "unit": "ขวด",
-    "note": "50 คน 3 ขวด/วัน วิธีคิดคำนวณ ((จำนวนคนที่เข้า ร่วมโครงการ x 3)/50) x จำนวนวัน)"
+    "note": "50 คน 3 ขวด/วัน วิธีคิดคำนวณ ((จำนวนคนที่เข้า ร่วมโครงการ x 3)/50) x จำนวนวัน)",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": [
+      "ค่าอาหารว่าง"
+    ]
   },
   {
     "category": "หมวดโภชนาการ",
     "name": "น้ำแดงเฮลบลูบอย",
     "price": 790.0,
     "unit": "ลัง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": [
+      "ค่าอาหารว่าง"
+    ]
   },
   {
     "category": "หมวดยานพาหนะ",
     "name": "ค่าน้ำมันรถ",
     "price": 0.0,
     "unit": "เหมาจ่าย",
-    "note": "คำนวณจากระยะทางไป-กลับ โดยใช้แบบฟอร์ม ขององค์การนักศึกษา และคำนวณมาเอง อ้างอิง ระยะทางจากกรมทางหลวง"
+    "note": "คำนวณจากระยะทางไป-กลับ โดยใช้แบบฟอร์ม ขององค์การนักศึกษา และคำนวณมาเอง อ้างอิง ระยะทางจากกรมทางหลวง",
+    "pricingType": "lump_sum",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดยานพาหนะ",
     "name": "ค่าจ้างพนักงานขับรถปีบทอง",
     "price": 320.0,
     "unit": "คน/วัน",
-    "note": "ภายนอกจังหวัดนครราชสีมา และต่างอำเภอ"
+    "note": "ภายนอกจังหวัดนครราชสีมา และต่างอำเภอ",
+    "pricingType": "per_person",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดยานพาหนะ",
     "name": "ค่าจ้างพนักงานขับรถปีบทอง",
     "price": 60.0,
     "unit": "คน/ชั่วโมง",
-    "note": "ภายในอำเภอเมืองนครราชสีมา เหมาจ่าย ไม่เกิน เหมาจ่าย 240 บาท/คน/วัน"
+    "note": "ภายในอำเภอเมืองนครราชสีมา เหมาจ่าย ไม่เกิน เหมาจ่าย 240 บาท/คน/วัน",
+    "pricingType": "per_person",
+    "maxCap": 240,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดยานพาหนะ",
@@ -168,6 +249,9 @@
     "price": 60.0,
     "unit": "คน/ชั่วโมง",
     "note": "วันจันทร์-วันศุกร์ เหมาจ่าย ไม่เกินเหมาจ่าย 240 บาท/คน/วัน",
+    "pricingType": "per_person",
+    "maxCap": 240,
+    "exclusiveWith": [],
     "condition": "WEEKDAY"
   },
   {
@@ -176,6 +260,9 @@
     "price": 60.0,
     "unit": "คน/ชั่วโมง",
     "note": "วันเสาร์-อาทิตย์ และวันหยุดนักขัตฤกษ์ ไม่เกินเหมา จ่าย 420 บาท/คน/วัน",
+    "pricingType": "per_person",
+    "maxCap": 420,
+    "exclusiveWith": [],
     "condition": "WEEKEND"
   },
   {
@@ -183,7 +270,10 @@
     "name": "ค่าที่พักพนักงานขับรถตู้",
     "price": 450.0,
     "unit": "คน/คืน",
-    "note": ""
+    "note": "",
+    "pricingType": "per_person",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดยานพาหนะ",
@@ -191,6 +281,9 @@
     "price": 200.0,
     "unit": "คน/วัน",
     "note": "วันจันทร์-วันศุกร์ภายในจังหวัดนครราชสีมา",
+    "pricingType": "per_person",
+    "maxCap": null,
+    "exclusiveWith": [],
     "condition": "WEEKDAY"
   },
   {
@@ -199,6 +292,9 @@
     "price": 300.0,
     "unit": "คน/วัน",
     "note": "ภายนอกจังหวัดนครราชสีมา",
+    "pricingType": "per_person",
+    "maxCap": null,
+    "exclusiveWith": [],
     "condition": "WEEKDAY"
   },
   {
@@ -207,6 +303,9 @@
     "price": 420.0,
     "unit": "คน/วัน",
     "note": "วันเสาร์-อาทิตย์ และวันหยุดนักขัตฤกษ์ ทั้ง ภายใน และนอกจังหวัดนครราชสีมา",
+    "pricingType": "per_person",
+    "maxCap": null,
+    "exclusiveWith": [],
     "condition": "WEEKEND"
   },
   {
@@ -214,14 +313,20 @@
     "name": "ค่าจ้างพนักงานขับรถ 6 ล้อ",
     "price": 320.0,
     "unit": "คน/วัน",
-    "note": "ภายนอกจังหวัดนครราชสีมา และต่างอำเภอ"
+    "note": "ภายนอกจังหวัดนครราชสีมา และต่างอำเภอ",
+    "pricingType": "per_person",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดยานพาหนะ",
     "name": "ค่าจ้างพนักงานขับรถ 6 ล้อ",
     "price": 60.0,
     "unit": "คน/ชั่วโมง",
-    "note": "ภายในอำเภอเมืองนครราชสีมา เหมาจ่าย ไม่เกิน 240 บาท/คน/วัน"
+    "note": "ภายในอำเภอเมืองนครราชสีมา เหมาจ่าย ไม่เกิน 240 บาท/คน/วัน",
+    "pricingType": "per_person",
+    "maxCap": 240,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดยานพาหนะ",
@@ -229,6 +334,9 @@
     "price": 60.0,
     "unit": "คน/ชั่วโมง",
     "note": "วันจันทร์ – วันศุกร์ เหมาจ่าย ไม่เกิน 240 บาท/คน/ วัน",
+    "pricingType": "per_person",
+    "maxCap": 240,
+    "exclusiveWith": [],
     "condition": "WEEKDAY"
   },
   {
@@ -237,6 +345,9 @@
     "price": 60.0,
     "unit": "คน/ชั่วโมง",
     "note": "วันเสาร์-อาทิตย์ และวันหยุดนักขัตฤกษ์ ไม่เกินเหมา จ่าย 420 บาท/คน/วัน",
+    "pricingType": "per_person",
+    "maxCap": 420,
+    "exclusiveWith": [],
     "condition": "WEEKEND"
   },
   {
@@ -244,2344 +355,3357 @@
     "name": "ไขควงวัดไฟ",
     "price": 270.0,
     "unit": "อัน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์อิเล็กทรอนิกส์",
     "name": "ถ่าน Alcalye 2A/P2 Panasonic",
     "price": 45.0,
     "unit": "อัน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์อิเล็กทรอนิกส์",
     "name": "ถ่านขนาด AA",
     "price": 450.0,
     "unit": "กล่อง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์อิเล็กทรอนิกส์",
     "name": "ถ่านขนาด AA",
     "price": 55.0,
     "unit": "แพ็ก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์อิเล็กทรอนิกส์",
     "name": "ปลั๊กตัวผู้",
     "price": 30.0,
     "unit": "อัน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์อิเล็กทรอนิกส์",
     "name": "ปลั๊กตัวเมีย 4 รู",
     "price": 248.0,
     "unit": "อัน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์อิเล็กทรอนิกส์",
     "name": "ปลั๊กพ่วง ยาว 10 ม.",
     "price": 495.0,
     "unit": "อัน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์อิเล็กทรอนิกส์",
     "name": "ไฟฉายแบบถือ",
     "price": 85.0,
     "unit": "อัน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์อิเล็กทรอนิกส์",
     "name": "ไมค์ช่วยสอนลำโพงพกพา",
     "price": 229.0,
     "unit": "ตัว",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์อิเล็กทรอนิกส์",
     "name": "ล้อเก็บสายไฟเหล็ก 30 ม. (ปลั๊กไฟ)",
     "price": 2188.0,
     "unit": "อัน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "Post-it Note 3x3 นิ้ว (500 แผ่น)",
     "price": 39.0,
     "unit": "แพ็ก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "กบเหลาดินสอ",
     "price": 18.0,
     "unit": "แพ็ก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "กรรไกร ขนาด 6 นิ้ว",
     "price": 25.0,
     "unit": "ด้าม",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "กรรไกร ขนาด 7 นิ้ว",
     "price": 35.0,
     "unit": "ด้าม",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "กรรไกร ขนาด 8 นิ้ว",
     "price": 58.0,
     "unit": "ด้าม",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "กระดานไวท์บอร์ด ขนาด 40x60 ซม.",
     "price": 180.0,
     "unit": "แผ่น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "กระดานไวท์บอร์ด ขนาด 60X80 ซม.",
     "price": 553.0,
     "unit": "แผ่น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "กระดาษ 100 ปอนด์ A0",
     "price": 35.0,
     "unit": "แผ่น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "กระดาษ 100 ปอนด์ A4",
     "price": 7.0,
     "unit": "แผ่น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "กระดาษ A4 (80 แกรม)",
     "price": 125.0,
     "unit": "รีม",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "กระดาษ A4 (80 แกรม)",
     "price": 625.0,
     "unit": "ลัง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "กระดาษ A4 สี (120 แกรม)",
     "price": 20.0,
     "unit": "แพ็ก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "กระดาษเกียรติบัตร A4",
     "price": 39.0,
     "unit": "แพ็ก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "กระดาษแก้ว",
     "price": 130.0,
     "unit": "แพ็ก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "กระดาษแข็งคละสี A4 (310 แกรม)",
     "price": 180.0,
     "unit": "แพ็ก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "กระดาษชาร์ท ชนิดบาง",
     "price": 5.0,
     "unit": "แผ่น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "กระดาษชาร์ท ชนิดหน้าเดียว",
     "price": 12.0,
     "unit": "แผ่น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "กระดาษเทาขาว ชนิดหนา",
     "price": 18.0,
     "unit": "แผ่น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "กระดาษบรู๊ฟ",
     "price": 3.0,
     "unit": "แผ่น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "กระดาษโปสเตอร์สี ชนิดหนา",
     "price": 10.0,
     "unit": "แผ่น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "กระดาษโปสเตอร์สีสองหน้า (120 แกรม)",
     "price": 20.0,
     "unit": "แผ่น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "กระดาษโปสเตอร์สีสองหน้า (80 แกรม)",
     "price": 10.0,
     "unit": "แผ่น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "กระดาษโฟโต้ A4 (180 แกรม)",
     "price": 50.0,
     "unit": "แพ็ก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "กระดาษสา",
     "price": 15.0,
     "unit": "แผ่น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "กาว UHU ติดโฟม (50 มล.)",
     "price": 105.0,
     "unit": "หลอด",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "กาวแท่ง UHU (21 กรัม)",
     "price": 56.0,
     "unit": "แท่ง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "กาวร้อน",
     "price": 25.0,
     "unit": "หลอด",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "กาวร้อน (12 ขวด)",
     "price": 150.0,
     "unit": "กล่อง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "กาวร้อน (50 ขวด)",
     "price": 420.0,
     "unit": "กล่อง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "กาวลาเท็กซ์ TOA 16 oz.",
     "price": 21.0,
     "unit": "กระปุก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "กาวลาเท็กซ์ TOA 32 oz.",
     "price": 70.0,
     "unit": "กระปุก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "เข็มหมุด",
     "price": 35.0,
     "unit": "กล่อง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "คลิปดำ ขนาด 25 มม.",
     "price": 17.0,
     "unit": "กล่อง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "คลิปดำ ขนาด 32 mm.",
     "price": 22.0,
     "unit": "กล่อง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "คลิปดำ ขนาด 50 mm.",
     "price": 55.0,
     "unit": "กล่อง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "คลิปบอร์ด A4",
     "price": 29.0,
     "unit": "แผ่น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "คัตเตอร์ ขนาดเล็ก (9 มม.)",
     "price": 25.0,
     "unit": "เล่ม",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "คัตเตอร์ ขนาดใหญ่ (18 มม.)",
     "price": 50.0,
     "unit": "เล่ม",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "เครื่องเจาะกระดาษ 2 รู",
     "price": 30.0,
     "unit": "ชิ้น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "เครื่องเย็บกระดาษ (No.10)",
     "price": 41.0,
     "unit": "อัน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "เครื่องเย็บกระดาษ (No.35)",
     "price": 125.0,
     "unit": "อัน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "ชอล์ค",
     "price": 30.0,
     "unit": "กล่อง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "เชือกขาว-แดง ม้วนกลาง (80 ม.)",
     "price": 35.0,
     "unit": "ม้วน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "เชือกขาว-แดง ม้วนใหญ่ (180 ม.)",
     "price": 50.0,
     "unit": "ม้วน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "ซองป้ายชื่อ (10 ชิ้น)",
     "price": 65.0,
     "unit": "แพ็ก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "ดินน้ำมัน",
     "price": 5.0,
     "unit": "ก้อน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "ดินน้ำมัน (12 ก้อน)",
     "price": 90.0,
     "unit": "แพ็ก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "ดินสอ 2B",
     "price": 10.0,
     "unit": "ด้าม",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "ดินสอ 2B (50 แท่ง)",
     "price": 135.0,
     "unit": "กล่อง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "ดินสอ HB",
     "price": 5.0,
     "unit": "ด้าม",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "ดินสอ HB (12 แท่ง)",
     "price": 37.0,
     "unit": "กล่อง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "ดินสอ HB (50 แท่ง)",
     "price": 80.0,
     "unit": "กระปุก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "เทป OPP ขนาด 2 นิ้ว",
     "price": 18.0,
     "unit": "ม้วน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "เทปกระดาษ",
     "price": 12.0,
     "unit": "ม้วน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "เทปกาวย่น 1.5 นิ้ว",
     "price": 20.0,
     "unit": "ม้วน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "เทปกาวสองหน้า 18 มม. (20 หลา)",
     "price": 20.0,
     "unit": "ม้วน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "เทปกาวสองหน้า 3M สีใส (18 มม.)",
     "price": 55.0,
     "unit": "ม้วน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "เทปกาวสองหน้าบาง 18 มม. (20 หลา)",
     "price": 78.0,
     "unit": "แพ็ก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "เทปผ้า ขนาด 2 นิ้ว",
     "price": 25.0,
     "unit": "ม้วน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "เทปโฟม กาวสองหน้า (3 เมตร)",
     "price": 149.0,
     "unit": "ม้วน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "เทปลบคำผิด",
     "price": 25.0,
     "unit": "ชิ้น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "เทปใส 2 นิ้ว",
     "price": 22.0,
     "unit": "ม้วน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "ใบมีดคัตเตอร์ ขนาดเล็ก",
     "price": 15.0,
     "unit": "แพ็ก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "ใบมีดคัตเตอร์ ขนาดใหญ่",
     "price": 25.0,
     "unit": "แพ็ก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "ปากกาเคมี 2 หัว",
     "price": 12.0,
     "unit": "แท่ง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "ปากกาเคมี 2 หัว",
     "price": 144.0,
     "unit": "กล่อง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "ปากกาเมจิก",
     "price": 6.0,
     "unit": "ด้าม",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "ปากกาลูกลื่น",
     "price": 5.0,
     "unit": "ด้าม",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "ปากกาลูกลื่น (50 ด้าม)",
     "price": 175.0,
     "unit": "กระปุก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "ปากกาไวท์บอร์ด",
     "price": 20.0,
     "unit": "ด้าม",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "ปากกาไวท์บอร์ด (3 สี)",
     "price": 38.0,
     "unit": "แพ็ก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "ป้ายติดหน้าอก",
     "price": 189.0,
     "unit": "แพ็ก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "แปรงลบกระดาน",
     "price": 20.0,
     "unit": "อัน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "แผ่นรองตัด ขนาด A2",
     "price": 350.0,
     "unit": "แผ่น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "แผ่นรองตัด ขนาด A3",
     "price": 89.0,
     "unit": "แผ่น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "แผ่นรองตัด ขนาด A4",
     "price": 59.0,
     "unit": "แผ่น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "พลาสติก fastener",
     "price": 99.0,
     "unit": "แพ็ก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "พู่กัน เบอร์ 02",
     "price": 6.0,
     "unit": "อัน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "พู่กัน เบอร์ 04",
     "price": 11.0,
     "unit": "อัน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "พู่กัน เบอร์ 08",
     "price": 15.0,
     "unit": "อัน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "พู่กัน เบอร์ 12",
     "price": 30.0,
     "unit": "อัน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "ฟิวเจอร์บอร์ด 2 มม. (120x65 ซม.)",
     "price": 39.0,
     "unit": "แผ่น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "ฟิวเจอร์บอร์ด 3 มม. (65x50 ซม.)",
     "price": 20.0,
     "unit": "แผ่น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "แฟ้มซองซิป A4",
     "price": 25.0,
     "unit": "อัน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "แฟ้มซองพลาสติก A4",
     "price": 13.0,
     "unit": "อัน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "โฟม บอร์ดขนาด 4x8 ฟุต (5 มม.)",
     "price": 150.0,
     "unit": "แผ่น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "โฟม หนา 2 นิ้ว",
     "price": 75.0,
     "unit": "แผ่น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "ไม้บรรทัดเหล็ก 12 นิ้ว",
     "price": 19.0,
     "unit": "อัน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "ไม้ไอติม",
     "price": 16.0,
     "unit": "แพ็ก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "ยางลบ",
     "price": 5.0,
     "unit": "ก้อน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "ยางลบ (แพ็ก 50 ก้อน)",
     "price": 75.0,
     "unit": "แพ็ก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "ลวดเย็บกระดาษ No.10",
     "price": 6.0,
     "unit": "กล่อง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "ลวดเย็บกระดาษ No.35",
     "price": 18.0,
     "unit": "กล่อง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "ลวดเย็บเสียบดาษ (50 ตัว)",
     "price": 12.0,
     "unit": "กล่อง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "ลวดเสียบกระดาษ (300 ตัว)",
     "price": 49.0,
     "unit": "กล่อง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "ลังกระดาษ (35x50x32 ซม.)",
     "price": 48.0,
     "unit": "ชิ้น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "ไวท์บอร์ด (80x120 ซม.)",
     "price": 480.0,
     "unit": "แผ่น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "สติ๊กเกอร์ใส",
     "price": 22.0,
     "unit": "แผ่น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "สมุดปกอ่อน",
     "price": 5.0,
     "unit": "เล่ม",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "สมุดปกอ่อนลายไทย (12 เล่ม)",
     "price": 70.0,
     "unit": "แพ็ก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "สายห้อยป้ายชื่อ",
     "price": 70.0,
     "unit": "แพ็ก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "สีเทียน",
     "price": 13.0,
     "unit": "กล่อง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "สีโปสเตอร์ (15 มล.)",
     "price": 18.0,
     "unit": "ขวด",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "สีโปสเตอร์ 6 สี (15 มล.)",
     "price": 75.0,
     "unit": "กล่อง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "สีไม้ 24 สี",
     "price": 53.0,
     "unit": "กล่อง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "สีอะคริลิค",
     "price": 199.0,
     "unit": "กระป๋อง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "สีอะคริลิค วาดเขียน (20 มล.)",
     "price": 20.0,
     "unit": "ขวด",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอุปกรณ์สำนักงาน",
     "name": "ไส้แฟ้ม (20 ซอง)",
     "price": 89.0,
     "unit": "แพ็ก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "Bolt (M3x10 มม.)",
     "price": 28.0,
     "unit": "แพ็ก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "Cable Ties 10 in (100เส้น)",
     "price": 50.0,
     "unit": "แพ็ก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "กระดาษทราย เบอร์ 1500",
     "price": 20.0,
     "unit": "แผ่น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "กระดาษทราย เบอร์ 200",
     "price": 20.0,
     "unit": "แผ่น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "กระดาษทราย เบอร์ 220",
     "price": 20.0,
     "unit": "แผ่น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "กระดาษทราย เบอร์ 3",
     "price": 13.0,
     "unit": "แผ่น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "กระดาษทราย เบอร์ 400",
     "price": 12.0,
     "unit": "แผ่น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "กระสอบป่าน",
     "price": 250.0,
     "unit": "กระสอบ",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "กาวทาท่อ (100 กรัม)",
     "price": 70.0,
     "unit": "กระป๋อง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "กาวน้ำ (560 ซีซี)",
     "price": 37.0,
     "unit": "ขวด",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "กำมะถัน",
     "price": 150.0,
     "unit": "กิโลกรัม",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ข้อต่อตรงเกลียวนอก (1 นิ้ว)",
     "price": 8.0,
     "unit": "อัน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ข้อต่อสามทาง (1/2 นิ้ว)",
     "price": 7.0,
     "unit": "อัน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "คลิปก้ามปู (1/2 นิ้ว)",
     "price": 4.0,
     "unit": "อัน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ค้อนตอกตะปู",
     "price": 140.0,
     "unit": "ด้าม",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "คีมตัดลวด (8 นิ้ว)",
     "price": 90.0,
     "unit": "อัน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "คีมตัดลวดปากจิ้งจก",
     "price": 120.0,
     "unit": "อัน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "คีมตัดลวดปากเฉียง",
     "price": 180.0,
     "unit": "อัน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "คีมผูกลวด",
     "price": 50.0,
     "unit": "อัน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "เคลือบขาว (120x240 ซม.)",
     "price": 449.0,
     "unit": "ถัง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "เชือกในลอนด์",
     "price": 100.0,
     "unit": "ม้วน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "เชือกฟาง (100 ม.)",
     "price": 74.0,
     "unit": "ม้วน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ดอกไขควงสี่แฉก 2 หัว (65 มม. 10 ชิ้น)",
     "price": 280.0,
     "unit": "แพ็ค",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ดินสอช่าง",
     "price": 5.0,
     "unit": "แท่ง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ตลับเมตร (ขนาดระยะ 10 เมตร)",
     "price": 358.0,
     "unit": "ตลับ",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ตลับเมตร (ขนาดระยะ 3 เมตร)",
     "price": 150.0,
     "unit": "ตลับ",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ตลับเมตร (ขนาดระยะ 5 เมตร)",
     "price": 90.0,
     "unit": "ตลับ",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ตะปู (1 นิ้ว)",
     "price": 60.0,
     "unit": "กิโลกรัม",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ตะปู (1.5 นิ้ว)",
     "price": 60.0,
     "unit": "กิโลกรัม",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ตะปู (2 นิ้ว)",
     "price": 60.0,
     "unit": "กิโลกรัม",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ตะปู (3 นิ้ว)",
     "price": 60.0,
     "unit": "กิโลกรัม",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ตัวผู้เกลียวขวา (M12*1.75)",
     "price": 55.0,
     "unit": "ตัว",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ถาดรองลูกกลิ้งทาสีพลาสติก (10 นิ้ว)",
     "price": 78.0,
     "unit": "ชิ้น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ถุงมือผ้า (12 คู่)",
     "price": 53.0,
     "unit": "โหล",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ทราย",
     "price": 599.2,
     "unit": "คิว",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ทรายหยาบ",
     "price": 524.3,
     "unit": "คิว",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ท่อ PVC (1/2 นิ้ว หนา 13.5 ยาว 4 ม.)",
     "price": 55.0,
     "unit": "เส้น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ท่อ PVC (1/4 นิ้ว หนา 13.5 ยาว 4 ม.)",
     "price": 150.0,
     "unit": "เส้น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ท่อ PVC (3/4 นิ้ว หนา 13.5 ยาว 4 ม.)",
     "price": 70.0,
     "unit": "เส้น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ท่อ PVC (3/8 นิ้ว หนา 13.5 ยาว 4 ม.)",
     "price": 45.0,
     "unit": "เส้น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ทินเนอร์ (11 กก.)",
     "price": 680.0,
     "unit": "ปี๊ป",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "เทปพันสายไฟ (20 ม.)",
     "price": 45.0,
     "unit": "ชิ้น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "เทปพันสายไฟ (7 ม.)",
     "price": 20.0,
     "unit": "ม้วน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "น็อต (2.5 มม.)",
     "price": 5.0,
     "unit": "ตัว",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "น็อต (5 มม.)",
     "price": 1.0,
     "unit": "ตัว",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "น็อตทองเหลือง (M3x12 มม.)",
     "price": 13.0,
     "unit": "ตัว",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "น็อตสกรูหัวกลมแฉก (M2.5*20 มม.)",
     "price": 15.0,
     "unit": "ตัว",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "น้ำมันสน",
     "price": 550.0,
     "unit": "ปี๊ป",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ใบตัดเหล็ก (4 นิ้ว)",
     "price": 15.0,
     "unit": "ใบ",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ใบตัดเหล็ก 14 นิ้ว",
     "price": 70.0,
     "unit": "ใบ",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ใบเลื่อยจิ๊กซอว์ตัดไม้",
     "price": 170.0,
     "unit": "แพ็ค",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ปักเต้าตีเส้น (30 ม.)",
     "price": 143.0,
     "unit": "ชิ้น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ปืนกาวไฟฟ้า",
     "price": 158.0,
     "unit": "อัน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ปูนขาว",
     "price": 30.0,
     "unit": "ถุง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ปูนโครงสร้าง",
     "price": 158.0,
     "unit": "ถุง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ปูนโดโลไมท์ (5 กก.)",
     "price": 120.0,
     "unit": "กระสอบ",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ปูนปลาสเตอร์",
     "price": 20.0,
     "unit": "ถุง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "แปรงทาสี (1 นิ้ว)",
     "price": 10.0,
     "unit": "อัน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "แปรงทาสี (1.5 นิ้ว)",
     "price": 15.0,
     "unit": "ด้าม",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "แปรงทาสี (2 นิ้ว)",
     "price": 16.0,
     "unit": "ด้าม",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "แปรงทาสี (2.5 นิ้ว)",
     "price": 17.0,
     "unit": "ด้าม",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "แปรงทาสี (3 นิ้ว)",
     "price": 20.0,
     "unit": "ด้าม",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "แปรงทาสี (4 นิ้ว)",
     "price": 25.0,
     "unit": "ด้าม",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "แปรงทาสีน้ำมันขนสัตว์ด้ามไม้ (0.75 นิ้ว)",
     "price": 13.0,
     "unit": "ด้าม",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "แปรงทาสีน้ำมันขนสัตว์ด้ามไม้ (1.0 นิ้ว)",
     "price": 15.0,
     "unit": "ด้าม",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "แปรงทาสีน้ำมันขนสัตว์ด้ามไม้ (2.0 นิ้ว)",
     "price": 23.0,
     "unit": "ด้าม",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "แปรงทาสีน้ำมันขนสัตว์ด้ามไม้ (3.0 นิ้ว)",
     "price": 38.0,
     "unit": "ด้าม",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "แปรงลวด",
     "price": 25.0,
     "unit": "ด้าม",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ผ้าด้ายดิบ (90 ซม.)",
     "price": 30.0,
     "unit": "เมตร",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ผ้าใบพลาสติก (2x3 เมตร)",
     "price": 100.0,
     "unit": "ม้วน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ฝาครอบ (4 หุน)",
     "price": 5.0,
     "unit": "ตัว",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "พุกเหล็ก (1/2 นิ้ว)",
     "price": 15.0,
     "unit": "ตัว",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "พุกเหล็ก (1/4 นิ้ว)",
     "price": 30.0,
     "unit": "ถุง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "พุกเหล็ก (5/8 นิ้ว)",
     "price": 25.0,
     "unit": "ตัว",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "พู่กันทาสีปลายตัด เบอร์10,12 (2 ชิ้น)",
     "price": 53.0,
     "unit": "แพ็ค",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "เพลทเหล็ก",
     "price": 60.0,
     "unit": "แผ่น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ไม้จ๊อย (2.5 ม.)",
     "price": 365.0,
     "unit": "มัด",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ไม้อัด (120x240 ซม.x3 มม.)",
     "price": 175.0,
     "unit": "แผ่น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ไม้อัดยาง (120x240 ซม.)",
     "price": 356.0,
     "unit": "แผ่น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ลวด (เบอร์ 16)",
     "price": 100.0,
     "unit": "ม้วน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ลวดขาว (เบอร์ 18)",
     "price": 45.0,
     "unit": "ม้วน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ลวดเชื่อม (3.2 มม.)",
     "price": 490.0,
     "unit": "แพ็ค",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ลวดผูกเหล็ก (1.2 มม. ขนาด 2.2 กก. เบอร์ 18)",
     "price": 70.0,
     "unit": "ม้วน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ลูกกลิ้งทาสี (10 นิ้ว)",
     "price": 63.0,
     "unit": "ด้าม",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ลูกกลิ้งทาสี (4 นิ้ว)",
     "price": 25.0,
     "unit": "ด้าม",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ลูกกลิ้งทาสี (4x16 นิ้ว)",
     "price": 55.0,
     "unit": "ด้าม",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ลูกกลิ้งทาสี (7 นิ้ว)",
     "price": 25.0,
     "unit": "ด้าม",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "ลูกกลิ้งทาสี (9 นิ้ว)",
     "price": 30.0,
     "unit": "ด้าม",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "สกรูไดร์วอลล์หัวเรียบ (Flat6x11/4 นิ้ว 100 ตัว)",
     "price": 38.0,
     "unit": "แพ็ค",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "สกรูปลายแหลมหัวร่ม-โครงไม้ (0.8 นิ้ว (8x3/4) 350ตัว)",
     "price": 226.0,
     "unit": "กล่อง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "สกรูไม้ฝา (7x32 (ปลายแหลม)(แขวน50)1.2 นิ้ว)",
     "price": 46.0,
     "unit": "ชิ้น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "สกรูยึดหลังคา",
     "price": 250.0,
     "unit": "กล่อง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "สปริงดึง",
     "price": 24.0,
     "unit": "ตัว",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "สว่านไร้สาย",
     "price": 1690.0,
     "unit": "ชิ้น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "สายเอ็น (35 เมตร)",
     "price": 25.0,
     "unit": "ม้วน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "สี Super sef GL",
     "price": 480.0,
     "unit": "ถัง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "สีกันสนิมเทา (3.78 ลิตร)",
     "price": 300.0,
     "unit": "ถัง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "สีทาพื้นถนน (3 ลิตร)",
     "price": 900.0,
     "unit": "ถัง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "สีทาภายนอก (18 ลิตร)",
     "price": 920.0,
     "unit": "ถัง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "สีน้ำทาภายในกระทิง (18 ลิตร)",
     "price": 820.0,
     "unit": "ถัง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "สีน้ำเนียน (2.5 แกลลอน)",
     "price": 1480.0,
     "unit": "ถัง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "สีน้ำภายนอกด้าน (ขาว)",
     "price": 1030.0,
     "unit": "ถัง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "สีน้ำมัน",
     "price": 838.0,
     "unit": "ถัง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "สีน้ำมัน สีดำ",
     "price": 744.0,
     "unit": "ถัง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "สีน้ำมันอะคิริค (18 ลิตร)",
     "price": 2280.0,
     "unit": "ถัง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "สีรองพื้น (5 แกลลอน) (3,700 บาท)",
     "price": 3700.0,
     "unit": "ถัง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "สีรองพื้น (5 แกลลอน) (2,690 บาท)",
     "price": 2690.0,
     "unit": "ถัง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "สีรองพื้นปูนอเนกประสงค์สูตรน้ำ",
     "price": 1215.0,
     "unit": "ถัง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "สีอะครีลิคทาภายนอก (3 ลิตร)",
     "price": 530.0,
     "unit": "ถัง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "สีอะคิริค 199/กระป๋อง",
     "price": 0.0,
     "unit": "หน่วย",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "หลังคาเมทัลชีท (76x500 ซม.)",
     "price": 249.0,
     "unit": "แผ่น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "หิน (3/4)",
     "price": 802.5,
     "unit": "คิว",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "หินกรวด (3/8)",
     "price": 834.0,
     "unit": "คิว",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "หินโรยกระถาง",
     "price": 15.0,
     "unit": "ถุง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "เหล็ก แป๊บโปร่ง (2.5x38x38 มม. 6 ม.)",
     "price": 575.0,
     "unit": "เส้น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "เหล็กกล่อง (3x1.5 นิ้ว)",
     "price": 485.0,
     "unit": "เส้น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "เหล็กกล่อง (4x2 นิ้ว)",
     "price": 650.0,
     "unit": "เส้น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดวัสดุก่อสร้าง",
     "name": "เหล็กกล่อง (4x4 นิ้ว)",
     "price": 1100.0,
     "unit": "เส้น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "กระดาษทิชชู่ (24 ม้วน)",
     "price": 122.0,
     "unit": "เเพ็ก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "กระสอบป่าน (29x43 นิ้ว)",
     "price": 169.0,
     "unit": "ชิ้น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ก้านลูกโป่ง",
     "price": 120.0,
     "unit": "เเพ็ค",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "แก้วกระดาษ (6.5 ออนซ์)",
     "price": 30.0,
     "unit": "แถว",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ใบ",
     "price": 0.0,
     "unit": "หน่วย",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "แก้วพลาสติกใส (16 ออนซ์)",
     "price": 40.0,
     "unit": "แถว",
-    "note": "50 ใบ"
+    "note": "50 ใบ",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "แก้วพลาสติกใส (22 ออนซ์)",
     "price": 45.0,
     "unit": "แถว",
-    "note": "50 ใบ"
+    "note": "50 ใบ",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "แก้วพลาสติกใส (7 ออนซ์)",
     "price": 20.0,
     "unit": "แถว",
-    "note": "50 ใบ"
+    "note": "50 ใบ",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "เข็ม+ด้าย",
     "price": 5.0,
     "unit": "ชุด",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "เข็มกลัดสีเงิน",
     "price": 19.0,
     "unit": "เเพ็ค",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ครีมเทียมข้นหวาน (2,000 ก.x8 ถุง)",
     "price": 918.0,
     "unit": "ลัง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ค่าของที่ระลึก",
     "price": 500.0,
     "unit": "คน/ชิ้น",
-    "note": "เลือกของที่ระลึก จะไม่ได้ ค่าตอบแทนวิทยากร"
+    "note": "เลือกของที่ระลึก จะไม่ได้ ค่าตอบแทนวิทยากร",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": [
+      "ค่าวิทยากร (ภายนอก)",
+      "ค่าวิทยากร (ภายใน)"
+    ]
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ค่าของรางวัล",
     "price": 3000.0,
     "unit": "โครงการ",
-    "note": "เลือกได้ 1 อย่าง (เหรียญรางวัล/โล่ รางวัล/ถ้วยรางวัล) เลือกของรางวัล จะไม่ได้ค่าเงินรางวัล"
+    "note": "เลือกได้ 1 อย่าง (เหรียญรางวัล/โล่ รางวัล/ถ้วยรางวัล) เลือกของรางวัล จะไม่ได้ค่าเงินรางวัล",
+    "pricingType": "project_fixed",
+    "maxCap": null,
+    "exclusiveWith": [
+      "ค่าเงินรางวัล"
+    ]
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ค่าเครื่องสำอาง",
     "price": 6000.0,
     "unit": "โครงการ",
-    "note": ""
+    "note": "",
+    "pricingType": "project_fixed",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ค่าเงินรางวัล",
     "price": 3000.0,
-    "unit": "โครงการ เลือกเงินรางวัล จะไม่ได้ค่าของ",
-    "note": "รางวัล"
+    "unit": "โครงการ",
+    "note": "เลือกเงินรางวัล จะไม่ได้ค่าของรางวัล",
+    "pricingType": "project_fixed",
+    "maxCap": null,
+    "exclusiveWith": [
+      "ค่าของรางวัล",
+      "ค่าของขวัญ/ของรางวัล"
+    ]
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ค่าที่พัก 50%",
     "price": 800.0,
     "unit": "คน/วัน",
-    "note": "400 บาท/คน/วัน"
+    "note": "400 บาท/คน/วัน",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ค่าประกอบพิธีกรรม",
     "price": 500.0,
     "unit": "โครงการ",
-    "note": ""
+    "note": "",
+    "pricingType": "project_fixed",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ค่าอุปกรณ์สันทนาการ",
     "price": 500.0,
     "unit": "โครงการ",
-    "note": ""
+    "note": "",
+    "pricingType": "project_fixed",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "จานสีพลาสติก 7 หลุม",
     "price": 5.0,
     "unit": "ใบ",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "เจลลดไข้ (6 ชิ้น)",
     "price": 69.0,
     "unit": "แพ็ก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "เจลแอลกอฮอล์ล้างมือ (1,000 มล.)",
     "price": 100.0,
     "unit": "ขวด",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ช็อกโกแลตชิพ ชนิดเม็ดกลาง (550 ก.)",
     "price": 139.0,
     "unit": "ถุง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ชาตรามือ (400 ก.)",
     "price": 75.0,
     "unit": "ถุง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ชุดลูกปัด พร้อมกล่อง",
     "price": 180.0,
     "unit": "กล่อง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "เชือกฟาง",
     "price": 63.0,
     "unit": "เเพ็ค",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "โซ่ สแตนเลส (6 มม.)",
     "price": 120.0,
     "unit": "เมตร",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ดินปลูก (5 กก.)",
     "price": 25.0,
     "unit": "ถุง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ดินสอพอง (1 กก.)",
     "price": 20.0,
     "unit": "ถุง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ตะเกียบ",
     "price": 20.0,
     "unit": "เเพ็ค",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ถังน้ำ (100 ลิตร)",
     "price": 329.0,
     "unit": "ถัง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ถ่านก่อไฟ",
     "price": 50.0,
     "unit": "ถุง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ถุงขยะดํา (36x45 นิ้ว)",
     "price": 43.0,
     "unit": "แพ็ก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ถุงขยะดำ (30x40 นิ้ว)",
     "price": 43.0,
     "unit": "แพ็ก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ถุงซิปล็อค",
     "price": 23.0,
     "unit": "แพ็ก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ถุงผ้าดิบ ขนาด 10x9 นิ้ว",
     "price": 16.0,
     "unit": "ใบ",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ถุงพลาสติกหูหิ้ว (6x14 นิ้ว)",
     "price": 13.0,
     "unit": "แพ็ก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ถุงมือผ้า (12 คู่)",
     "price": 53.0,
     "unit": "แพ็ก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ถุงมือพลาสติกอเนกประสงค์",
     "price": 20.0,
     "unit": "แพ็ก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ถุงมือยางส้ม",
     "price": 23.0,
     "unit": "อัน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ถุงร้อน (6x9 นิ้ว)",
     "price": 50.0,
     "unit": "แพ็ก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ที่โกยผงพลาสติก",
     "price": 48.0,
     "unit": "อัน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "เทปติดสนาม",
     "price": 150.0,
     "unit": "กล่อง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "เทปพยุงกล้ามเนื้อ",
     "price": 15.0,
     "unit": "ม้วน",
-    "note": "ผ้ายืดสีเนื้อ"
+    "note": "ผ้ายืดสีเนื้อ",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "เทปพันล็อค (2.5 cm.)",
     "price": 35.0,
     "unit": "ม้วน",
-    "note": "สำหรับนักกีฬา"
+    "note": "สำหรับนักกีฬา",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "เทียน 1 สลึง (51 แท่ง)",
     "price": 25.0,
     "unit": "แพ็ก",
-    "note": "สูง 12.5 - 17 ซม. กว้าง 0.8 ซม."
+    "note": "สูง 12.5 - 17 ซม. กว้าง 0.8 ซม.",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "เทียน เบอร์ 21 (51 แท่ง)",
     "price": 95.0,
     "unit": "แพ็ก",
-    "note": "สูง 19 ซม. กว้าง 1 ซม."
+    "note": "สูง 19 ซม. กว้าง 1 ซม.",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "เทียนถ้วย (100 ถ้วย)",
     "price": 159.0,
     "unit": "แพ็ก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ธูป (32 ชม.)",
     "price": 80.0,
     "unit": "แพ็ก",
-    "note": "1 กิโลกรัม มี 550 - 700 ก้าน"
+    "note": "1 กิโลกรัม มี 550 - 700 ก้าน",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "นกหวีด",
     "price": 27.0,
     "unit": "ชิ้น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "นมข้นจืด (405 ก.X6)",
     "price": 156.0,
     "unit": "แพ็ก",
-    "note": "50 น้ํามันก๊าด (1 GL) 490 บาท/แกลลอน ไทวัสดุ"
+    "note": "50 น้ํามันก๊าด (1 GL) 490 บาท/แกลลอน ไทวัสดุ",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "น้ํามันก๊าด (10 ลิตร)",
     "price": 1400.0,
     "unit": "แกลลอน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "น้ำตาล (1 กก.x5 ถุง)",
     "price": 139.0,
     "unit": "แพ็ก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "น้ำมันมวย",
     "price": 126.0,
     "unit": "ขวด",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "น้ำยาถูพื้น",
     "price": 129.0,
     "unit": "ถัง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "น้ำยาล้างจาน (10,000 มล.)",
     "price": 264.0,
     "unit": "แกลลอน",
-    "note": "ล้างจานได้ประมาณ 25,000 ถึง 40,000 ใบ"
+    "note": "ล้างจานได้ประมาณ 25,000 ถึง 40,000 ใบ",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "น้ำยาล้างจาน (3,600 มล.)",
     "price": 125.0,
     "unit": "แกลลอน",
-    "note": "ล้างจานได้ประมาณ 3,600 ถึง 10,800 ใบ"
+    "note": "ล้างจานได้ประมาณ 3,600 ถึง 10,800 ใบ",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "น้ำยาล้างจาน (750 มล.)",
     "price": 26.0,
     "unit": "ขวด",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "น้ำยาล้างห้องน้ำ (900 มล.)",
     "price": 48.0,
     "unit": "ขวด",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "เนยขาวโอพีครีม (1 กก.)",
     "price": 115.0,
     "unit": "ถุง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "เนยอิมพีเรียล เนยเค็ม (200 ก.)",
     "price": 85.0,
     "unit": "ถุง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "แป้งอเนกประสงค์ (1 กก.)",
     "price": 38.0,
     "unit": "ถุง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "แปรงขัดห้องน้ำด้ามยาว",
     "price": 89.0,
     "unit": "อัน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "แปรงขัดห้องน้ำด้ามยาว",
     "price": 100.0,
     "unit": "ด้าม",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ผงซักฝอก (1,500 ก.)",
     "price": 114.0,
     "unit": "ถุง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ผงโซดาแม็กกาแรต (300 ก.)",
     "price": 32.0,
     "unit": "ถุง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ผ้าขนหนูเย็น (11x11นิ้ว 30 ชิ้น)",
     "price": 256.0,
     "unit": "แพ็ก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ผ้าปิดตากันแสง",
     "price": 69.0,
     "unit": "ชิ้น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ผ้าอนามัย",
     "price": 25.0,
     "unit": "ห่อ",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ฝาปิด (16 OZ. 50 ชิ้น)",
     "price": 45.0,
     "unit": "เเพ็ค",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "พรมอัดลอน 3 มม.",
     "price": 298.0,
     "unit": "เมตร",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ฟองน้ำล้างจาน (3 ชิ้น)",
     "price": 20.0,
     "unit": "แพ็ก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ฟอยด์",
     "price": 57.0,
     "unit": "ห่อ",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "เฟรมผ้าใบ 280 g. (30x30 cm.)",
     "price": 60.0,
     "unit": "ชิ้น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "เฟสชิว",
     "price": 8.0,
     "unit": "อัน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ไฟแช็ก",
     "price": 10.0,
     "unit": "ชิ้น",
-    "note": "จุดได้ มากกว่า 1,500 ครั้ง"
+    "note": "จุดได้ มากกว่า 1,500 ครั้ง",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "เมล็ดกาแฟคั่ว (500 ก.)",
     "price": 265.0,
     "unit": "ถุง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "แม็คคอร์มิคกลิ่นวานิลา (473 ML)",
     "price": 126.0,
     "unit": "ขวด",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ไม้กวาดดอกหญ้า",
     "price": 50.0,
     "unit": "ด้าม",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ไม้กวาดทางมะพร้าว",
     "price": 80.0,
     "unit": "ด้าม",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ไม้ตีแมลงวันพลาสติก",
     "price": 10.0,
     "unit": "อัน",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ไม้ถูพื้น",
     "price": 109.0,
     "unit": "ชิ้น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ยากันยุงแบบฉีด 80 มล. (4 ขวด)",
     "price": 255.0,
     "unit": "แพ็ก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ยากันยุงแบบซอง (24 ซอง)",
     "price": 80.0,
     "unit": "แพ็ก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ยางรัดของ (500 กรัม)",
     "price": 60.0,
     "unit": "ถุง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ยาจุดกันยุง (6 กล่อง)",
     "price": 73.0,
     "unit": "แพ็ก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ยาดม (12 ชิ้น)",
     "price": 185.0,
     "unit": "แพ็ก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ยานวดแบบเย็น",
     "price": 84.0,
     "unit": "หลอด",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ลังกระดาษ",
     "price": 5.0,
     "unit": "ลัง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ลูกปิงปอง (6 ลูก)",
     "price": 21.0,
     "unit": "แพ็ก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ลูกโป่ง",
     "price": 68.0,
     "unit": "ถุง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ไวนิล",
     "price": 100.0,
     "unit": "ตร.ม.",
-    "note": "ร้าน เปิดป้ายเซฟวันโคราช"
+    "note": "ร้าน เปิดป้ายเซฟวันโคราช",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "สเปรย์กำจัดแมลง (600 มล.)",
     "price": 72.0,
     "unit": "กระป๋อง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "สเปรย์ระงับอาการปวดกล้ามเนื้อ (250 ml)",
     "price": 300.0,
     "unit": "ขวด",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "สายสิญจน์",
     "price": 159.0,
     "unit": "ชิ้น",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ไส้ตะเกียง",
     "price": 10.0,
     "unit": "เมตร",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "หน้ากากอนามัย",
     "price": 47.0,
     "unit": "กล่อง",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "หลอดพลาสติก (100 ชิ้น)",
     "price": 20.0,
     "unit": "แพ็ก",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "ห่วงสแตนเลส (6 มม.)",
     "price": 450.0,
     "unit": "ห่อ",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   },
   {
     "category": "หมวดอื่นๆ",
     "name": "โหลแก้ว",
     "price": 69.0,
     "unit": "โหล",
-    "note": ""
+    "note": "",
+    "pricingType": "unit",
+    "maxCap": null,
+    "exclusiveWith": []
   }
 ]
