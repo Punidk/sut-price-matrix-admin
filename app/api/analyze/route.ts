@@ -14,6 +14,7 @@ import {
   isLumpSumUnit,
   checkProjectExclusions,
   ProjectExclusionViolation,
+  sanitizeTotalAmount,
 } from "@/lib/types";
 import { db } from "@/lib/firebase";
 import { collection, getDocs } from "firebase/firestore";
@@ -25,6 +26,7 @@ export {
   normalizeProposalItem,
   findMatchingPriceMatrixItem,
   checkProjectExclusions,
+  sanitizeTotalAmount,
 };
 
 // ขยายเวลา Serverless Function เพื่อป้องกันปัญหา Vercel Timeout (504 Gateway Timeout)
@@ -53,6 +55,11 @@ function isPerPersonUnit(unit: string, itemName: string, personCount: number): b
 
   // 3. หากชื่อรายการระบุคำว่า ต่อคน, ต่อท่าน, /คน
   if (/ต่อคน|ต่อท่าน|\/คน/i.test(cleanN)) {
+    return true;
+  }
+
+  // 4. หากชื่อรายการมีระบุคน (เช่น "(1 คน)" หรือ "คน") และหน่วยเป็นชั่วโมง/เวลา (Vehicle Hourly with person)
+  if (personCount >= 1 && /ชม|ชั่วโมง/i.test(cleanU) && /คน/i.test(cleanN)) {
     return true;
   }
 
@@ -251,7 +258,7 @@ export async function POST(req: NextRequest) {
 ========================================
 1. ชื่อโครงการ (projectName): ดึงชื่อโครงการจากหัวเอกสาร (หากไม่พบให้ใส่ "โครงการกิจกรรมนักศึกษา")
 2. วันที่ (date): วันที่จัดกิจกรรมหรือวันที่ทำเอกสาร (หากไม่พบให้ใส่ "-")
-3. ยอดงบประมาณรวมที่ขอสนับสนุน (requestedBudgetTotal): ดึงตัวเลขยอดเงินรวมทั้งสิ้นที่ขอรับการสนับสนุนจากเอกสาร เช่น "งบประมาณที่ขอรับการสนับสนุน ... บาท" ที่อยู่บนหัวเอกสารโครงการ หรือ "รวมเงินทั้งสิ้น ... บาท" (สกัดเป็น number)
+3. ยอดงบประมาณรวมที่ขอสนับสนุน (requestedBudgetTotal): ดึงตัวเลขยอดเงินรวมทั้งสิ้นที่ขอรับการสนับสนุนจากเอกสาร เช่น "งบประมาณที่ขอรับการสนับสนุน ... บาท" ที่อยู่บนหัวเอกสารโครงการ หรือ "รวมเงินทั้งสิ้น ... บาท" (สกัดเป็นตัวเลข number โดยตัดข้อความอ่านตัวเลขภาษาไทยในวงเล็บ เช่น "(สามพันห้าร้อยเก้าสิบสี่บาทถ้วน)" ออก ให้ได้ตัวเลขล้วน เช่น 3594)
 4. ยอดรวมแต่ละหมวดตามที่ระบุในเอกสาร (detectedCategorySubtotals): ค้นหาแถวหรือบรรทัดสรุปยอดรวมของแต่ละหมวด เช่น "รวมเงินหมวด... จำนวน ... บาท" (สกัดเป็น array: [{ "category": "ชื่อหมวด", "subtotal": ตัวเลข }])
 5. ดึงรายการค่าใช้จ่ายทุกแถวในตารางออกมาใน items โดยใช้ฟิลด์มาตรฐาน:
    - category: จัดกลุ่มเข้า 1 ใน 6 หมวดหลัก ได้แก่ 'หมวดค่าตอบแทน', 'หมวดโภชนาการ', 'หมวดยานพาหนะ', 'หมวดวัสดุก่อสร้าง', 'หมวดอุปกรณ์สำนักงาน', 'หมวดอุปกรณ์อิเล็กทรอนิกส์' (หรือ 'หมวดอื่นๆ')
@@ -260,7 +267,7 @@ export async function POST(req: NextRequest) {
    - quantity: จำนวน (number) เช่น 1, 2, 4
    - unitPriceInBill: ราคาต่อหน่วยตามที่เขียนในเอกสาร (number)
    - totalInBill: ยอดรวมเป็นเงินตามที่เขียนในช่องรวมเงินของแถวนั้น (number)
-   - personCount: สกัดตัวเลข "จำนวนคน/ผู้เข้าร่วม" ที่อยู่ในชื่อรายการ หรือในวงเล็บ เช่น "(40 คน)", "(1 คน)", "(3 คน)" หรือ "วิทยากร 2 คน" ให้ส่งเป็น number เช่น 40, 1, 3 (หากไม่ระบุจำนวนคนให้ใส่ 1)
+   - personCount: สกัดตัวเลข "จำนวนคน/ผู้เข้าร่วม" ที่ระบุคู่กับคำว่า "คน" เท่านั้น เช่น "(40 คน)", "(1 คน)", "(3 คน)" หรือ "วิทยากร 2 คน" ให้ส่งเป็น number เช่น 40, 1, 3 (หากเป็นขนาด ความยาว หรือจำนวนบรรจุ เช่น "(3ชิ้น)", "3.2 ล.", "51 เล่ม" ห้ามนำมาเป็น personCount ให้ใส่ 1 เสมอ)
 
 *** ข้อสำคัญ: ไม่ต้องคำนวณเลขใหม่ ไม่ต้องเทียบราคากลาง ดึงตัวเลขดิบตามที่ปรากฏบนเอกสารเท่านั้น ***
 
@@ -667,6 +674,9 @@ ${matrixContext}
         const baseItemName = getBaseItemName(rawName);
 
         const personCount = item.personCount;
+        const hasExplicitPersonInName =
+          /[\(\[（\{][^\)\]）\}]*?(\d+)\s*คน[^\)\]）\}]*?[\)\]）\}]/.test(rawName) ||
+          /(?:^|\s)(\d+)\s*คน(?:$|\s)/.test(rawName);
         const qty = item.quantity;
         const rawUnit = item.rawUnit;
         const normalizedUnit = normalizeUnit(rawUnit);
@@ -761,22 +771,28 @@ ${matrixContext}
           // รายการประเภท unit หรือ per_person:
           // ตรวจสูตรคณิตศาสตร์แนวนอน:
           const isPersonUnit = isPerPersonUnit(rawUnit, rawName, personCount);
+          const isHourly =
+            /^(?:คน\s*\/\s*)?(?:ชม\.?|ช\.ม\.?|ชั่วโมง)$/i.test((rawUnit || "").trim()) ||
+            /^(?:คน\s*\/\s*)?(?:ชม\.?|ช\.ม\.?|ชั่วโมง)$/i.test((matchedMatrixData?.unit || "").trim()) ||
+            /ชม|ชั่วโมง/.test(normalizeUnit(rawUnit));
+          const isVehicleHourlyWithPerson =
+            isHourly && (hasExplicitPersonInName || (personCount >= 1 && category === "หมวดยานพาหนะ"));
+
           const standardTotal = qty * unitPrice;
-          const multidimTotal = (personCount > 1 ? personCount : 1) * qty * unitPrice;
+          const multidimTotal = (personCount >= 1 ? personCount : 1) * qty * unitPrice;
 
           let expectedTotal = standardTotal;
           let isMathCorrect = false;
 
-          if (isPersonUnit && personCount > 1) {
-            // มีตัวคูณคนในชื่อรายการหรือหน่วยนับ
+          if (isVehicleHourlyWithPerson || (isPersonUnit && (personCount > 1 || hasExplicitPersonInName))) {
+            // มีตัวคูณคนในชื่อรายการหรือหน่วยนับ หรือหมวดยานพาหนะคิดตามชั่วโมงและคน
+            expectedTotal = multidimTotal;
             if (Math.abs(multidimTotal - totalPrice) <= 0.1) {
-              expectedTotal = multidimTotal;
               isMathCorrect = true;
             } else if (Math.abs(standardTotal - totalPrice) <= 0.1) {
               expectedTotal = standardTotal;
               isMathCorrect = true;
             } else {
-              expectedTotal = multidimTotal;
               isMathCorrect = false;
             }
           } else {
@@ -797,10 +813,12 @@ ${matrixContext}
           if (hasHorizontalError) {
             itemStatus = "FAIL";
             errorFlags.push("คำนวณเลขผิด");
-            const calcFormulaStr =
-              personCount > 1 && expectedTotal === multidimTotal
-                ? `${personCount} คน × ${qty} ${rawUnit || "หน่วย"} × ฿${unitPrice.toLocaleString()} = ฿${expectedTotal.toLocaleString()}`
-                : `${qty} ${rawUnit || "หน่วย"} × ฿${unitPrice.toLocaleString()} = ฿${expectedTotal.toLocaleString()}`;
+            const showPersonInFormula =
+              (isVehicleHourlyWithPerson || isPersonUnit || hasExplicitPersonInName || personCount > 1) &&
+              (expectedTotal === multidimTotal || multidimTotal === standardTotal);
+            const calcFormulaStr = showPersonInFormula
+              ? `${personCount} คน × ${qty} ${rawUnit || "หน่วย"} × ฿${unitPrice.toLocaleString()} = ฿${expectedTotal.toLocaleString()}`
+              : `${qty} ${rawUnit || "หน่วย"} × ฿${unitPrice.toLocaleString()} = ฿${expectedTotal.toLocaleString()}`;
             const mathWarn = `[ข้อผิดพลาดทางคณิตศาสตร์: รายการ "${cleanDisplayItemName}" คำนวณจริง (${calcFormulaStr}) แต่ระบุรวมเป็นเงิน ฿${totalPrice.toLocaleString()}]`;
             proposalWarnings.push(mathWarn);
           }
@@ -851,7 +869,7 @@ ${matrixContext}
             quantity: qty,
             unitPriceInBill: unitPrice,
             totalInBill: totalPrice,
-            personCount: personCount > 1 ? personCount : undefined,
+            personCount: personCount > 1 || hasExplicitPersonInName ? personCount : undefined,
 
             // ฟิลด์ดั้งเดิมสำหรับรองรับ UI และการแสดงผลเดิม
             itemName: cleanDisplayItemName,
@@ -960,8 +978,8 @@ ${matrixContext}
           (dc: any) => normalizeExpenseCategory(dc.category) === catName
         );
 
-        const detected = matchDetected && Number(matchDetected.subtotal) > 0
-          ? Number(matchDetected.subtotal)
+        const detected = matchDetected && sanitizeTotalAmount(matchDetected.subtotal) > 0
+          ? sanitizeTotalAmount(matchDetected.subtotal)
           : cData.calculated;
 
         const diff = Math.abs(cData.calculated - detected);
@@ -989,11 +1007,11 @@ ${matrixContext}
 
       // 6. คำนวณผลรวมทั้งโครงการ (Grand Total Requested Budget Check)
       const grandCalculated = Object.values(catTotalsMap).reduce((sum, c) => sum + c.calculated, 0);
-      let requestedBudget = Number(
+      const rawRequested =
         parsedData.requestedBudgetTotal ??
         parsedData.proposalAudit?.requestedBudgetTotal ??
-        parsedData.financialSummary?.total
-      );
+        parsedData.financialSummary?.total;
+      let requestedBudget = sanitizeTotalAmount(rawRequested);
 
       if (!requestedBudget || isNaN(requestedBudget) || requestedBudget <= 0) {
         requestedBudget = grandCalculated;

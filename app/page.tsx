@@ -17,6 +17,7 @@ import {
   CategorySubtotalCheck,
   ProjectExclusionViolation,
   isLumpSumUnit,
+  isUnitCompatible,
 } from "@/lib/types";
 import { initialPriceMatrixData } from "@/lib/mockData";
 import {
@@ -2522,6 +2523,12 @@ export default function UserFrontendPage() {
                           const itemName = item.receiptData?.itemName || item.itemInReceipt || "รายการที่ตรวจพบ";
                           const qty = item.receiptData?.qty != null ? item.receiptData.qty : 1;
                           const personCount = item.receiptData?.personCount;
+                          const hasExplicitPersonInName =
+                            /[\(\[（\{][^\)\]）\}]*?(\d+)\s*คน[^\)\]）\}]*?[\)\]）\}]/.test(itemName) ||
+                            /(?:^|\s)(\d+)\s*คน(?:$|\s)/.test(itemName);
+                          const showPersonMultiplier =
+                            (personCount != null && personCount > 1) ||
+                            (personCount != null && personCount >= 1 && hasExplicitPersonInName);
                           const receiptUnit = item.receiptData?.unit || item.unit || "หน่วย";
                           const unitPrice = item.receiptData?.unitPrice != null ? item.receiptData.unitPrice : (item.detectedPrice || 0);
                           const totalPrice = item.receiptData?.totalPrice != null ? item.receiptData.totalPrice : (qty * unitPrice);
@@ -2546,8 +2553,8 @@ export default function UserFrontendPage() {
                               !!(
                                 matrixUnit &&
                                 receiptUnit &&
-                                matrixUnit.trim().toLowerCase() !== receiptUnit.trim().toLowerCase() &&
-                                !(personCount && personCount > 1 && matrixUnit.toLowerCase().includes(receiptUnit.toLowerCase()))
+                                !isUnitCompatible(receiptUnit, matrixUnit) &&
+                                !(personCount && personCount >= 1 && matrixUnit.toLowerCase().includes(receiptUnit.toLowerCase()))
                               ));
 
                           const itemMaxCap = item.maxCap != null ? item.maxCap : item.matrixData?.maxCap;
@@ -2666,7 +2673,7 @@ export default function UserFrontendPage() {
                                       </span>
                                     ) : (
                                       <>
-                                        {personCount && personCount > 1 && (
+                                        {showPersonMultiplier && (
                                           <>
                                             <span className="font-mono bg-blue-50 text-blue-800 px-2 py-0.5 border border-blue-200 rounded font-bold">
                                               {personCount} คน
@@ -2705,8 +2712,8 @@ export default function UserFrontendPage() {
                                     <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                                     <span>
                                       คูณเลขไม่ตรง:{" "}
-                                      {personCount && personCount > 1 ? `${personCount} คน × ` : ""}
-                                      {qty} × {unitPrice} = {((personCount && personCount > 1 ? personCount : 1) * qty * unitPrice).toFixed(2)} แต่ในบิลระบุ {Number(totalPrice).toFixed(2)}
+                                      {showPersonMultiplier ? `${personCount} คน × ` : ""}
+                                      {qty} × {unitPrice} = {((showPersonMultiplier ? personCount : 1) * qty * unitPrice).toFixed(2)} แต่ในบิลระบุ {Number(totalPrice).toFixed(2)}
                                     </span>
                                   </div>
                                 )}
@@ -3061,7 +3068,11 @@ export default function UserFrontendPage() {
                                   <span>เหมาจ่ายโครงการ</span>
                                 ) : (
                                   <>
-                                    {item.receiptData?.personCount && item.receiptData.personCount > 1 ? `${item.receiptData.personCount} คน × ` : ""}
+                                    {((item.receiptData?.personCount && item.receiptData.personCount > 1) ||
+                                      (item.receiptData?.personCount != null &&
+                                        /[\(\[（\{][^\)\]）\}]*?(\d+)\s*คน[^\)\]）\}]*?[\)\]）\}]/.test(itemName)))
+                                      ? `${item.receiptData?.personCount} คน × `
+                                      : ""}
                                     {qty} {receiptUnit} × ฿{Number(unitPrice).toFixed(2)}
                                   </>
                                 )}

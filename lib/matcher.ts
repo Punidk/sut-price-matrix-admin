@@ -162,6 +162,15 @@ export function isUnitCompatible(docUnit: string, matrixUnit: string, personCoun
   const mClean = m.replace(/\./g, "").replace(/\s+/g, "");
   if (dClean === mClean) return true;
 
+  // 2. หมวดชั่วโมงและยานพาหนะ: รองรับหน่วย "ชั่วโมง", "ชม.", "คน/ชั่วโมง", "คน/ชม." ให้เป็น Compatible Units
+  const isHourly = (u: string) => /^(?:คน\s*\/\s*)?(?:ชม\.?|ช\.ม\.?|ชั่วโมง)$/i.test(u.trim());
+  if (isHourly(docUnit) && isHourly(matrixUnit)) {
+    return true;
+  }
+  if (isHourly(dClean) && isHourly(mClean)) {
+    return true;
+  }
+
   // กรณีมิติคน เช่น ในราคากลางระบุ "คน/มื้อ" แต่ในตารางงบเขียน "มื้อ" หรือ "คน/เเมต" กับ "แมต"
   if (personCount > 1 || /คน|ท่าน|ราย/i.test(dClean) || /คน|ท่าน|ราย/i.test(mClean)) {
     if (
@@ -223,6 +232,46 @@ export function findMatchingPriceMatrixItem(
       (baseName.length >= 3 && (pmBase.includes(baseName) || baseName.includes(pmBase)))
     );
   });
+
+  // 1.1 ปรับปรุง Fuzzy Search สำหรับรายการคำสั้น (Short Name Substring Fallback)
+  // หากยังไม่พบ candidate จากหมวดและชื่อตรง หรือพบแต่หน่วยไม่ตรง และชื่อรายการเป็นคำสั้น (<= 10 ตัวอักษร เช่น "ธูป", "เชือก", "สี")
+  // ให้ค้นหาแบบ substring ในชื่อรายการของราคากลางทั้งหมด และจับคู่กับรายการที่หน่วยนับตรงกัน
+  if (candidates.length === 0 || (!candidates.some((c: any) => cleanText(c.unit || c.unitType || "") === cleanDocUnit) && baseName.length <= 10)) {
+    const fallbackMatches = (priceMatrix || []).filter((pm: any) => {
+      const pmRawName = (pm.itemName || pm.name || "").trim();
+      const pmBase = getBaseItemName(pmRawName);
+      const pmClean = cleanText(pmRawName);
+
+      const isSubstring =
+        pmClean.includes(cleanName) ||
+        pmBase.includes(baseName) ||
+        cleanName.includes(pmClean) ||
+        (baseName.length >= 2 && pmBase.includes(baseName));
+
+      return isSubstring;
+    });
+
+    if (fallbackMatches.length > 0) {
+      if (cleanDocUnit.length > 0) {
+        const unitExactMatches = fallbackMatches.filter(
+          (pm: any) => cleanText(pm.unit || pm.unitType || "") === cleanDocUnit
+        );
+        const unitCompatibleMatches = fallbackMatches.filter(
+          (pm: any) => isUnitCompatible(rawUnit, pm.unit || pm.unitType || "", personCount)
+        );
+
+        if (unitExactMatches.length > 0) {
+          candidates = unitExactMatches;
+        } else if (unitCompatibleMatches.length > 0) {
+          candidates = unitCompatibleMatches;
+        } else if (candidates.length === 0) {
+          candidates = fallbackMatches;
+        }
+      } else if (candidates.length === 0) {
+        candidates = fallbackMatches;
+      }
+    }
+  }
 
   if (candidates.length === 0) {
     return {

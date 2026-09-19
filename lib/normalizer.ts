@@ -13,10 +13,11 @@ export interface ExtractedProposalItem {
 }
 
 /**
- * สกัดจำนวนคนจากชื่อรายการ (Extract Person Multiplier)
- * - ค้นหาแพทเทิร์นจำนวนคน เช่น /(?:(?:\(|（)?(\d+)\s*คน(?:\)|）)?)/
- * - รองรับ (30 คน), (40 คน), 3 คน, วิทยากร 2 คน, （40 คน）, [5 คน]
- * - หากไม่พบ คืนค่าเริ่มต้นเป็น 1
+ * สกัดจำนวนคนจากชื่อรายการ (Strict Person Regex)
+ * - การสกัดตัวคูณคน ต้องจับคู่กับคำว่า "คน" อย่างเคร่งครัดเท่านั้น
+ *   เช่น /(?:(?:\(|（)?(\d+)\s*คน(?:\)|）)?)/
+ * - หากเป็นตัวเลขขนาดหรือจำนวนบรรจุ เช่น "(3ชิ้น)", "3.2 ล.", "51 เล่ม"
+ *   ห้ามนำมาเป็น personCount โดยเด็ดขาด (ให้ personCount = 1)
  */
 export function extractPersonCount(name: string): number {
   if (!name || typeof name !== "string") return 1;
@@ -28,18 +29,19 @@ export function extractPersonCount(name: string): number {
     cleanName = cleanName.replaceAll(td, String(idx));
   });
 
-  // 1. ตรวจจับในวงเล็บ/ก้ามปู เช่น "(40 คน)", "(นักศึกษา 40 คน)", "（40 คน）", "[3 ท่าน]"
+  // 1. ตรวจจับในวงเล็บ/ก้ามปูที่ระบุ "คน" อย่างเคร่งครัด เช่น "(40 คน)", "(1 คน)", "（3 คน）", "[2 คน]"
   const parenMatch = cleanName.match(
-    /[\(\[（\{][^\)\]）\}]*?(\d+)\s*(?:คน|ท่าน|ราย)[^\)\]）\}]*?[\)\]）\}]/
+    /[\(\[（\{][^\)\]）\}]*?(\d+)\s*คน[^\)\]）\}]*?[\)\]）\}]/
   );
   if (parenMatch && parenMatch[1]) {
     const num = parseInt(parenMatch[1], 10);
     if (!isNaN(num) && num > 0) return num;
   }
 
-  // 2. ตรวจจับแพทเทิร์นจำนวนคนทั่วไป เช่น "30 คน", "3 คน", "วิทยากร 2 คน", "จำนวน 40 คน"
+  // 2. ตรวจจับแพทเทิร์นจำนวนคนทั่วไป เช่น "วิทยากร 2 คน", "จำนวน 40 คน"
+  // ต้องมีคำว่า "คน" กำกับติดกับตัวเลขเท่านั้น
   const generalMatch = cleanName.match(
-    /(?:(?:\(|（|\[)?(\d+)\s*(?:คน|ท่าน|ราย)(?:\)|）|\])?)/
+    /(?:^|[^\d\.])(\d+)\s*คน(?:$|[^\d])/
   );
   if (generalMatch && generalMatch[1]) {
     const num = parseInt(generalMatch[1], 10);
@@ -151,4 +153,39 @@ export function normalizeProposalItem(rawItem: any): ExtractedProposalItem {
     personCount,
     category: category || undefined,
   };
+}
+
+/**
+ * ล้างข้อมูลยอดเงินและตัดข้อความอ่านตัวเลขภาษาไทยในวงเล็บ เช่น "(สามพันห้าร้อยเก้าสิบสี่บาทถ้วน)"
+ * ออกก่อนนำตัวเลข 3,594 ไปแปลงเป็น float/int เพื่อป้องกันข้อผิดพลาด NaN หรือการแปลงผิดพลาด
+ */
+export function sanitizeTotalAmount(val: any): number {
+  if (val == null) return 0;
+  if (typeof val === "number") return isNaN(val) ? 0 : val;
+  if (typeof val !== "string") return 0;
+
+  let s = val.trim();
+  if (!s) return 0;
+
+  // 1. ตัดข้อความอ่านตัวเลขภาษาไทยในวงเล็บทุกรูปแบบ เช่น "(สามพันห้าร้อยเก้าสิบสี่บาทถ้วน)", "（...）", "[...]"
+  s = s.replace(/[\(\[（\{][^\)\]）\}]*?(?:บาท|ถ้วน|สตางค์|ศูนย์|หนึ่ง|เอ็ด|สอง|ยี่|สาม|สี่|ห้า|หก|เจ็ด|แปด|เก้า|สิบ|ร้อย|พัน|หมื่น|แสน|ล้าน)[^\)\]）\}]*?[\)\]）\}]/g, "");
+
+  // 2. ตัดข้อความอ่านภาษาไทยที่อาจอยู่นอกวงเล็บ
+  s = s.replace(/(?:บาทถ้วน|บาท|ถ้วน|สตางค์|฿)/g, "").trim();
+
+  // 3. แปลงเลขไทย (๐-๙) เป็นเลขอารบิก (0-9)
+  const thaiDigits = ["๐", "๑", "๒", "๓", "๔", "๕", "๖", "๗", "๘", "๙"];
+  thaiDigits.forEach((td, idx) => {
+    s = s.replaceAll(td, String(idx));
+  });
+
+  // 4. สกัดเฉพาะตัวเลขที่มีเครื่องหมายคอมม่าและทศนิยม เช่น "3,594", "3,594.00"
+  const match = s.match(/[\d,]+(?:\.\d+)?/);
+  if (match) {
+    const cleanNum = match[0].replace(/,/g, "");
+    const parsed = parseFloat(cleanNum);
+    return isNaN(parsed) ? 0 : parsed;
+  }
+
+  return 0;
 }

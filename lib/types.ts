@@ -254,7 +254,7 @@ export interface MatrixItemData {
   note?: string;
 }
 
-export { extractPersonCount, normalizeUnit, normalizeProposalItem } from "./normalizer";
+export { extractPersonCount, normalizeUnit, normalizeProposalItem, sanitizeTotalAmount } from "./normalizer";
 export {
   findMatchingPriceMatrixItem,
   isUnitCompatible,
