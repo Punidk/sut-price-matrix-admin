@@ -258,6 +258,8 @@ export { extractPersonCount, normalizeUnit, normalizeProposalItem } from "./norm
 export {
   findMatchingPriceMatrixItem,
   isUnitCompatible,
+  isLumpSumUnit,
+  LUMP_SUM_UNIT_ALIASES,
   cleanProposalItemName,
   getBaseItemName,
   parseThaiOrIsoDate,

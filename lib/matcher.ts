@@ -122,8 +122,33 @@ export function parseThaiOrIsoDate(dateStr: string): Date | null {
   return null;
 }
 
-// Helper: ตรวจสอบความเข้ากันได้ของหน่วยนับในเอกสารกับหน่วยในราคากลาง (โดยเฉพาะหน่วยที่มีมิติคน)
+export const LUMP_SUM_UNIT_ALIASES = [
+  "เหมาจ่าย",
+  "โครงการ",
+  "บาท/โครงการ",
+  "เหมา",
+  "งาน",
+  "เหมาจ่ายต่อโครงการ",
+];
+
+export function isLumpSumUnit(unit: string): boolean {
+  if (!unit || typeof unit !== "string") return false;
+  const uNorm = normalizeUnit(unit);
+  const cleaned = cleanText(unit).replace(/\s+/g, "");
+  const cleanedNorm = cleanText(uNorm).replace(/\s+/g, "");
+  return LUMP_SUM_UNIT_ALIASES.some((alias) => {
+    const aClean = cleanText(alias).replace(/\s+/g, "");
+    return cleaned === aClean || cleanedNorm === aClean;
+  });
+}
+
+// Helper: ตรวจสอบความเข้ากันได้ของหน่วยนับในเอกสารกับหน่วยในราคากลาง (โดยเฉพาะหน่วยที่มีมิติคน หรือหน่วยเหมาจ่าย)
 export function isUnitCompatible(docUnit: string, matrixUnit: string, personCount: number = 1): boolean {
+  // 1. ตรวจสอบกลุ่มคำที่ถือว่าเข้ากันได้สำหรับรายการเหมาจ่าย/ต่อโครงการ (Equivalent Units)
+  if (isLumpSumUnit(docUnit) && isLumpSumUnit(matrixUnit)) {
+    return true;
+  }
+
   const dNorm = normalizeUnit(docUnit);
   const mNorm = normalizeUnit(matrixUnit);
   if (!dNorm || !mNorm) return true;
@@ -340,6 +365,17 @@ export function findMatchingPriceMatrixItem(
   const pricingType = (matched.pricingType as PricingType) || "unit";
   const maxCap = matched.maxCap !== undefined ? matched.maxCap : null;
   const exclusiveWith = Array.isArray(matched.exclusiveWith) ? matched.exclusiveWith : [];
+
+  const isLumpSumItem =
+    pricingType === "lump_sum" ||
+    pricingType === "project_fixed" ||
+    isLumpSumUnit(rawUnit) ||
+    isLumpSumUnit(matched.unit || "");
+
+  if (isLumpSumItem) {
+    isUnitMismatch = false;
+    unitWarning = undefined;
+  }
 
   return {
     matchedItem: matched,

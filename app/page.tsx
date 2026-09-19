@@ -16,6 +16,7 @@ import {
   ProposalAuditData,
   CategorySubtotalCheck,
   ProjectExclusionViolation,
+  isLumpSumUnit,
 } from "@/lib/types";
 import { initialPriceMatrixData } from "@/lib/mockData";
 import {
@@ -2530,13 +2531,24 @@ export default function UserFrontendPage() {
                           const matrixUnit = item.matrixData?.unit || null;
 
                           const errorFlags = Array.isArray(item.errorFlags) ? item.errorFlags : [];
-                          const isUnitMismatch = errorFlags.includes("หน่วยไม่ตรง") || !!(matrixUnit && receiptUnit && matrixUnit.trim().toLowerCase() !== receiptUnit.trim().toLowerCase() && !(personCount && personCount > 1 && matrixUnit.toLowerCase().includes(receiptUnit.toLowerCase())));
 
                           const isLumpSum =
                             item.pricingType === "lump_sum" ||
                             item.pricingType === "project_fixed" ||
                             item.matrixData?.pricingType === "lump_sum" ||
-                            item.matrixData?.pricingType === "project_fixed";
+                            item.matrixData?.pricingType === "project_fixed" ||
+                            isLumpSumUnit(receiptUnit) ||
+                            isLumpSumUnit(matrixUnit || "");
+
+                          const isUnitMismatch =
+                            !isLumpSum &&
+                            (errorFlags.includes("หน่วยไม่ตรง") ||
+                              !!(
+                                matrixUnit &&
+                                receiptUnit &&
+                                matrixUnit.trim().toLowerCase() !== receiptUnit.trim().toLowerCase() &&
+                                !(personCount && personCount > 1 && matrixUnit.toLowerCase().includes(receiptUnit.toLowerCase()))
+                              ));
 
                           const itemMaxCap = item.maxCap != null ? item.maxCap : item.matrixData?.maxCap;
 

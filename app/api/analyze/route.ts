@@ -11,6 +11,7 @@ import {
   getBaseItemName,
   parseThaiOrIsoDate,
   isUnitCompatible,
+  isLumpSumUnit,
   checkProjectExclusions,
   ProjectExclusionViolation,
 } from "@/lib/types";
@@ -677,7 +678,7 @@ ${matrixContext}
         // จัดหมวดหมู่งบประมาณมาตรฐาน
         const category = normalizeExpenseCategory(item.category, rawName);
 
-        const errorFlags: string[] = [];
+        let errorFlags: string[] = [];
         let itemStatus: "PASS" | "FAIL" | "NOT_FOUND" = "PASS";
         let message = "";
 
@@ -698,7 +699,11 @@ ${matrixContext}
         const pricingType = lookupResult.pricingType;
         const maxCap = lookupResult.maxCap;
         const matchedPrice = lookupResult.matchedPrice;
-        const isLumpSumOrFixed = pricingType === "lump_sum" || pricingType === "project_fixed";
+        const isLumpSumOrFixed =
+          pricingType === "lump_sum" ||
+          pricingType === "project_fixed" ||
+          isLumpSumUnit(rawUnit) ||
+          isLumpSumUnit(matchedMatrixData?.unit || "");
 
         // 2. ตรวจสอบเงื่อนไขอัตราค่าตอบแทนวันทำการ vs วันหยุด
         if (lookupResult.isRateConditionMismatch && lookupResult.rateMismatchWarning) {
@@ -710,8 +715,8 @@ ${matrixContext}
           message = lookupResult.rateMismatchWarning.replace(/^\[|\]$/g, "");
         }
 
-        // 3. ตรวจสอบกรณีหน่วยนับไม่ตรง
-        if (lookupResult.isUnitMismatch && lookupResult.unitWarning) {
+        // 3. ตรวจสอบกรณีหน่วยนับไม่ตรง (ข้ามหากเป็นรายการเหมาจ่าย / Lump-Sum / Project-Fixed)
+        if (!isLumpSumOrFixed && lookupResult.isUnitMismatch && lookupResult.unitWarning) {
           itemStatus = "FAIL";
           if (!errorFlags.includes("หน่วยไม่ตรง")) errorFlags.push("หน่วยไม่ตรง");
           message = lookupResult.unitWarning;
@@ -727,19 +732,30 @@ ${matrixContext}
           message = "รายการมีลักษณะคลุมเครือ ไม่แจกแจงชนิดสิ่งของ ต้องแนบใบแจกแจงรายการย่อยตามระเบียบ";
         }
 
-        // 5. ตรวจสอบคณิตศาสตร์และเพดานราคาตาม Pricing Type (Step 4)
+        // 5. ตรวจสอบคณิตศาสตร์และเพดานราคาตาม Pricing Type (Step 4 & Lump-Sum Bugfix)
         if (isLumpSumOrFixed) {
-          // รายการประเภท lump_sum หรือ project_fixed:
-          // ข้ามการตรวจสอบสูตรคูณแนวนอน (ไม่ต้องนำ personCount หรือ quantity มาคูณ)
-          // ตรวจสอบเฉพาะว่า totalInBill <= matchedPrice หรือไม่
+          // รายการประเภท lump_sum หรือ project_fixed หรือหน่วยนับเข้าข่ายกลุ่มเหมาจ่าย:
+          // 1) ไม่ต้องแสดงการแจ้งเตือนเรื่องหน่วยไม่ตรง
+          if (errorFlags.includes("หน่วยไม่ตรง")) {
+            errorFlags = errorFlags.filter((f) => f !== "หน่วยไม่ตรง");
+          }
+          // 2) ข้ามการตรวจสอบสูตรคูณแนวนอน (ไม่ต้องนำ personCount หรือ quantity มาคูณ)
+          // 3) การตัดสินผล (Status): หาก totalInBill <= matchedPrice ให้ถือว่าผ่านเกณฑ์ (PASS)
           if (matchedPrice > 0 && totalPrice > matchedPrice) {
             itemStatus = "FAIL";
             if (!errorFlags.includes("ราคาเกินเกณฑ์")) errorFlags.push("ราคาเกินเกณฑ์");
             message = `ยอดเบิกจ่าย (฿${totalPrice.toLocaleString()}) เกินเพดานราคากลางเหมาจ่ายต่อโครงการ (เพดาน ฿${matchedPrice.toLocaleString()})`;
             const lumpWarn = `[ราคาเกินเกณฑ์: รายการ "${cleanDisplayItemName}" ยอดเบิกจ่าย (฿${totalPrice.toLocaleString()}) เกินเพดานราคากลางเหมาจ่ายต่อโครงการ (เพดาน ฿${matchedPrice.toLocaleString()})]`;
             if (!proposalWarnings.includes(lumpWarn)) proposalWarnings.push(lumpWarn);
-          } else if (itemStatus === "PASS" && !message) {
-            message = `ยอดเบิกจ่าย (฿${totalPrice.toLocaleString()}) ผ่านเกณฑ์ราคากลางเหมาจ่ายต่อโครงการ (เพดาน ฿${matchedPrice.toLocaleString()})`;
+          } else if (matchedMatrixData) {
+            // totalInBill <= matchedPrice
+            if (!isAmbiguous) {
+              itemStatus = "PASS";
+            }
+            message = `ผ่านเกณฑ์ราคาเหมาจ่ายต่อโครงการ (เพดาน ฿${matchedPrice.toLocaleString()}/โครงการ)`;
+          } else if (!isAmbiguous) {
+            itemStatus = "NOT_FOUND";
+            message = "ไม่พบในฐานข้อมูลราคากลางปี 2569";
           }
         } else {
           // รายการประเภท unit หรือ per_person:
