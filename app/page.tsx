@@ -8,6 +8,7 @@ import { db, isFirebaseConfigured } from "@/lib/firebase";
 import { collection, onSnapshot, addDoc, serverTimestamp, getDocs } from "firebase/firestore";
 import {
   PriceMatrixItem,
+  PricingType,
   SUT_EXPENSE_CATEGORIES,
   SutExpenseCategory,
   normalizeExpenseCategory,
@@ -66,9 +67,17 @@ export interface ReceiptItemData {
 
 export interface MatrixItemData {
   itemName?: string | null;
+  name?: string | null;
   category?: string | null;
   maxPrice?: number | null;
+  matchedPrice?: number;
+  price?: number | null;
   unit?: string | null;
+  pricingType?: PricingType;
+  maxCap?: number | null;
+  exclusiveWith?: string[];
+  condition?: string | null;
+  note?: string;
 }
 
 export interface AnalysisItemResult {
@@ -78,6 +87,10 @@ export interface AnalysisItemResult {
   message?: string;
   receiptData?: ReceiptItemData;
   matrixData?: MatrixItemData | null;
+  pricingType?: PricingType;
+  maxCap?: number | null;
+  exclusiveWith?: string[];
+  matchedPrice?: number;
   // Fallbacks for compatibility
   itemInReceipt?: string;
   matchedMatrixItem?: string | null;

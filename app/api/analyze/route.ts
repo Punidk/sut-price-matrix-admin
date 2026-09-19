@@ -6,12 +6,17 @@ import {
   extractPersonCount,
   normalizeUnit,
   normalizeProposalItem,
+  findMatchingPriceMatrixItem,
+  cleanProposalItemName,
+  getBaseItemName,
+  parseThaiOrIsoDate,
+  isUnitCompatible,
 } from "@/lib/types";
 import { db } from "@/lib/firebase";
 import { collection, getDocs } from "firebase/firestore";
 import { PRICE_MATRIX_2569, getCompositeKey } from "@/lib/priceMatrix2569";
 
-export { extractPersonCount, normalizeUnit, normalizeProposalItem };
+export { extractPersonCount, normalizeUnit, normalizeProposalItem, findMatchingPriceMatrixItem };
 
 // ขยายเวลา Serverless Function เพื่อป้องกันปัญหา Vercel Timeout (504 Gateway Timeout)
 export const maxDuration = 60;
@@ -19,22 +24,6 @@ export const maxDuration = 60;
 // Helper: ทำความสะอาดข้อความเปรียบเทียบ
 function cleanText(val: string): string {
   return (val || "").trim().toLowerCase();
-}
-
-// Helper: ตัดสัญลักษณ์/ลำดับข้อ เช่น "1.1 ", "• ", "- " ออกจากชื่อรายการในตารางของบประมาณ
-function cleanProposalItemName(name: string): string {
-  return (name || "")
-    .replace(/^[\d\.\-\•\*\s\(\)]+/, "")
-    .trim();
-}
-
-// Helper: สกัดชื่อรายการหลักโดยตัดข้อความในวงเล็บออก สำหรับเทียบราคากลาง
-function getBaseItemName(name: string): string {
-  return cleanProposalItemName(name)
-    .replace(/\(.*?\)/g, "")
-    .replace(/\[.*?\]/g, "")
-    .trim()
-    .toLowerCase();
 }
 
 // Helper: ตรวจสอบว่าหน่วยนับ หรือบริบทรายการ มีมิติของตัวคูณ "คน" หรือไม่
@@ -59,112 +48,6 @@ function isPerPersonUnit(unit: string, itemName: string, personCount: number): b
   }
 
   return false;
-}
-
-// Helper: ตรวจสอบความเข้ากันได้ของหน่วยนับในเอกสารกับหน่วยในราคากลาง (โดยเฉพาะหน่วยที่มีมิติคน)
-function isUnitCompatible(docUnit: string, matrixUnit: string, personCount: number): boolean {
-  const dNorm = normalizeUnit(docUnit);
-  const mNorm = normalizeUnit(matrixUnit);
-  if (!dNorm || !mNorm) return true;
-  if (dNorm === mNorm) return true;
-
-  const d = cleanText(dNorm);
-  const m = cleanText(mNorm);
-  if (d === m) return true;
-
-  const dClean = d.replace(/\./g, "").replace(/\s+/g, "");
-  const mClean = m.replace(/\./g, "").replace(/\s+/g, "");
-  if (dClean === mClean) return true;
-
-  // กรณีมิติคน เช่น ในราคากลางระบุ "คน/มื้อ" แต่ในตารางงบเขียน "มื้อ" หรือ "คน/เเมต" กับ "แมต"
-  if (personCount > 1 || /คน|ท่าน|ราย/i.test(dClean) || /คน|ท่าน|ราย/i.test(mClean)) {
-    if (
-      (mClean.includes("มื้อ") && dClean.includes("มื้อ")) ||
-      (mClean.includes("วัน") && dClean.includes("วัน")) ||
-      (mClean.includes("ชม") && dClean.includes("ชม")) ||
-      (mClean.includes("ชั่วโมง") && dClean.includes("ชั่วโมง")) ||
-      ((mClean.includes("เเมต") || mClean.includes("แมต")) && (dClean.includes("เเมต") || dClean.includes("แมต"))) ||
-      (mClean.includes("คน") && dClean.includes("คน"))
-    ) {
-      return true;
-    }
-  }
-
-  // กรณีเอกสารระบุ "บาท/คน/มื้อ" หรือ "บาท/มื้อ" หรือ "บาท/หน่วย"
-  if (dClean.startsWith("บาท/")) {
-    const stripped = dClean.replace(/^บาท\//, "");
-    if (stripped === mClean || (personCount > 1 && mClean.endsWith(stripped))) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-// Helper: แปลงสตริงวันที่เป็น Date object รองรับรูปแบบไทยและสากล
-function parseThaiOrIsoDate(dateStr: string): Date | null {
-  if (!dateStr || typeof dateStr !== "string") return null;
-  const thaiDigits = ["๐", "๑", "๒", "๓", "๔", "๕", "๖", "๗", "๘", "๙"];
-  let cleanStr = dateStr.trim();
-  thaiDigits.forEach((td, idx) => {
-    cleanStr = cleanStr.replaceAll(td, String(idx));
-  });
-  if (!cleanStr || cleanStr === "-" || cleanStr === "ไม่ระบุ") return null;
-
-  const thaiMonths: Record<string, number> = {
-    "มกราคม": 0, "ม.ค.": 0, "ม.ค": 0,
-    "กุมภาพันธ์": 1, "ก.พ.": 1, "ก.พ": 1,
-    "มีนาคม": 2, "มี.ค.": 2, "มี.ค": 2,
-    "เมษายน": 3, "เม.ย.": 3, "เม.ย": 3,
-    "พฤษภาคม": 4, "พ.ค.": 4, "พ.ค": 4,
-    "มิถุนายน": 5, "มิ.ย.": 5, "มิ.ย": 5,
-    "กรกฎาคม": 6, "ก.ค.": 6, "ก.ค": 6,
-    "สิงหาคม": 7, "ส.ค.": 7, "ส.ค": 7,
-    "กันยายน": 8, "ก.ย.": 8, "ก.ย": 8,
-    "ตุลาคม": 9, "ต.ค.": 9, "ต.ค": 9,
-    "พฤศจิกายน": 10, "พ.ย.": 10, "พ.ย": 10,
-    "ธันวาคม": 11, "ธ.ค.": 11, "ธ.ค": 11,
-  };
-
-  for (const [mName, mIdx] of Object.entries(thaiMonths)) {
-    if (cleanStr.includes(mName)) {
-      const parts = cleanStr.split(mName);
-      const dayMatch = parts[0].match(/(\d{1,2})\s*$/);
-      const yearMatch = parts[1].match(/^\s*\.?\s*(\d{4})/);
-      if (dayMatch && yearMatch) {
-        const day = parseInt(dayMatch[1], 10);
-        let year = parseInt(yearMatch[1], 10);
-        if (year > 2400) year -= 543;
-        return new Date(year, mIdx, day);
-      }
-    }
-  }
-
-  const dmyMatch = cleanStr.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})/);
-  if (dmyMatch) {
-    const day = parseInt(dmyMatch[1], 10);
-    const month = parseInt(dmyMatch[2], 10) - 1;
-    let year = parseInt(dmyMatch[3], 10);
-    if (year > 2400) year -= 543;
-    return new Date(year, month, day);
-  }
-
-  const ymdMatch = cleanStr.match(/(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})/);
-  if (ymdMatch) {
-    let year = parseInt(ymdMatch[1], 10);
-    if (year > 2400) year -= 543;
-    const month = parseInt(ymdMatch[2], 10) - 1;
-    const day = parseInt(ymdMatch[3], 10);
-    return new Date(year, month, day);
-  }
-
-  const timestamp = Date.parse(cleanStr);
-  if (!isNaN(timestamp)) {
-    const d = new Date(timestamp);
-    if (d.getFullYear() > 2400) d.setFullYear(d.getFullYear() - 543);
-    return d;
-  }
-  return null;
 }
 
 // รายการคำคลุมเครือที่ไม่อนุมัติหากไม่แจกแจง
@@ -865,78 +748,41 @@ ${matrixContext}
           );
         });
 
-        let matchedMatrixData: any = null;
+        // 3. จับคู่กับราคากลางใน activePriceMatrix ด้วย Unit-Aware Matching Engine (Step 3)
+        const lookupResult = findMatchingPriceMatrixItem(
+          {
+            name: rawName,
+            rawUnit: rawUnit,
+            category: category,
+            unitPrice: unitPrice,
+            personCount: personCount,
+            docDate: parsedDocDate,
+          },
+          activePriceMatrix
+        );
 
-        // ตรวจสอบอัตราค่าตอบแทนวันธรรมดา vs วันหยุด
-        if (category === "หมวดค่าตอบแทน" && candidates.some((c) => c.condition)) {
-          const isWeekdayPm = (pm: any) =>
-            pm.condition === "WEEKDAY" || /จันทร์|วันธรรมดา|เวลาราชการ/i.test((pm.itemName || "") + " " + (pm.note || ""));
-          const isWeekendPm = (pm: any) =>
-            pm.condition === "WEEKEND" || /เสาร์|อาทิตย์|วันหยุด/i.test((pm.itemName || "") + " " + (pm.note || ""));
+        const matchedMatrixData = lookupResult.matchedItem;
 
-          const weekdayCandidate = candidates.find(isWeekdayPm);
-          const weekendCandidate = candidates.find(isWeekendPm);
-
-          const parsedItemDate = parseThaiOrIsoDate(rawName);
-          const effectiveDate = parsedItemDate || parsedDocDate;
-          const dayOfWeek = effectiveDate ? effectiveDate.getDay() : null; // 0=Sun, 1..5=Mon..Fri, 6=Sat
-
-          if (dayOfWeek != null && dayOfWeek >= 1 && dayOfWeek <= 5 && weekdayCandidate) {
-            // วันธรรมดา
-            matchedMatrixData = weekdayCandidate;
-            const weekdayRate = Number(weekdayCandidate.maxPrice) || 0;
-            const weekendRate = weekendCandidate ? Number(weekendCandidate.maxPrice) || 0 : 0;
-            const targetUnit = weekdayCandidate.unit || normalizedUnit || rawUnit || "คน/วัน";
-
-            const isClaimingWeekend =
-              (weekendRate > weekdayRate && unitPrice >= weekendRate) ||
-              unitPrice > weekdayRate ||
-              /เสาร์|อาทิตย์|วันหยุด/i.test(rawName);
-
-            if (isClaimingWeekend) {
-              itemStatus = "FAIL";
-              if (!errorFlags.includes("ราคาเกินเกณฑ์")) errorFlags.push("ราคาเกินเกณฑ์");
-              const warnMsg = `[อัตราค่าตอบแทนไม่ถูกต้อง: วันที่จัดกิจกรรมตรงกับวันธรรมดา ต้องใช้อัตรา ${weekdayRate} บาท/${targetUnit} แทนอัตราวันหยุด]`;
-              if (!proposalWarnings.includes(warnMsg)) proposalWarnings.push(warnMsg);
-              message = `วันที่จัดกิจกรรมตรงกับวันธรรมดา ต้องใช้อัตราวันธรรมดา (${weekdayRate} บาท/${targetUnit}) แต่ในเอกสารเบิกในอัตราวันหยุด`;
-            }
-          } else if (dayOfWeek != null && (dayOfWeek === 0 || dayOfWeek === 6) && weekendCandidate) {
-            // วันเสาร์-อาทิตย์
-            matchedMatrixData = weekendCandidate;
-          } else {
-            matchedMatrixData = weekdayCandidate || candidates[0];
+        // ตรวจสอบเงื่อนไขอัตราค่าตอบแทนวันทำการ vs วันหยุด
+        if (lookupResult.isRateConditionMismatch && lookupResult.rateMismatchWarning) {
+          itemStatus = "FAIL";
+          if (!errorFlags.includes("ราคาเกินเกณฑ์")) errorFlags.push("ราคาเกินเกณฑ์");
+          if (!proposalWarnings.includes(lookupResult.rateMismatchWarning)) {
+            proposalWarnings.push(lookupResult.rateMismatchWarning);
           }
+          message = lookupResult.rateMismatchWarning.replace(/^\[|\]$/g, "");
         }
 
-        if (!matchedMatrixData && candidates.length > 0) {
-          // 1. ค้นหารายการที่หน่วยนับเข้ากันได้ (Compatible Unit Match)
-          const compatibleCandidates = candidates.filter((c: any) =>
-            isUnitCompatible(rawUnit, c.unit, personCount)
-          );
-
-          const candidatePool = compatibleCandidates.length > 0 ? compatibleCandidates : candidates;
-
-          // 2. ค้นหารายการที่ราคาต่อหน่วยตรงกัน หรืออยู่ในเกณฑ์ (ไม่เกิน maxPrice)
-          const exactPriceMatch = candidatePool.find(
-            (c: any) => Number(c.maxPrice) === unitPrice
-          );
-          const withinBudgetMatch = candidatePool.find(
-            (c: any) => Number(c.maxPrice) >= unitPrice
-          );
-
-          matchedMatrixData = exactPriceMatch || withinBudgetMatch || candidatePool[0];
-
-          const matchedUnitNorm = cleanText(normalizeUnit(matchedMatrixData.unit));
-          if (compatibleCandidates.length === 0 && cleanUnit && matchedUnitNorm !== cleanUnit) {
-            itemStatus = "FAIL";
-            if (!errorFlags.includes("หน่วยไม่ตรง")) errorFlags.push("หน่วยไม่ตรง");
-            message = `หน่วยนับ '${rawUnit}' ไม่ตรงกับหน่วยในราคากลาง ('${candidates.map((c: any) => c.unit).join(", ")}')`;
-          }
+        // ตรวจสอบกรณีหน่วยนับไม่ตรง
+        if (lookupResult.isUnitMismatch && lookupResult.unitWarning) {
+          itemStatus = "FAIL";
+          if (!errorFlags.includes("หน่วยไม่ตรง")) errorFlags.push("หน่วยไม่ตรง");
+          message = lookupResult.unitWarning;
         }
 
         // ประเมินราคาเทียบเพดานราคากลาง
         if (matchedMatrixData) {
-          const maxPrice = Number(matchedMatrixData.maxPrice) || 0;
+          const maxPrice = lookupResult.matchedPrice;
           if (maxPrice > 0 && unitPrice > maxPrice) {
             itemStatus = "FAIL";
             if (!errorFlags.includes("ราคาเกินเกณฑ์")) errorFlags.push("ราคาเกินเกณฑ์");
@@ -954,6 +800,10 @@ ${matrixContext}
           category: category,
           errorFlags: errorFlags,
           message: message,
+          pricingType: lookupResult.pricingType,
+          maxCap: lookupResult.maxCap,
+          exclusiveWith: lookupResult.exclusiveWith,
+          matchedPrice: lookupResult.matchedPrice,
           receiptData: {
             // โครงสร้างมาตรฐานตาม Step 2
             name: item.name,
@@ -972,10 +822,18 @@ ${matrixContext}
           },
           matrixData: matchedMatrixData
             ? {
-                itemName: matchedMatrixData.itemName,
+                itemName: matchedMatrixData.itemName || matchedMatrixData.name,
+                name: matchedMatrixData.name || matchedMatrixData.itemName,
                 category: category,
-                maxPrice: Number(matchedMatrixData.maxPrice) || 0,
+                maxPrice: lookupResult.matchedPrice,
+                matchedPrice: lookupResult.matchedPrice,
+                price: lookupResult.matchedPrice,
                 unit: matchedMatrixData.unit,
+                pricingType: lookupResult.pricingType,
+                maxCap: lookupResult.maxCap,
+                exclusiveWith: lookupResult.exclusiveWith,
+                condition: matchedMatrixData.condition || null,
+                note: matchedMatrixData.note || "",
               }
             : null,
         });
@@ -1358,6 +1216,14 @@ ${matrixContext}
             ? `${item.message} - [รายการคลุมเครือ: ต้องแนบใบแจกแจงรายการย่อย]`
             : "รายการมีลักษณะคลุมเครือ ไม่แจกแจงชนิดสิ่งของ ต้องแนบใบแจกแจงรายการย่อยตามระเบียบ";
         }
+      }
+
+      // แนบข้อมูลราคากลาง Step 3 เมตาเดตาเข้าสู่ Engine
+      if (item.matrixData) {
+        item.pricingType = item.matrixData.pricingType || item.pricingType || "unit";
+        item.maxCap = item.matrixData.maxCap !== undefined ? item.matrixData.maxCap : (item.maxCap ?? null);
+        item.exclusiveWith = Array.isArray(item.matrixData.exclusiveWith) ? item.matrixData.exclusiveWith : (item.exclusiveWith ?? []);
+        item.matchedPrice = Number(item.matrixData.matchedPrice ?? item.matrixData.maxPrice ?? item.matrixPrice) || 0;
       }
     });
 

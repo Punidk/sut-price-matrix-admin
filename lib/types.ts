@@ -228,5 +228,28 @@ export interface ReceiptItemData {
   totalInBill?: number;
 }
 
+export interface MatrixItemData {
+  itemName?: string | null;
+  name?: string | null;
+  category?: string | null;
+  maxPrice?: number | null;
+  matchedPrice?: number;
+  price?: number | null;
+  unit?: string | null;
+  pricingType?: PricingType;
+  maxCap?: number | null;
+  exclusiveWith?: string[];
+  condition?: string | null;
+  note?: string;
+}
+
 export { extractPersonCount, normalizeUnit, normalizeProposalItem } from "./normalizer";
+export {
+  findMatchingPriceMatrixItem,
+  isUnitCompatible,
+  cleanProposalItemName,
+  getBaseItemName,
+  parseThaiOrIsoDate,
+} from "./matcher";
+export type { LookupParams, LookupResult } from "./matcher";
 
