@@ -354,3 +354,201 @@ export function findMatchingPriceMatrixItem(
     unitWarning,
   };
 }
+
+export interface ProjectExclusionViolation {
+  id: string;
+  rule: string;
+  message: string;
+  severity: "error" | "warning";
+  items: string[];
+}
+
+export interface ExclusionCheckItem {
+  name: string;
+  cleanName?: string;
+  totalInBill?: number;
+  totalPrice?: number;
+  exclusiveWith?: string[];
+  pricingType?: PricingType;
+}
+
+/**
+ * ตรวจสอบกฎความขัดแย้งห้ามเบิกซ้ำซ้อนระดับโครงการ (Project-Level Exclusion Rules)
+ * ตามประกาศเกณฑ์ราคากลางปีการศึกษา 2569:
+ * - กฎที่ 1: ห้ามเบิก "น้ำแดงเฮลบลูบอย" ควบคู่กับ "ค่าอาหารว่าง"
+ * - กฎที่ 2: ห้ามเบิก "ค่าของที่ระลึก" ควบคู่กับ "ค่าตอบแทนวิทยากร"
+ * - กฎที่ 3: ห้ามเบิก "ค่าของขวัญ/ของรางวัล" ควบคู่กับ "ค่าเงินรางวัล" (และเพดานรวมของรางวัล/เงินรางวัลห้ามเกิน 3,000 บาท)
+ * - กฎเฉพาะรายการ: ตรวจสอบรายการที่มี `exclusiveWith` กำกับไว้ในฐานข้อมูล
+ */
+export function checkProjectExclusions(
+  items: ExclusionCheckItem[]
+): ProjectExclusionViolation[] {
+  const violations: ProjectExclusionViolation[] = [];
+  if (!Array.isArray(items) || items.length === 0) return violations;
+
+  // กฎที่ 1: น้ำแดงเฮลบลูบอย vs ค่าอาหารว่าง
+  const isSyrup = (item: ExclusionCheckItem) => {
+    const text = `${item.name || ""} ${item.cleanName || ""}`.toLowerCase();
+    const hasSyrupKeyword = /น้ำแดง|เฮลบลูบอย|เฮลซ์บลูบอย/i.test(text);
+    const hasExclusion =
+      Array.isArray(item.exclusiveWith) &&
+      item.exclusiveWith.some((e) => /อาหารว่าง|ขนมเบรก/i.test(e));
+    return hasSyrupKeyword || hasExclusion;
+  };
+
+  const isSnack = (item: ExclusionCheckItem) => {
+    const text = `${item.name || ""} ${item.cleanName || ""}`.toLowerCase();
+    const hasSnackKeyword = /อาหารว่าง|ขนมเบรก|snack/i.test(text);
+    const hasExclusion =
+      Array.isArray(item.exclusiveWith) &&
+      item.exclusiveWith.some((e) => /น้ำแดง|เฮลบลูบอย/i.test(e));
+    return hasSnackKeyword || hasExclusion;
+  };
+
+  const syrupItems = items.filter(isSyrup);
+  const snackItems = items.filter(isSnack);
+
+  if (syrupItems.length > 0 && snackItems.length > 0) {
+    violations.push({
+      id: "EXCLUSION_SYRUP_SNACK",
+      rule: "อาหารว่างและน้ำแดงเฮลบลูบอย",
+      message: "ผิดเงื่อนไข: ค่าอาหารว่างและน้ำแดงเฮลบลูบอย ให้เลือกเบิกได้อย่างใดอย่างหนึ่งเท่านั้น",
+      severity: "error",
+      items: [
+        ...syrupItems.map((i) => i.cleanName || i.name),
+        ...snackItems.map((i) => i.cleanName || i.name),
+      ],
+    });
+  }
+
+  // กฎที่ 2: ค่าของที่ระลึก vs ค่าตอบแทนวิทยากร (วิทยากรภายในหรือภายนอก)
+  const isSouvenir = (item: ExclusionCheckItem) => {
+    const text = `${item.name || ""} ${item.cleanName || ""}`.toLowerCase();
+    const hasSouvenirKeyword = /ของที่ระลึก|ของชำร่วย|souvenir/i.test(text);
+    const hasExclusion =
+      Array.isArray(item.exclusiveWith) &&
+      item.exclusiveWith.some((e) => /วิทยากร/i.test(e));
+    return hasSouvenirKeyword || hasExclusion;
+  };
+
+  const isSpeaker = (item: ExclusionCheckItem) => {
+    const text = `${item.name || ""} ${item.cleanName || ""}`.toLowerCase();
+    const hasSpeakerKeyword = /วิทยากร/i.test(text);
+    const hasExclusion =
+      Array.isArray(item.exclusiveWith) &&
+      item.exclusiveWith.some((e) => /ของที่ระลึก/i.test(e));
+    return hasSpeakerKeyword || hasExclusion;
+  };
+
+  const souvenirItems = items.filter(isSouvenir);
+  const speakerItems = items.filter(isSpeaker);
+
+  if (souvenirItems.length > 0 && speakerItems.length > 0) {
+    violations.push({
+      id: "EXCLUSION_SOUVENIR_SPEAKER",
+      rule: "ของที่ระลึกและค่าตอบแทนวิทยากร",
+      message: "ผิดเงื่อนไข: หากเลือกของที่ระลึก จะไม่สามารถเบิกค่าตอบแทนวิทยากรได้",
+      severity: "error",
+      items: [
+        ...souvenirItems.map((i) => i.cleanName || i.name),
+        ...speakerItems.map((i) => i.cleanName || i.name),
+      ],
+    });
+  }
+
+  // กฎที่ 3: ค่าของขวัญ/ของรางวัล vs ค่าเงินรางวัล
+  const isGiftPrize = (item: ExclusionCheckItem) => {
+    const text = `${item.name || ""} ${item.cleanName || ""}`.toLowerCase();
+    const hasGiftKeyword = (/ของรางวัล/i.test(text) || /ของขวัญ/i.test(text)) && !/เงินรางวัล/i.test(text);
+    const hasExclusion =
+      Array.isArray(item.exclusiveWith) &&
+      item.exclusiveWith.some((e) => /เงินรางวัล/i.test(e));
+    return hasGiftKeyword || hasExclusion;
+  };
+
+  const isCashPrize = (item: ExclusionCheckItem) => {
+    const text = `${item.name || ""} ${item.cleanName || ""}`.toLowerCase();
+    const hasCashKeyword = /เงินรางวัล/i.test(text);
+    const hasExclusion =
+      Array.isArray(item.exclusiveWith) &&
+      item.exclusiveWith.some((e) => /ของรางวัล|ของขวัญ/i.test(e));
+    return hasCashKeyword || hasExclusion;
+  };
+
+  const giftItems = items.filter(isGiftPrize);
+  const cashPrizeItems = items.filter(isCashPrize);
+
+  if (giftItems.length > 0 && cashPrizeItems.length > 0) {
+    violations.push({
+      id: "EXCLUSION_PRIZE_CONFLICT",
+      rule: "ของรางวัลและเงินรางวัล",
+      message: "ผิดเงื่อนไข: ให้เลือกเบิกของรางวัลหรือเงินรางวัลได้อย่างใดอย่างหนึ่ง (เพดานรวมไม่เกิน 3,000 บาท)",
+      severity: "error",
+      items: [
+        ...giftItems.map((i) => i.cleanName || i.name),
+        ...cashPrizeItems.map((i) => i.cleanName || i.name),
+      ],
+    });
+  }
+
+  // กฎที่ 3 (Cap): หากมีของขวัญ/ของรางวัล หรือเงินรางวัล ยอดรวมเกิน 3,000 บาท ให้แจ้งเตือนเพดานโครงการ
+  const allPrizeItems = items.filter((item) => {
+    const text = `${item.name || ""} ${item.cleanName || ""}`.toLowerCase();
+    return /ของรางวัล|ของขวัญ|เงินรางวัล/i.test(text);
+  });
+
+  const totalPrizeAmount = allPrizeItems.reduce((sum, item) => {
+    return sum + (Number(item.totalInBill ?? item.totalPrice) || 0);
+  }, 0);
+
+  if (totalPrizeAmount > 3000) {
+    violations.push({
+      id: "EXCLUSION_PRIZE_CAP_EXCEEDED",
+      rule: "เพดานรางวัลรวมโครงการ",
+      message: `ผิดเงื่อนไข: ยอดรวมค่าของรางวัลและเงินรางวัล (฿${totalPrizeAmount.toLocaleString()}) เกินเพดานโครงการ (จำกัดไม่เกิน 3,000 บาท)`,
+      severity: "error",
+      items: allPrizeItems.map((i) => i.cleanName || i.name),
+    });
+  }
+
+  // กฎเฉพาะรายการ: ตรวจสอบ exclusiveWith ที่จับคู่ได้จาก price matrix
+  for (let i = 0; i < items.length; i++) {
+    const itemA = items[i];
+    const exList = Array.isArray(itemA.exclusiveWith) ? itemA.exclusiveWith : [];
+    if (exList.length === 0) continue;
+
+    for (let j = i + 1; j < items.length; j++) {
+      const itemB = items[j];
+      const textB = `${itemB.name || ""} ${itemB.cleanName || ""}`.toLowerCase();
+
+      const isConflict = exList.some((exTag) => {
+        const tag = exTag.trim().toLowerCase();
+        return tag.length > 0 && textB.includes(tag);
+      });
+
+      if (isConflict) {
+        // ตรวจสอบว่าไม่ซ้ำกับ Rule 1, 2, 3 ที่ดักไปแล้ว
+        const alreadyCovered = violations.some((v) =>
+          (v.id === "EXCLUSION_SYRUP_SNACK" && (isSyrup(itemA) || isSnack(itemA))) ||
+          (v.id === "EXCLUSION_SOUVENIR_SPEAKER" && (isSouvenir(itemA) || isSpeaker(itemA))) ||
+          (v.id === "EXCLUSION_PRIZE_CONFLICT" && (isGiftPrize(itemA) || isCashPrize(itemA)))
+        );
+
+        if (!alreadyCovered) {
+          const nameA = itemA.cleanName || itemA.name;
+          const nameB = itemB.cleanName || itemB.name;
+          violations.push({
+            id: `EXCLUSION_CUSTOM_${i}_${j}`,
+            rule: "รายการห้ามเบิกพร้อมกัน",
+            message: `ผิดเงื่อนไข: รายการ "${nameA}" ไม่สามารถเบิกจ่ายร่วมกับ "${nameB}" ได้ตามประกาศราคากลาง`,
+            severity: "error",
+            items: [nameA, nameB],
+          });
+        }
+      }
+    }
+  }
+
+  return violations;
+}
+

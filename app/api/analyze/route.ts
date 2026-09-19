@@ -11,12 +11,20 @@ import {
   getBaseItemName,
   parseThaiOrIsoDate,
   isUnitCompatible,
+  checkProjectExclusions,
+  ProjectExclusionViolation,
 } from "@/lib/types";
 import { db } from "@/lib/firebase";
 import { collection, getDocs } from "firebase/firestore";
 import { PRICE_MATRIX_2569, getCompositeKey } from "@/lib/priceMatrix2569";
 
-export { extractPersonCount, normalizeUnit, normalizeProposalItem, findMatchingPriceMatrixItem };
+export {
+  extractPersonCount,
+  normalizeUnit,
+  normalizeProposalItem,
+  findMatchingPriceMatrixItem,
+  checkProjectExclusions,
+};
 
 // ขยายเวลา Serverless Function เพื่อป้องกันปัญหา Vercel Timeout (504 Gateway Timeout)
 export const maxDuration = 60;
@@ -242,8 +250,8 @@ export async function POST(req: NextRequest) {
 ========================================
 1. ชื่อโครงการ (projectName): ดึงชื่อโครงการจากหัวเอกสาร (หากไม่พบให้ใส่ "โครงการกิจกรรมนักศึกษา")
 2. วันที่ (date): วันที่จัดกิจกรรมหรือวันที่ทำเอกสาร (หากไม่พบให้ใส่ "-")
-3. ยอดงบประมาณรวมที่ขอสนับสนุน (requestedBudgetTotal): ดึงตัวเลขยอดเงินรวมทั้งสิ้นที่ขอรับการสนับสนุนจากเอกสาร เช่น "งบประมาณที่ขอรับการสนับสนุนทั้งสิ้น ... บาท" หรือ "รวมเงินทั้งสิ้น ... บาท" (สกัดเป็น number)
-4. ยอดรวมแต่ละหมวดตามที่ระบุในเอกสาร (detectedCategorySubtotals): ค้นหาแถวสรุปยอดรวมของแต่ละหมวด เช่น "รวมเงินหมวดค่าตอบแทน ... บาท" สกัดเป็น array: [{ "category": "ชื่อหมวด", "subtotal": ตัวเลข }]
+3. ยอดงบประมาณรวมที่ขอสนับสนุน (requestedBudgetTotal): ดึงตัวเลขยอดเงินรวมทั้งสิ้นที่ขอรับการสนับสนุนจากเอกสาร เช่น "งบประมาณที่ขอรับการสนับสนุน ... บาท" ที่อยู่บนหัวเอกสารโครงการ หรือ "รวมเงินทั้งสิ้น ... บาท" (สกัดเป็น number)
+4. ยอดรวมแต่ละหมวดตามที่ระบุในเอกสาร (detectedCategorySubtotals): ค้นหาแถวหรือบรรทัดสรุปยอดรวมของแต่ละหมวด เช่น "รวมเงินหมวด... จำนวน ... บาท" (สกัดเป็น array: [{ "category": "ชื่อหมวด", "subtotal": ตัวเลข }])
 5. ดึงรายการค่าใช้จ่ายทุกแถวในตารางออกมาใน items โดยใช้ฟิลด์มาตรฐาน:
    - category: จัดกลุ่มเข้า 1 ใน 6 หมวดหลัก ได้แก่ 'หมวดค่าตอบแทน', 'หมวดโภชนาการ', 'หมวดยานพาหนะ', 'หมวดวัสดุก่อสร้าง', 'หมวดอุปกรณ์สำนักงาน', 'หมวดอุปกรณ์อิเล็กทรอนิกส์' (หรือ 'หมวดอื่นๆ')
    - name: ชื่อรายการตามตาราง (เช่น "ค่าอาหารและเครื่องดื่ม (40 คน)")
@@ -673,82 +681,7 @@ ${matrixContext}
         let itemStatus: "PASS" | "FAIL" | "NOT_FOUND" = "PASS";
         let message = "";
 
-        // 1. ตรวจสูตรคณิตศาสตร์แนวนอน:
-        // - หากหน่วยเป็นหน่วยคูณคน เช่น บาท/คน/มื้อ, คน/มื้อ, คน/วัน, คน/ชั่วโมง หรือชื่อรายการระบุจำนวนคนไว้:
-        //   ยอดรวม = (personCount || 1) * จำนวน * ราคาต่อหน่วย
-        // - หากเป็นหน่วยปกติ (ลัง, แพ็ก, ม้วน, แกลลอน, รีม ฯลฯ):
-        //   ยอดรวม = จำนวน * ราคาต่อหน่วย
-        const isPersonUnit = isPerPersonUnit(rawUnit, rawName, personCount);
-        const standardTotal = qty * unitPrice;
-        const multidimTotal = (personCount > 1 ? personCount : 1) * qty * unitPrice;
-
-        let expectedTotal = standardTotal;
-        let isMathCorrect = false;
-
-        if (isPersonUnit && personCount > 1) {
-          // มีตัวคูณคนในชื่อรายการหรือหน่วยนับ
-          if (Math.abs(multidimTotal - totalPrice) <= 0.1) {
-            expectedTotal = multidimTotal;
-            isMathCorrect = true;
-          } else if (Math.abs(standardTotal - totalPrice) <= 0.1) {
-            // เผื่อกรณีในเอกสารคูณคนรวมเข้าไปในช่องจำนวนแล้ว (เช่น จำนวน 40 มื้อ x 40 บาท = 1,600)
-            expectedTotal = standardTotal;
-            isMathCorrect = true;
-          } else {
-            expectedTotal = multidimTotal;
-            isMathCorrect = false;
-          }
-        } else {
-          // รายการหน่วยปกติ
-          if (Math.abs(standardTotal - totalPrice) <= 0.1) {
-            expectedTotal = standardTotal;
-            isMathCorrect = true;
-          } else if (personCount > 1 && Math.abs(multidimTotal - totalPrice) <= 0.1) {
-            expectedTotal = multidimTotal;
-            isMathCorrect = true;
-          } else {
-            expectedTotal = standardTotal;
-            isMathCorrect = false;
-          }
-        }
-
-        const hasHorizontalError = !isMathCorrect && totalPrice > 0 && unitPrice > 0;
-        if (hasHorizontalError) {
-          itemStatus = "FAIL";
-          errorFlags.push("คำนวณเลขผิด");
-          const calcFormulaStr =
-            personCount > 1 && expectedTotal === multidimTotal
-              ? `${personCount} คน × ${qty} ${rawUnit || "หน่วย"} × ฿${unitPrice.toLocaleString()} = ฿${expectedTotal.toLocaleString()}`
-              : `${qty} ${rawUnit || "หน่วย"} × ฿${unitPrice.toLocaleString()} = ฿${expectedTotal.toLocaleString()}`;
-          const mathWarn = `[ข้อผิดพลาดทางคณิตศาสตร์: รายการ "${cleanDisplayItemName}" คำนวณจริง (${calcFormulaStr}) แต่ระบุรวมเป็นเงิน ฿${totalPrice.toLocaleString()}]`;
-          proposalWarnings.push(mathWarn);
-        }
-
-        // 2. ตรวจสอบรายการคลุมเครือ
-        const isAmbiguous = AMBIGUOUS_KEYWORDS.some(
-          (kw) => rawName === kw || rawName.startsWith(kw + " ") || rawName.endsWith(" " + kw)
-        );
-        if (isAmbiguous) {
-          itemStatus = "FAIL";
-          errorFlags.push("[รายการคลุมเครือ: ต้องแนบใบแจกแจงรายการย่อย]");
-          message = "รายการมีลักษณะคลุมเครือ ไม่แจกแจงชนิดสิ่งของ ต้องแนบใบแจกแจงรายการย่อยตามระเบียบ";
-        }
-
-        // 3. จับคู่กับราคากลางใน activePriceMatrix
-        const candidates = activePriceMatrix.filter((pm: any) => {
-          const pmCategory = normalizeExpenseCategory(pm.category, pm.itemName);
-          const categoryMatches =
-            pmCategory === category || category === "หมวดอื่นๆ" || pmCategory === "หมวดอื่นๆ";
-          if (!categoryMatches) return false;
-
-          const pmBase = getBaseItemName(pm.itemName);
-          return (
-            pmBase === baseItemName ||
-            (baseItemName.length >= 3 && (pmBase.includes(baseItemName) || baseItemName.includes(pmBase)))
-          );
-        });
-
-        // 3. จับคู่กับราคากลางใน activePriceMatrix ด้วย Unit-Aware Matching Engine (Step 3)
+        // 1. ค้นหาและจับคู่ราคากลางด้วย Unit-Aware Matching Engine (Step 3)
         const lookupResult = findMatchingPriceMatrixItem(
           {
             name: rawName,
@@ -762,8 +695,12 @@ ${matrixContext}
         );
 
         const matchedMatrixData = lookupResult.matchedItem;
+        const pricingType = lookupResult.pricingType;
+        const maxCap = lookupResult.maxCap;
+        const matchedPrice = lookupResult.matchedPrice;
+        const isLumpSumOrFixed = pricingType === "lump_sum" || pricingType === "project_fixed";
 
-        // ตรวจสอบเงื่อนไขอัตราค่าตอบแทนวันทำการ vs วันหยุด
+        // 2. ตรวจสอบเงื่อนไขอัตราค่าตอบแทนวันทำการ vs วันหยุด
         if (lookupResult.isRateConditionMismatch && lookupResult.rateMismatchWarning) {
           itemStatus = "FAIL";
           if (!errorFlags.includes("ราคาเกินเกณฑ์")) errorFlags.push("ราคาเกินเกณฑ์");
@@ -773,26 +710,113 @@ ${matrixContext}
           message = lookupResult.rateMismatchWarning.replace(/^\[|\]$/g, "");
         }
 
-        // ตรวจสอบกรณีหน่วยนับไม่ตรง
+        // 3. ตรวจสอบกรณีหน่วยนับไม่ตรง
         if (lookupResult.isUnitMismatch && lookupResult.unitWarning) {
           itemStatus = "FAIL";
           if (!errorFlags.includes("หน่วยไม่ตรง")) errorFlags.push("หน่วยไม่ตรง");
           message = lookupResult.unitWarning;
         }
 
-        // ประเมินราคาเทียบเพดานราคากลาง
-        if (matchedMatrixData) {
-          const maxPrice = lookupResult.matchedPrice;
-          if (maxPrice > 0 && unitPrice > maxPrice) {
+        // 4. ตรวจสอบรายการคลุมเครือ
+        const isAmbiguous = AMBIGUOUS_KEYWORDS.some(
+          (kw) => rawName === kw || rawName.startsWith(kw + " ") || rawName.endsWith(" " + kw)
+        );
+        if (isAmbiguous) {
+          itemStatus = "FAIL";
+          errorFlags.push("[รายการคลุมเครือ: ต้องแนบใบแจกแจงรายการย่อย]");
+          message = "รายการมีลักษณะคลุมเครือ ไม่แจกแจงชนิดสิ่งของ ต้องแนบใบแจกแจงรายการย่อยตามระเบียบ";
+        }
+
+        // 5. ตรวจสอบคณิตศาสตร์และเพดานราคาตาม Pricing Type (Step 4)
+        if (isLumpSumOrFixed) {
+          // รายการประเภท lump_sum หรือ project_fixed:
+          // ข้ามการตรวจสอบสูตรคูณแนวนอน (ไม่ต้องนำ personCount หรือ quantity มาคูณ)
+          // ตรวจสอบเฉพาะว่า totalInBill <= matchedPrice หรือไม่
+          if (matchedPrice > 0 && totalPrice > matchedPrice) {
             itemStatus = "FAIL";
             if (!errorFlags.includes("ราคาเกินเกณฑ์")) errorFlags.push("ราคาเกินเกณฑ์");
-            message = `ราคาต่อหน่วย (฿${unitPrice.toFixed(2)}) เกินเพดานราคากลางหน่วย '${matchedMatrixData.unit}' (฿${maxPrice.toFixed(2)}/${matchedMatrixData.unit})`;
+            message = `ยอดเบิกจ่าย (฿${totalPrice.toLocaleString()}) เกินเพดานราคากลางเหมาจ่ายต่อโครงการ (เพดาน ฿${matchedPrice.toLocaleString()})`;
+            const lumpWarn = `[ราคาเกินเกณฑ์: รายการ "${cleanDisplayItemName}" ยอดเบิกจ่าย (฿${totalPrice.toLocaleString()}) เกินเพดานราคากลางเหมาจ่ายต่อโครงการ (เพดาน ฿${matchedPrice.toLocaleString()})]`;
+            if (!proposalWarnings.includes(lumpWarn)) proposalWarnings.push(lumpWarn);
           } else if (itemStatus === "PASS" && !message) {
-            message = `ราคาต่อหน่วย (฿${unitPrice.toFixed(2)}) ผ่านเกณฑ์ราคากลางหน่วย '${matchedMatrixData.unit}' (เพดาน ฿${maxPrice.toFixed(2)}/${matchedMatrixData.unit})`;
+            message = `ยอดเบิกจ่าย (฿${totalPrice.toLocaleString()}) ผ่านเกณฑ์ราคากลางเหมาจ่ายต่อโครงการ (เพดาน ฿${matchedPrice.toLocaleString()})`;
           }
-        } else if (!isAmbiguous) {
-          itemStatus = "NOT_FOUND";
-          message = "ไม่พบในฐานข้อมูลราคากลางปี 2569";
+        } else {
+          // รายการประเภท unit หรือ per_person:
+          // ตรวจสูตรคณิตศาสตร์แนวนอน:
+          const isPersonUnit = isPerPersonUnit(rawUnit, rawName, personCount);
+          const standardTotal = qty * unitPrice;
+          const multidimTotal = (personCount > 1 ? personCount : 1) * qty * unitPrice;
+
+          let expectedTotal = standardTotal;
+          let isMathCorrect = false;
+
+          if (isPersonUnit && personCount > 1) {
+            // มีตัวคูณคนในชื่อรายการหรือหน่วยนับ
+            if (Math.abs(multidimTotal - totalPrice) <= 0.1) {
+              expectedTotal = multidimTotal;
+              isMathCorrect = true;
+            } else if (Math.abs(standardTotal - totalPrice) <= 0.1) {
+              expectedTotal = standardTotal;
+              isMathCorrect = true;
+            } else {
+              expectedTotal = multidimTotal;
+              isMathCorrect = false;
+            }
+          } else {
+            // รายการหน่วยปกติ
+            if (Math.abs(standardTotal - totalPrice) <= 0.1) {
+              expectedTotal = standardTotal;
+              isMathCorrect = true;
+            } else if (personCount > 1 && Math.abs(multidimTotal - totalPrice) <= 0.1) {
+              expectedTotal = multidimTotal;
+              isMathCorrect = true;
+            } else {
+              expectedTotal = standardTotal;
+              isMathCorrect = false;
+            }
+          }
+
+          const hasHorizontalError = !isMathCorrect && totalPrice > 0 && unitPrice > 0;
+          if (hasHorizontalError) {
+            itemStatus = "FAIL";
+            errorFlags.push("คำนวณเลขผิด");
+            const calcFormulaStr =
+              personCount > 1 && expectedTotal === multidimTotal
+                ? `${personCount} คน × ${qty} ${rawUnit || "หน่วย"} × ฿${unitPrice.toLocaleString()} = ฿${expectedTotal.toLocaleString()}`
+                : `${qty} ${rawUnit || "หน่วย"} × ฿${unitPrice.toLocaleString()} = ฿${expectedTotal.toLocaleString()}`;
+            const mathWarn = `[ข้อผิดพลาดทางคณิตศาสตร์: รายการ "${cleanDisplayItemName}" คำนวณจริง (${calcFormulaStr}) แต่ระบุรวมเป็นเงิน ฿${totalPrice.toLocaleString()}]`;
+            proposalWarnings.push(mathWarn);
+          }
+
+          // ตรวจสอบราคาต่อหน่วยเทียบกับเพดานราคากลาง
+          if (matchedMatrixData) {
+            if (matchedPrice > 0 && unitPrice > matchedPrice) {
+              itemStatus = "FAIL";
+              if (!errorFlags.includes("ราคาเกินเกณฑ์")) errorFlags.push("ราคาเกินเกณฑ์");
+              message = `ราคาต่อหน่วย (฿${unitPrice.toFixed(2)}) เกินเพดานราคากลางหน่วย '${matchedMatrixData.unit}' (฿${matchedPrice.toFixed(2)}/${matchedMatrixData.unit})`;
+            } else if (itemStatus === "PASS" && !message) {
+              message = `ราคาต่อหน่วย (฿${unitPrice.toFixed(2)}) ผ่านเกณฑ์ราคากลางหน่วย '${matchedMatrixData.unit}' (เพดาน ฿${matchedPrice.toFixed(2)}/${matchedMatrixData.unit})`;
+            }
+          } else if (!isAmbiguous) {
+            itemStatus = "NOT_FOUND";
+            message = "ไม่พบในฐานข้อมูลราคากลางปี 2569";
+          }
+        }
+
+        // 6. ตรวจสอบเพดานเหมาจ่ายสูงสุด (Max Cap Logic - Step 4)
+        if (maxCap != null && maxCap > 0) {
+          if (totalPrice > maxCap) {
+            itemStatus = "FAIL";
+            if (!errorFlags.includes("เกินเพดานเหมาจ่าย")) {
+              errorFlags.push("เกินเพดานเหมาจ่าย");
+            }
+            message = `ยอดรวมเกินเพดานเหมาจ่ายสูงสุดของโครงการ (จำกัดไม่เกิน ฿${maxCap.toLocaleString()})`;
+            const capWarn = `[เกินเพดานเหมาจ่าย: รายการ "${cleanDisplayItemName}" ยอดรวม ฿${totalPrice.toLocaleString()} เกินเพดานเหมาจ่ายสูงสุดของโครงการ (จำกัดไม่เกิน ฿${maxCap.toLocaleString()})]`;
+            if (!proposalWarnings.includes(capWarn)) {
+              proposalWarnings.push(capWarn);
+            }
+          }
         }
 
         finalItems.push({
@@ -839,14 +863,59 @@ ${matrixContext}
         });
       }
 
-      // 4. คำนวณผลรวมแต่ละหมวด (Category Subtotals Check)
+      // 4. ตรวจสอบกฎความขัดแย้งห้ามเบิกซ้ำซ้อนระดับโครงการ (Step 5: Project-Level Exclusion Rules)
+      const exclusionItems = finalItems.map((fi) => ({
+        name: fi.receiptData?.name || fi.receiptData?.itemName || "",
+        cleanName: fi.receiptData?.itemName || "",
+        totalInBill: fi.receiptData?.totalInBill ?? fi.receiptData?.totalPrice ?? 0,
+        totalPrice: fi.receiptData?.totalPrice ?? 0,
+        exclusiveWith: fi.exclusiveWith || [],
+        pricingType: fi.pricingType,
+      }));
+
+      const exclusionViolations = checkProjectExclusions(exclusionItems);
+
+      if (exclusionViolations.length > 0) {
+        for (const violation of exclusionViolations) {
+          const ruleWarn = `[กฎความขัดแย้งโครงการ] ${violation.message}`;
+          if (!proposalWarnings.includes(ruleWarn)) {
+            proposalWarnings.push(ruleWarn);
+          }
+
+          // ปรับรายการที่เกี่ยวข้องในโครงการเป็น FAIL พร้อมระบุ Flag
+          for (const fItem of finalItems) {
+            const fName = fItem.receiptData?.name || "";
+            const fCleanName = fItem.receiptData?.itemName || "";
+            const isConflictingItem =
+              violation.items.includes(fCleanName) ||
+              violation.items.includes(fName) ||
+              (violation.id === "EXCLUSION_SYRUP_SNACK" && /น้ำแดง|เฮลบลูบอย|อาหารว่าง|ขนมเบรก/i.test(fName + " " + fCleanName)) ||
+              (violation.id === "EXCLUSION_SOUVENIR_SPEAKER" && /ของที่ระลึก|วิทยากร/i.test(fName + " " + fCleanName)) ||
+              (violation.id === "EXCLUSION_PRIZE_CONFLICT" && /ของรางวัล|ของขวัญ|เงินรางวัล/i.test(fName + " " + fCleanName)) ||
+              (violation.id === "EXCLUSION_PRIZE_CAP_EXCEEDED" && /ของรางวัล|ของขวัญ|เงินรางวัล/i.test(fName + " " + fCleanName));
+
+            if (isConflictingItem) {
+              fItem.status = "FAIL";
+              if (!fItem.errorFlags.includes("ผิดเงื่อนไขห้ามเบิกซ้ำซ้อน")) {
+                fItem.errorFlags.push("ผิดเงื่อนไขห้ามเบิกซ้ำซ้อน");
+              }
+              fItem.message = violation.message;
+            }
+          }
+        }
+      }
+
+      // 5. คำนวณผลรวมแต่ละหมวด (Category Subtotals Check)
       const catTotalsMap: Record<string, { calculated: number; count: number }> = {};
       finalItems.forEach((item) => {
         const cat = item.category || "หมวดอื่นๆ";
         if (!catTotalsMap[cat]) {
           catTotalsMap[cat] = { calculated: 0, count: 0 };
         }
-        catTotalsMap[cat].calculated += item.receiptData.totalPrice;
+        const itemTotal = Number(
+          item.receiptData?.totalInBill ?? item.receiptData?.totalPrice ?? 0
+        );
+        catTotalsMap[cat].calculated += itemTotal;
         catTotalsMap[cat].count += 1;
       });
 
@@ -879,10 +948,15 @@ ${matrixContext}
           ? Number(matchDetected.subtotal)
           : cData.calculated;
 
-        const isMatch = Math.abs(detected - cData.calculated) <= 0.5;
+        const diff = Math.abs(cData.calculated - detected);
+        const isMatch = diff <= 0.5;
+        const categoryMessage = isMatch
+          ? "ยอดรวมประจำหมวดถูกต้อง"
+          : `ผลรวมในหมวดไม่ตรง: รายการรวมกันได้ ฿${cData.calculated.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} แต่ในเอกสารระบุ ฿${detected.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (ต่างกัน ฿${diff.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`;
+
         if (!isMatch && (detected > 0 || cData.calculated > 0)) {
           hasCategoryMismatch = true;
-          const catWarn = `[ข้อผิดพลาดผลรวมหมวด: ${catName} ผลรวมรายการย่อย (${cData.calculated.toLocaleString()} บาท) ไม่ตรงกับยอดรวมหมวดที่ระบุ (${detected.toLocaleString()} บาท)]`;
+          const catWarn = `[ข้อผิดพลาดผลรวมหมวด: ${catName}] ${categoryMessage}`;
           if (!proposalWarnings.includes(catWarn)) proposalWarnings.push(catWarn);
         }
 
@@ -890,12 +964,14 @@ ${matrixContext}
           category: catName,
           detectedSubtotal: detected,
           calculatedSubtotal: cData.calculated,
+          difference: diff,
           isMatch: isMatch,
           itemCount: cData.count,
+          message: categoryMessage,
         });
       }
 
-      // 5. คำนวณผลรวมทั้งโครงการ (Grand Total Requested Budget Check)
+      // 6. คำนวณผลรวมทั้งโครงการ (Grand Total Requested Budget Check)
       const grandCalculated = Object.values(catTotalsMap).reduce((sum, c) => sum + c.calculated, 0);
       let requestedBudget = Number(
         parsedData.requestedBudgetTotal ??
@@ -907,19 +983,21 @@ ${matrixContext}
         requestedBudget = grandCalculated;
       }
 
-      const isGrandMatch = Math.abs(requestedBudget - grandCalculated) <= 0.5;
+      const grandDiff = Math.abs(requestedBudget - grandCalculated);
+      const isGrandMatch = grandDiff <= 0.5;
       let hasGrandTotalMismatch = false;
       if (!isGrandMatch && requestedBudget > 0) {
         hasGrandTotalMismatch = true;
-        const grandWarn = `[ข้อผิดพลาดงบประมาณรวม: ผลรวมทุกหมวด (${grandCalculated.toLocaleString()} บาท) ไม่ตรงกับงบประมาณที่ขอรับการสนับสนุน (${requestedBudget.toLocaleString()} บาท)]`;
+        const grandWarn = `ยอดรวมงบประมาณทั้งโครงการไม่ตรง: ยอดรวมทุกหมวดได้ ฿${grandCalculated.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} แต่งบประมาณที่ขอรับการสนับสนุนระบุ ฿${requestedBudget.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
         if (!proposalWarnings.includes(grandWarn)) proposalWarnings.push(grandWarn);
       }
 
       const hasHorizontalMathError = finalItems.some((i) => i.errorFlags?.includes("คำนวณเลขผิด"));
 
-      // 6. กำหนด Overall Status
+      // 7. กำหนด Overall Status
       let overallStatus: "PASS" | "FAIL" | "NOT_FOUND" | "INVALID_DOCUMENT" = "PASS";
       if (
+        exclusionViolations.length > 0 ||
         hasHorizontalMathError ||
         hasCategoryMismatch ||
         hasGrandTotalMismatch ||
@@ -928,8 +1006,12 @@ ${matrixContext}
           (w) =>
             w.includes("ข้อผิดพลาด") ||
             w.includes("ราคาเกินเกณฑ์") ||
+            w.includes("เกินเพดานเหมาจ่าย") ||
+            w.includes("ผิดเงื่อนไข") ||
             w.includes("อัตราค่าตอบแทนไม่ถูกต้อง") ||
-            w.includes("รายการคลุมเครือ")
+            w.includes("รายการคลุมเครือ") ||
+            w.includes("ยอดรวมงบประมาณทั้งโครงการไม่ตรง") ||
+            w.includes("ผลรวมในหมวดไม่ตรง")
         )
       ) {
         overallStatus = "FAIL";
@@ -966,6 +1048,7 @@ ${matrixContext}
           isGrandTotalMatch: isGrandMatch,
           isHorizontalMathCorrect: !hasHorizontalMathError,
           categoryChecks: categoryChecksList,
+          exclusionViolations: exclusionViolations,
         },
         overallStatus: overallStatus,
         warnings: proposalWarnings,

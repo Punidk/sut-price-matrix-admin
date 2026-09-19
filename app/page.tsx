@@ -15,6 +15,7 @@ import {
   DocumentMode,
   ProposalAuditData,
   CategorySubtotalCheck,
+  ProjectExclusionViolation,
 } from "@/lib/types";
 import { initialPriceMatrixData } from "@/lib/mockData";
 import {
@@ -162,6 +163,7 @@ export default function UserFrontendPage() {
   const [documentType, setDocumentType] = useState<string | null>(null);
   const [documentMode, setDocumentMode] = useState<DocumentMode>("PROPOSAL");
   const [proposalAudit, setProposalAudit] = useState<ProposalAuditData | null>(null);
+  const [projectExclusionViolations, setProjectExclusionViolations] = useState<ProjectExclusionViolation[]>([]);
   const [isQuotationCheck, setIsQuotationCheck] = useState<boolean>(false);
   const [financialSummary, setFinancialSummary] = useState<FinancialSummaryData | null>(null);
   const [documentWarnings, setDocumentWarnings] = useState<string[]>([]);
@@ -572,6 +574,7 @@ export default function UserFrontendPage() {
     setCustomerInfo(null);
     setQuotationTerms(null);
     setProposalAudit(null);
+    setProjectExclusionViolations([]);
     setDocumentType(null);
     setFinancialSummary(null);
     setDocumentWarnings([]);
@@ -596,6 +599,7 @@ export default function UserFrontendPage() {
     setCustomerInfo(null);
     setQuotationTerms(null);
     setProposalAudit(null);
+    setProjectExclusionViolations([]);
     setFinancialSummary(null);
     setDocumentWarnings([]);
     setOverallStatus(null);
@@ -686,6 +690,11 @@ export default function UserFrontendPage() {
         results = data;
       }
       setProposalAudit(propAudit);
+      setProjectExclusionViolations(propAudit?.exclusionViolations || data?.proposalAudit?.exclusionViolations || []);
+
+      if (propAudit?.exclusionViolations && propAudit.exclusionViolations.length > 0) {
+        overallStatusStr = "FAIL";
+      }
 
       // เงื่อนไข Math Error (!isMathCorrect) ให้ทำงานเฉพาะเมื่อเอกสารเป็นใบเสร็จที่ถูกต้อง (overallStatus !== 'INVALID_DOCUMENT' และมี items.length > 0) เท่านั้น
       if (
@@ -863,10 +872,13 @@ export default function UserFrontendPage() {
       isQuotationCheck ||
       hasSutQuotationViolation);
 
+  const hasProjectExclusionViolation = projectExclusionViolations.length > 0;
+
   const hasProposalViolation =
     documentMode === "PROPOSAL" &&
     !isInvalidDocument &&
-    (proposalAudit?.isHorizontalMathCorrect === false ||
+    (hasProjectExclusionViolation ||
+      proposalAudit?.isHorizontalMathCorrect === false ||
       proposalAudit?.isGrandTotalMatch === false ||
       (proposalAudit?.categoryChecks?.some((c) => !c.isMatch) ?? false));
 
@@ -1511,6 +1523,8 @@ export default function UserFrontendPage() {
                         ? "ตรวจพบบิลที่อาจซ้ำซ้อน: เคยมีประวัติการตรวจสอบบิลนี้ในระบบแล้ว"
                         : hasSutQuotationViolation
                         ? "เอกสารไม่ผ่านระเบียบใบเสนอราคา มหาวิทยาลัยเทคโนโลยีสุรนารี"
+                        : hasProjectExclusionViolation
+                        ? `พบ ${projectExclusionViolations.length} ข้อผิดพลาดจากกฎความขัดแย้งระดับโครงการ`
                         : isOverallPass
                         ? "ผ่านการตรวจสอบราคากลางทั้งหมด"
                         : isMathError
@@ -1526,6 +1540,8 @@ export default function UserFrontendPage() {
                             : "รูปภาพที่ส่งเข้ามาไม่ใช่เอกสารทางการเงินหรือใบเสร็จรับเงิน กรุณาถ่ายภาพใบเสร็จให้ชัดเจน")
                         : hasSutQuotationViolation
                         ? (documentWarnings?.find((w) => typeof w === "string" && w.includes("[ระเบียบ มทส.]")) || "พบข้อกำหนดไม่ตรงตามระเบียบการจัดซื้อจัดจ้าง มทส.")
+                        : hasProjectExclusionViolation
+                        ? "ตรวจพบการขอเบิกจ่ายรายการที่ซ้ำซ้อนหรือเกินเพดานโครงการตามประกาศราคากลางปี 2569"
                         : `ตรวจพบทั้งหมด ${totalItemsCount} รายการ (ผ่าน ${passItemsCount} รายการ${
                             failItemsCount > 0 ? `, ไม่ผ่าน ${failItemsCount} รายการ` : ""
                           }${notFoundItemsCount > 0 ? `, ไม่อยู่ในฐานข้อมูล ${notFoundItemsCount} รายการ` : ""})`}
@@ -1561,6 +1577,68 @@ export default function UserFrontendPage() {
               </div>
             </div>
 
+            {/* Project-Level Exclusion Rules Warnings Card (Step 5) */}
+            {!isInvalidDocument && projectExclusionViolations.length > 0 && (
+              <div className="bg-rose-50 border-2 border-rose-500 rounded-2xl p-5 shadow-sm space-y-3.5 animate-in fade-in duration-300">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-rose-200 pb-3">
+                  <div className="flex items-center space-x-2.5">
+                    <div className="p-2 bg-rose-600 text-white rounded-xl shadow-xs">
+                      <AlertTriangle className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm sm:text-base font-bold text-rose-950 flex items-center space-x-2">
+                        <span>คำเตือนกฎความขัดแย้งระดับโครงการ</span>
+                        <span className="text-[10px] bg-rose-200 text-rose-900 font-mono px-2 py-0.5 rounded-full border border-rose-300">
+                          Project Exclusion Rules ({projectExclusionViolations.length})
+                        </span>
+                      </h4>
+                      <p className="text-[11px] sm:text-xs text-rose-700">
+                        ตรวจพบรายการที่ผิดเงื่อนไขการเบิกจ่ายซ้ำซ้อนหรือเกินเพดานโครงการตามประกาศราคากลางปี 2569
+                      </p>
+                    </div>
+                  </div>
+                  <span className="self-start sm:self-auto text-xs font-bold font-mono px-3 py-1 rounded-full bg-rose-600 text-white shadow-xs">
+                    ✕ ผิดเงื่อนไขระดับโครงการ
+                  </span>
+                </div>
+
+                <div className="space-y-2.5">
+                  {projectExclusionViolations.map((v, idx) => (
+                    <div
+                      key={idx}
+                      className="bg-white/95 border border-rose-300 rounded-xl p-3.5 space-y-2 shadow-xs"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-start space-x-2">
+                          <span className="text-rose-600 font-bold text-sm shrink-0 mt-0.5">⚠️</span>
+                          <p className="text-xs sm:text-sm font-bold text-rose-950 leading-snug">
+                            {v.message}
+                          </p>
+                        </div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider bg-rose-100 text-rose-800 px-2.5 py-0.5 rounded border border-rose-200 shrink-0">
+                          {v.rule}
+                        </span>
+                      </div>
+
+                      {v.items && v.items.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1.5 pl-6 pt-1 border-t border-slate-100 mt-1">
+                          <span className="text-[11px] text-slate-500 font-medium">รายการที่เกี่ยวข้อง:</span>
+                          {v.items.map((itName, itIdx) => (
+                            <span
+                              key={itIdx}
+                              className="inline-flex items-center text-[11px] font-semibold bg-rose-50 text-rose-800 border border-rose-200 px-2 py-0.5 rounded-md"
+                            >
+                              {itName}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Document Integrity Warnings Alert Box */}
             {(isMathError || hasTampering || hasDuplicate || hasSutQuotationViolation || hasCompensationViolation || (documentWarnings && documentWarnings.length > 0)) && (
               <div className={`border-2 p-4 sm:p-5 rounded-2xl space-y-3 shadow-sm animate-in fade-in duration-300 ${
@@ -1592,8 +1670,16 @@ export default function UserFrontendPage() {
                   </div>
                 )}
 
-                {/* Red Alert Bar for Math Error - ซ่อนหาก isInvalidDocument หรือมี Tampering */}
-                {!isInvalidDocument && !hasTampering && isMathError && (
+                {/* Red Alert Bar for Proposal Grand Total Mismatch */}
+                {!isInvalidDocument && documentMode === "PROPOSAL" && proposalAudit && !proposalAudit.isGrandTotalMatch && (
+                  <div className="bg-rose-600 text-white font-bold text-xs sm:text-sm py-2.5 px-4 rounded-xl flex items-center space-x-2 shadow-xs">
+                    <AlertTriangle className="w-4 h-4 shrink-0 text-white" />
+                    <span>⚠️ ยอดรวมงบประมาณทั้งโครงการไม่ตรง: ยอดรวมทุกหมวดได้ ฿{(proposalAudit.calculatedGrandTotal || 0).toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} แต่งบประมาณที่ขอรับการสนับสนุนระบุ ฿{(proposalAudit.requestedBudgetTotal || 0).toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                )}
+
+                {/* Red Alert Bar for Math Error - ซ่อนหาก isInvalidDocument หรือมี Tampering หรือในโหมด PROPOSAL */}
+                {!isInvalidDocument && !hasTampering && isMathError && documentMode !== "PROPOSAL" && (
                   <div className="bg-rose-600 text-white font-bold text-xs sm:text-sm py-2.5 px-4 rounded-xl flex items-center space-x-2 shadow-xs">
                     <AlertTriangle className="w-4 h-4 shrink-0 text-white" />
                     <span>⚠️ ยอดคำนวณท้ายบิลไม่ถูกต้อง: ผลรวมรายการไม่ตรงกับยอดสุทธิ</span>
@@ -1748,12 +1834,38 @@ export default function UserFrontendPage() {
                             : `฿${Math.abs((proposalAudit?.requestedBudgetTotal || 0) - (proposalAudit?.calculatedGrandTotal || 0)).toLocaleString("th-TH", { minimumFractionDigits: 2 })}`}
                         </span>
                       </div>
-                      <div className="bg-orange-50/60 p-2.5 rounded-xl border border-orange-200">
-                        <span className="text-orange-900 block text-[10px] font-semibold">ยอดสุทธิรวม:</span>
-                        <span className="font-mono font-bold text-orange-800 text-xs">
+                      <div className={`p-2.5 rounded-xl border ${
+                        proposalAudit?.isGrandTotalMatch &&
+                        proposalAudit?.isHorizontalMathCorrect &&
+                        (!proposalAudit?.categoryChecks || proposalAudit.categoryChecks.every((c) => c.isMatch)) &&
+                        projectExclusionViolations.length === 0
+                          ? "bg-emerald-50/70 border-emerald-200"
+                          : "bg-rose-50/70 border-rose-200"
+                      }`}>
+                        <span className={`block text-[10px] font-semibold ${
+                          proposalAudit?.isGrandTotalMatch &&
+                          proposalAudit?.isHorizontalMathCorrect &&
+                          (!proposalAudit?.categoryChecks || proposalAudit.categoryChecks.every((c) => c.isMatch)) &&
+                          projectExclusionViolations.length === 0
+                            ? "text-emerald-900"
+                            : "text-rose-900"
+                        }`}>สถานะรวม:</span>
+                        <span className={`font-bold text-xs flex items-center gap-1 ${
+                          proposalAudit?.isGrandTotalMatch &&
+                          proposalAudit?.isHorizontalMathCorrect &&
+                          (!proposalAudit?.categoryChecks || proposalAudit.categoryChecks.every((c) => c.isMatch)) &&
+                          projectExclusionViolations.length === 0
+                            ? "text-emerald-700"
+                            : "text-rose-700"
+                        }`}>
                           {isInvalidDocument
                             ? "-"
-                            : `฿${totalBillAmount.toLocaleString("th-TH", { minimumFractionDigits: 2 })}`}
+                            : proposalAudit?.isGrandTotalMatch &&
+                              proposalAudit?.isHorizontalMathCorrect &&
+                              (!proposalAudit?.categoryChecks || proposalAudit.categoryChecks.every((c) => c.isMatch)) &&
+                              projectExclusionViolations.length === 0
+                            ? "✓ ผ่านเกณฑ์"
+                            : "✕ มีจุดที่ต้องแก้ไข"}
                         </span>
                       </div>
                     </div>
@@ -1838,16 +1950,18 @@ export default function UserFrontendPage() {
                       className={`text-xs font-bold font-mono px-3 py-1 rounded-full border ${
                         proposalAudit?.isGrandTotalMatch &&
                         proposalAudit?.isHorizontalMathCorrect &&
-                        (!proposalAudit?.categoryChecks || proposalAudit.categoryChecks.every((c) => c.isMatch))
+                        (!proposalAudit?.categoryChecks || proposalAudit.categoryChecks.every((c) => c.isMatch)) &&
+                        projectExclusionViolations.length === 0
                           ? "bg-emerald-100 text-emerald-800 border-emerald-300"
                           : "bg-rose-100 text-rose-800 border-rose-300"
                       }`}
                     >
                       {proposalAudit?.isGrandTotalMatch &&
                       proposalAudit?.isHorizontalMathCorrect &&
-                      (!proposalAudit?.categoryChecks || proposalAudit.categoryChecks.every((c) => c.isMatch))
-                        ? "✓ ตารางงบประมาณถูกต้องครบถ้วน"
-                        : "✕ พบข้อผิดพลาดในตารางงบประมาณ"}
+                      (!proposalAudit?.categoryChecks || proposalAudit.categoryChecks.every((c) => c.isMatch)) &&
+                      projectExclusionViolations.length === 0
+                        ? "✓ ยอดงบประมาณทั้งโครงการถูกต้องสมบูรณ์"
+                        : "✕ มีจุดที่ต้องแก้ไขในตารางงบประมาณ"}
                     </span>
                   </div>
                 </div>
@@ -1926,10 +2040,10 @@ export default function UserFrontendPage() {
                     </div>
                     <div className="text-xs">
                       <p className="font-semibold text-slate-800">
-                        งบที่ขอ: ฿{(proposalAudit?.requestedBudgetTotal || 0).toLocaleString()}
+                        งบที่ขอ: ฿{(proposalAudit?.requestedBudgetTotal || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                       <p className="text-[11px] text-slate-500 mt-0.5">
-                        คำนวณจริง: ฿{(proposalAudit?.calculatedGrandTotal || 0).toLocaleString()}
+                        คำนวณจริง: ฿{(proposalAudit?.calculatedGrandTotal || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                     </div>
                   </div>
@@ -1955,12 +2069,13 @@ export default function UserFrontendPage() {
                             <th className="py-2.5 px-3 text-center">จำนวนรายการ</th>
                             <th className="py-2.5 px-3 text-right">ยอดที่ระบุในตาราง (บาท)</th>
                             <th className="py-2.5 px-3 text-right">ผลรวมคำนวณจริง (บาท)</th>
+                            <th className="py-2.5 px-3 text-right">ผลต่าง (บาท)</th>
                             <th className="py-2.5 px-3 text-center">สถานะ</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                           {proposalAudit.categoryChecks.map((catCheck, cIdx) => (
-                            <tr key={cIdx} className="hover:bg-slate-50/50">
+                            <tr key={cIdx} className={`hover:bg-slate-50/50 ${!catCheck.isMatch ? "bg-rose-50/40" : ""}`}>
                               <td className="py-2.5 px-3 font-semibold text-slate-800">
                                 {catCheck.category}
                               </td>
@@ -1972,6 +2087,15 @@ export default function UserFrontendPage() {
                               </td>
                               <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
                                 ฿{catCheck.calculatedSubtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </td>
+                              <td className="py-2.5 px-3 text-right font-mono">
+                                {catCheck.isMatch ? (
+                                  <span className="text-slate-400">฿0.00</span>
+                                ) : (
+                                  <span className="font-bold text-rose-600">
+                                    ฿{(catCheck.difference ?? Math.abs(catCheck.calculatedSubtotal - catCheck.detectedSubtotal)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </span>
+                                )}
                               </td>
                               <td className="py-2.5 px-3 text-center">
                                 {catCheck.isMatch ? (
@@ -1991,6 +2115,20 @@ export default function UserFrontendPage() {
                         </tbody>
                       </table>
                     </div>
+                    {proposalAudit.categoryChecks.some((c) => !c.isMatch) && (
+                      <div className="bg-rose-50 border-t border-rose-200 p-3 space-y-1.5 text-xs text-rose-900">
+                        {proposalAudit.categoryChecks
+                          .filter((c) => !c.isMatch)
+                          .map((c, i) => (
+                            <div key={i} className="flex items-start space-x-1.5">
+                              <span className="text-rose-600 font-bold shrink-0">⚠️</span>
+                              <span className="font-medium">
+                                {c.message || `ผลรวมในหมวดไม่ตรง: รายการรวมกันได้ ฿${c.calculatedSubtotal.toLocaleString()} แต่ในเอกสารระบุ ฿${c.detectedSubtotal.toLocaleString()} (ต่างกัน ฿${(c.difference ?? Math.abs(c.calculatedSubtotal - c.detectedSubtotal)).toLocaleString()})`}
+                              </span>
+                            </div>
+                          ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -2394,10 +2532,19 @@ export default function UserFrontendPage() {
                           const errorFlags = Array.isArray(item.errorFlags) ? item.errorFlags : [];
                           const isUnitMismatch = errorFlags.includes("หน่วยไม่ตรง") || !!(matrixUnit && receiptUnit && matrixUnit.trim().toLowerCase() !== receiptUnit.trim().toLowerCase() && !(personCount && personCount > 1 && matrixUnit.toLowerCase().includes(receiptUnit.toLowerCase())));
 
+                          const isLumpSum =
+                            item.pricingType === "lump_sum" ||
+                            item.pricingType === "project_fixed" ||
+                            item.matrixData?.pricingType === "lump_sum" ||
+                            item.matrixData?.pricingType === "project_fixed";
+
+                          const itemMaxCap = item.maxCap != null ? item.maxCap : item.matrixData?.maxCap;
+
                           const hasBackendMathError = errorFlags.includes("คำนวณเลขผิด");
                           const expectedStandard = qty * unitPrice;
                           const expectedMultidim = (personCount || 1) * qty * unitPrice;
                           const isClientMathError =
+                            !isLumpSum &&
                             Math.abs(expectedStandard - totalPrice) > 0.05 &&
                             Math.abs(expectedMultidim - totalPrice) > 0.05;
                           const isMathError = hasBackendMathError || isClientMathError;
@@ -2440,6 +2587,16 @@ export default function UserFrontendPage() {
                                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${getCategoryBadgeStyle(group.category)}`}>
                                         {group.category}
                                       </span>
+                                      {isLumpSum && (
+                                        <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200">
+                                          เหมาจ่ายต่อโครงการ
+                                        </span>
+                                      )}
+                                      {itemMaxCap != null && itemMaxCap > 0 && (
+                                        <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                                          เพดานสูงสุด ฿{Number(itemMaxCap).toLocaleString()}
+                                        </span>
+                                      )}
                                     </div>
                                     <h5 className="text-base font-bold text-slate-900 leading-snug">
                                       {itemName}
@@ -2491,28 +2648,36 @@ export default function UserFrontendPage() {
                                 <div className="flex flex-wrap items-center justify-between gap-2">
                                   <div className="flex items-center space-x-2 text-slate-700 flex-wrap">
                                     <span className="font-semibold text-slate-900">จำนวน & ราคาในบิล:</span>
-                                    {personCount && personCount > 1 && (
+                                    {isLumpSum ? (
+                                      <span className="font-mono bg-purple-50 text-purple-800 px-2 py-0.5 border border-purple-200 rounded font-bold">
+                                        เหมาจ่ายต่อโครงการ
+                                      </span>
+                                    ) : (
                                       <>
-                                        <span className="font-mono bg-blue-50 text-blue-800 px-2 py-0.5 border border-blue-200 rounded font-bold">
-                                          {personCount} คน
+                                        {personCount && personCount > 1 && (
+                                          <>
+                                            <span className="font-mono bg-blue-50 text-blue-800 px-2 py-0.5 border border-blue-200 rounded font-bold">
+                                              {personCount} คน
+                                            </span>
+                                            <span>×</span>
+                                          </>
+                                        )}
+                                        <span className="font-mono bg-white px-2 py-0.5 border border-slate-200 rounded text-slate-900">
+                                          {qty}{" "}
+                                          {isUnitMismatch ? (
+                                            <span className="text-amber-700 font-bold underline" title={`หน่วยในบิล '${receiptUnit}' ไม่ตรงกับหน่วยราคากลาง '${matrixUnit}'`}>
+                                              {receiptUnit} (หน่วยไม่ตรง)
+                                            </span>
+                                          ) : (
+                                            receiptUnit
+                                          )}
                                         </span>
                                         <span>×</span>
+                                        <span className="font-mono bg-white px-2 py-0.5 border border-slate-200 rounded font-bold text-slate-900">
+                                          ฿{Number(unitPrice).toFixed(2)}
+                                        </span>
                                       </>
                                     )}
-                                    <span className="font-mono bg-white px-2 py-0.5 border border-slate-200 rounded text-slate-900">
-                                      {qty}{" "}
-                                      {isUnitMismatch ? (
-                                        <span className="text-amber-700 font-bold underline" title={`หน่วยในบิล '${receiptUnit}' ไม่ตรงกับหน่วยราคากลาง '${matrixUnit}'`}>
-                                          {receiptUnit} (หน่วยไม่ตรง)
-                                        </span>
-                                      ) : (
-                                        receiptUnit
-                                      )}
-                                    </span>
-                                    <span>×</span>
-                                    <span className="font-mono bg-white px-2 py-0.5 border border-slate-200 rounded font-bold text-slate-900">
-                                      ฿{Number(unitPrice).toFixed(2)}
-                                    </span>
                                   </div>
 
                                   <div className="text-right">
@@ -2523,7 +2688,7 @@ export default function UserFrontendPage() {
                                   </div>
                                 </div>
 
-                                {isMathError && (
+                                {isMathError && !isLumpSum && (
                                   <div className="text-[11px] text-rose-600 font-medium flex items-center space-x-1 pt-1">
                                     <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                                     <span>
@@ -2736,16 +2901,16 @@ export default function UserFrontendPage() {
                   <div className="flex justify-between items-center font-bold border-b border-neutral-300 pb-0.5">
                     <span>ผลการตรวจสอบตารางของบประมาณโครงการ (Project Proposal Audit):</span>
                     <span className="font-bold text-black">
-                      {proposalAudit.isGrandTotalMatch && proposalAudit.isHorizontalMathCorrect
-                        ? "✓ ยอดรวมและสูตรแนวนอนถูกต้อง"
-                        : "✕ พบข้อผิดพลาดในการคำนวณงบประมาณ"}
+                      {proposalAudit.isGrandTotalMatch && proposalAudit.isHorizontalMathCorrect && (!proposalAudit.categoryChecks || proposalAudit.categoryChecks.every((c) => c.isMatch)) && projectExclusionViolations.length === 0
+                        ? "✓ ยอดงบประมาณทั้งโครงการถูกต้องสมบูรณ์"
+                        : "✕ มีจุดที่ต้องแก้ไขในตารางงบประมาณ"}
                     </span>
                   </div>
                   <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[9px] leading-tight">
                     <div>1. สูตรแนวนอน (จำนวน × ราคา): {proposalAudit.isHorizontalMathCorrect ? "✓ ถูกต้องทุกรายการ" : "✕ มีรายการคำนวณผิด"}</div>
-                    <div>3. งบประมาณที่ขอรับการสนับสนุน: ฿{(proposalAudit.requestedBudgetTotal || 0).toLocaleString()}</div>
-                    <div>2. ผลรวม 6 หมวดงบประมาณ: {(!proposalAudit.categoryChecks || proposalAudit.categoryChecks.every((c) => c.isMatch)) ? "✓ ตรงกันทุกหมวด" : "✕ มียอดหมวดไม่ตรง"}</div>
-                    <div>4. ผลรวมคำนวณจริง: ฿{(proposalAudit.calculatedGrandTotal || 0).toLocaleString()} ({proposalAudit.isGrandTotalMatch ? "✓ ตรงกับงบที่ขอ" : "✕ ไม่ตรงกับงบที่ขอ"})</div>
+                    <div>3. งบประมาณที่ขอรับการสนับสนุน: ฿{(proposalAudit.requestedBudgetTotal || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                    <div>2. ผลรวมหมวดงบประมาณ: {(!proposalAudit.categoryChecks || proposalAudit.categoryChecks.every((c) => c.isMatch)) ? "✓ ตรงกันทุกหมวด" : "✕ มียอดหมวดไม่ตรง"}</div>
+                    <div>4. ผลรวมคำนวณจริง: ฿{(proposalAudit.calculatedGrandTotal || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ({proposalAudit.isGrandTotalMatch ? "✓ ตรงกับงบที่ขอ" : "✕ ไม่ตรงกับงบที่ขอ"})</div>
                   </div>
                 </div>
               )}
@@ -2769,6 +2934,22 @@ export default function UserFrontendPage() {
                     <div>4. โทรศัพท์: {customerInfo?.hasCorrectPhone ? "✓ 04-422-0000" : `✕ ${customerInfo?.phone || "ไม่ระบุ"}`}</div>
                     <div>8. ลายเซ็นผู้เสนอราคา: {quotationTerms?.hasQuotationSign ? "✓ พบลายเซ็น/ตรายาง" : "✕ ขาดลายเซ็น"}</div>
                   </div>
+                </div>
+              )}
+
+              {/* Project-Level Exclusion Violations in Print */}
+              {projectExclusionViolations.length > 0 && (
+                <div className="mt-2 p-2 border-2 border-black bg-neutral-100 text-[10px] space-y-1">
+                  <div className="font-bold underline text-black">
+                    ✕ คำเตือนกฎความขัดแย้งระดับโครงการ (Project Exclusion Violations):
+                  </div>
+                  <ul className="list-disc list-inside space-y-0.5">
+                    {projectExclusionViolations.map((v, vIdx) => (
+                      <li key={vIdx} className="font-bold">
+                        {v.message} {v.items && v.items.length > 0 && `(รายการ: ${v.items.join(", ")})`}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               )}
 
@@ -2833,6 +3014,11 @@ export default function UserFrontendPage() {
                           const errorFlags = Array.isArray(item.errorFlags) ? item.errorFlags : [];
                           const isUnitMismatch = !!(matrixUnit && receiptUnit && matrixUnit.trim().toLowerCase() !== receiptUnit.trim().toLowerCase());
                           const hasMatrixMax = matrixMaxPrice != null && matrixMaxPrice > 0;
+                          const isLumpSum =
+                            item.pricingType === "lump_sum" ||
+                            item.pricingType === "project_fixed" ||
+                            item.matrixData?.pricingType === "lump_sum" ||
+                            item.matrixData?.pricingType === "project_fixed";
 
                           return (
                             <tr key={originalIndex} className="align-top border-b border-neutral-200">
@@ -2859,8 +3045,14 @@ export default function UserFrontendPage() {
                                 )}
                               </td>
                               <td className="py-2 px-2 text-right font-mono whitespace-nowrap">
-                                {item.receiptData?.personCount && item.receiptData.personCount > 1 ? `${item.receiptData.personCount} คน × ` : ""}
-                                {qty} {receiptUnit} × ฿{Number(unitPrice).toFixed(2)}
+                                {isLumpSum ? (
+                                  <span>เหมาจ่ายโครงการ</span>
+                                ) : (
+                                  <>
+                                    {item.receiptData?.personCount && item.receiptData.personCount > 1 ? `${item.receiptData.personCount} คน × ` : ""}
+                                    {qty} {receiptUnit} × ฿{Number(unitPrice).toFixed(2)}
+                                  </>
+                                )}
                                 {isUnitMismatch && (
                                   <div className="text-[9px] text-neutral-600 font-sans">
                                     (หน่วยกลาง: {matrixUnit})

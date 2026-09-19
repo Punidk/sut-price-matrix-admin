@@ -188,8 +188,18 @@ export interface CategorySubtotalCheck {
   category: SutExpenseCategory;
   detectedSubtotal: number;
   calculatedSubtotal: number;
+  difference: number;
   isMatch: boolean;
   itemCount: number;
+  message?: string;
+}
+
+export interface ProjectExclusionViolation {
+  id: string;
+  rule: string;
+  message: string;
+  severity: "error" | "warning";
+  items: string[];
 }
 
 export interface ProposalAuditData {
@@ -199,6 +209,7 @@ export interface ProposalAuditData {
   isGrandTotalMatch?: boolean;
   isHorizontalMathCorrect?: boolean;
   categoryChecks?: CategorySubtotalCheck[];
+  exclusionViolations?: ProjectExclusionViolation[];
 }
 
 export interface ExtractedProposalItem {
@@ -250,6 +261,7 @@ export {
   cleanProposalItemName,
   getBaseItemName,
   parseThaiOrIsoDate,
+  checkProjectExclusions,
 } from "./matcher";
 export type { LookupParams, LookupResult } from "./matcher";
 
